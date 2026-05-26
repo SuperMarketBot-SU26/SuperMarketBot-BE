@@ -1,0 +1,6 @@
+@SmartMarketBot.API_HostAddress = http://localhost:5201
+
+GET {{SmartMarketBot.API_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###

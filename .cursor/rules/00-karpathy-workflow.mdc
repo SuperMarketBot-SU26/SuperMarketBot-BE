@@ -1,0 +1,26 @@
+---
+description: Quy trinh lam viec voi AI (Karpathy) — ap dung moi session BE
+alwaysApply: true
+---
+
+# SmartMarketBot BE — Quy trinh AI
+
+## Quy trinh (6 buoc)
+
+1. **Len ke hoach truoc** — Task khong don gian: neu ro spec, API contract, bang DB anh huong; tranh mo ho truoc khi code.
+2. **Kiem tra lien tuc** — Sau moi thay doi: `dotnet build`, xem diff, Swagger/route moi; khong chap nhan output AI ma khong verify.
+3. **Giu don gian** — Uu tien diff nho, it layer thua; hoi "co cach don gian hon khong?" truoc khi them abstraction.
+4. **Chi sua can thiet** — Khong refactor / format file ngoai pham vi task; khong doi schema bang `Members`, `Robot_Logs`, views n8n neu khong duoc yeu cau.
+5. **Huong ket qua** — Dinh nghia xong khi nao (build pass, endpoint tra JSON dung, test tay); lap lai den dat.
+6. **Phan tach cong viec** — Research codebase / DB schema co the tach task; tong hop ket qua truoc khi commit.
+
+## Nguyen tac cot loi
+
+- **Don gian truoc** — Code giai quyet dung bai toan, khong doan.
+- **Khong luoi** — Tim root cause; khong fix tam thoi che API.
+- **Tac dong toi thieu** — Khong tao side effect, khong vo hop dong voi AI (n8n) va IoT dang chay.
+
+## Pham vi role (chi BE)
+
+- Lam viec trong `SuperMarketBot-BE/`; khong sua FE, Android, AI Python tru khi user yeu cau ro.
+- Tham chieu `db/database.sql` khi doi Entity/EF mapping.

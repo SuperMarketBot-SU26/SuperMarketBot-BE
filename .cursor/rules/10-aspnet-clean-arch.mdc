@@ -1,0 +1,34 @@
+---
+description: ASP.NET Core Clean Architecture — SmartMarketBot-BE
+globs: "**/*.{cs,csproj,json}"
+alwaysApply: false
+---
+
+# BE conventions
+
+## Layers (khong dao nguoc phu thuoc)
+
+- `Domain` — entities, enums; khong EF, khong HTTP.
+- `Application` — DTOs, interfaces, services (Dijkstra, use cases).
+- `Infrastructure` — EF `AppDbContext`, MQTT, JWT, HTTP clients.
+- `API` — controllers, hubs, middleware, `Program.cs`.
+
+## DB / n8n compatibility (bat buoc)
+
+| C# | SQL |
+|----|-----|
+| `Member` | `Members` — `MemberName` computed, khong ghi EF |
+| `RobotLog` | `Robot_Logs` — giu `battery`, `location`, `status`, `timestamp` |
+| Views keyless | `PurchaseHistory`, `Store_Map`, `Blocked_Aisles`, `Real_Time_Stock` |
+
+## API
+
+- REST + Swagger; SignalR hub `/hubs/robot`; MQTT topic `smartmarketbot/robot/{code}/...`
+- Port dev: **5000**; connection string trong `appsettings.Development.json`
+- Async/await; global exception middleware — khong nuot loi im lang
+
+## Tranh
+
+- Them package / refactor lon ngoai task
+- Doi ten cot bang AI/n8n dang dung
+- Commit secret (JWT key, SA password) vao git

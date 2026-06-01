@@ -1,4 +1,5 @@
 using System.Buffers;
+using System.Linq;
 using System.Text;
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
@@ -10,6 +11,7 @@ using MQTTnet;
 using MQTTnet.Protocol;
 using SmartMarketBot.Application.Interfaces;
 using SmartMarketBot.Application.Models.Robots;
+using SmartMarketBot.Application.Services;
 using SmartMarketBot.Domain.Entities;
 using SmartMarketBot.Infrastructure.Options;
 using SmartMarketBot.Infrastructure.Persistence;
@@ -219,11 +221,107 @@ public sealed class MqttClientService(
                     timestamp);
 
                 await notifier.NotifyStatusAsync(status);
+
+                /* ── Phase 3.5: Auto-dock khi pin yếu ───────────────── */
+                if ("low_battery".Equals(payload.Status, StringComparison.OrdinalIgnoreCase))
+                {
+                    await HandleAutoDockAsync(scope, robotCode, robot);
+                }
+
+                /* ── Phase 3.5: Reroute khi robot bị kẹt ────────────── */
+                if ("reroute_needed".Equals(payload.Status, StringComparison.OrdinalIgnoreCase)
+                    && robot is not null && robot.CurrentNodeID.HasValue)
+                {
+                    await HandleRerouteAsync(scope, robotCode, robot);
+                }
             }
         }
         catch (Exception ex)
         {
             logger.LogError(ex, "Failed to process MQTT robot message.");
+        }
+    }
+
+    /// <summary>Phase 3.5 — Điều hướng robot về trạm sạc (DOCK_NODE_ID = 2).</summary>
+    private async Task HandleAutoDockAsync(IServiceScope scope, string robotCode, Domain.Entities.Robot? robot)
+    {
+        try
+        {
+            var navService = scope.ServiceProvider.GetRequiredService<INavigationService>();
+            var startNode  = robot?.CurrentNodeID ?? 1;
+            const int dockNodeId = 2; // Trạm sạc — khớp seed data + Config.h DOCK_NODE_ID
+
+            logger.LogWarning("Robot {RobotCode} battery low — auto-navigating to dock node {DockNode}.",
+                              robotCode, dockNodeId);
+
+            var route = await navService.PlanRouteAsync(
+                new Application.Models.Navigation.RoutePlanRequestDto(startNode, dockNodeId),
+                CancellationToken.None);
+
+            if (route.Nodes.Count == 0)
+            {
+                logger.LogError("Auto-dock: no route found from node {Start} to dock {Dock}.",
+                                startNode, dockNodeId);
+                return;
+            }
+
+            var waypoints = route.Nodes
+                .Select(n => new { x = n.X, y = n.Y, nodeId = n.NodeId })
+                .ToList();
+            var payload = System.Text.Json.JsonSerializer.Serialize(new { waypoints });
+
+            await _mqttClient.PublishAsync(
+                new MqttApplicationMessageBuilder()
+                    .WithTopic($"smartmarketbot/robot/{robotCode}/command")
+                    .WithPayload(System.Text.Json.JsonSerializer.Serialize(new
+                    {
+                        command = "navigate",
+                        payload,
+                        timestamp = DateTime.UtcNow
+                    }))
+                    .WithQualityOfServiceLevel(MqttQualityOfServiceLevel.AtLeastOnce)
+                    .Build());
+
+            logger.LogInformation("Auto-dock command sent to {RobotCode}: {NodeCount} waypoints to dock.",
+                                  robotCode, route.Nodes.Count);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Failed to auto-dock robot {RobotCode}.", robotCode);
+        }
+    }
+
+    /// <summary>Phase 3.5 — Tính lại route và gửi khi robot gặp vật cản không tránh được.</summary>
+    private async Task HandleRerouteAsync(IServiceScope scope, string robotCode, Domain.Entities.Robot robot)
+    {
+        try
+        {
+            var navCommandService = scope.ServiceProvider.GetRequiredService<Application.Services.NavigationCommandService>();
+
+            /* Lấy destination từ log gần nhất — tạm dùng waypoint cuối cùng trong route */
+            var dbCtx = scope.ServiceProvider.GetRequiredService<Infrastructure.Persistence.AppDbContext>();
+            var destNode = await dbCtx.RobotLogs
+                .AsNoTracking()
+                .Where(l => l.RobotID == robot.RobotID && l.CurrentNodeID.HasValue)
+                .OrderByDescending(l => l.timestamp)
+                .Select(l => l.CurrentNodeID)
+                .FirstOrDefaultAsync();
+
+            /* Fallback: tính lại từ node hiện tại về node tiếp theo đã biết */
+            int startNode = robot.CurrentNodeID ?? 1;
+            int endNode   = destNode ?? 5; // Default fallback — cần improve Phase 4
+
+            logger.LogWarning("Rerouting robot {RobotCode} from node {Start} to {End}.",
+                              robotCode, startNode, endNode);
+
+            await navCommandService.RerouteAsync(
+                new Application.Models.Navigation.RerouteRequestDto(
+                    robotCode, startNode, endNode, null),
+                CancellationToken.None);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Failed to reroute robot {RobotCode}.", robotCode);
         }
     }
 

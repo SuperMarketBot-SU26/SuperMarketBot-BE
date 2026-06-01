@@ -21,4 +21,14 @@ public sealed class RobotsController(IRobotService robotService) : ControllerBas
         await robotService.PublishCommandAsync(request, cancellationToken);
         return Accepted();
     }
+
+    /// <summary>
+    /// Tính route (Dijkstra) rồi publish lệnh navigate xuống robot qua MQTT.
+    /// </summary>
+    [HttpPost("navigate")]
+    public async Task<IActionResult> Navigate([FromBody] NavigateRobotRequestDto request, CancellationToken cancellationToken)
+    {
+        await robotService.NavigateRobotAsync(request, cancellationToken);
+        return Accepted(new { message = $"Navigate command sent to robot {request.RobotCode}." });
+    }
 }

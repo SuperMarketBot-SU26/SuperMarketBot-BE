@@ -163,6 +163,11 @@ public sealed class MqttClientService(
                     robot.IsOnline = payload.IsOnline.Value;
                 }
 
+                if (payload.CurrentNodeId.HasValue)
+                {
+                    robot.CurrentNodeID = payload.CurrentNodeId.Value;
+                }
+
                 robot.LastSeenAt = timestamp;
             }
 
@@ -180,7 +185,15 @@ public sealed class MqttClientService(
                     payload.IsOnline,
                     payload.XCoord,
                     payload.YCoord,
-                    timestamp);
+                    timestamp,
+                    LidarFront: payload.LidarFront,
+                    LidarRear: payload.LidarRear,
+                    RpmFL: payload.RpmFL,
+                    RpmFR: payload.RpmFR,
+                    RpmRL: payload.RpmRL,
+                    RpmRR: payload.RpmRR,
+                    NavState: payload.NavState,
+                    Estop: payload.Estop);
 
                 await notifier.NotifyTelemetryAsync(telemetry);
             }
@@ -215,6 +228,16 @@ public sealed class MqttClientService(
         public double? XCoord { get; set; }
         public double? YCoord { get; set; }
         public DateTime? Timestamp { get; set; }
+
+        // Phase 1 — sensor telemetry từ ESP32-S3
+        public int? LidarFront { get; set; }
+        public int? LidarRear { get; set; }
+        public double? RpmFL { get; set; }
+        public double? RpmFR { get; set; }
+        public double? RpmRL { get; set; }
+        public double? RpmRR { get; set; }
+        public string? NavState { get; set; }
+        public bool? Estop { get; set; }
     }
 
     private static byte[] CopySequenceToArray(in ReadOnlySequence<byte> sequence)

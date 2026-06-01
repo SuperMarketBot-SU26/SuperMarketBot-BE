@@ -6,4 +6,8 @@ public interface IRobotService
 {
     Task<IReadOnlyList<RobotDto>> GetRobotsAsync(CancellationToken cancellationToken = default);
     Task PublishCommandAsync(PublishRobotCommandRequestDto request, CancellationToken cancellationToken = default);
+    /// <summary>
+    /// Tính đường đi (Dijkstra nếu cần) rồi publish lệnh navigate xuống robot qua MQTT.
+    /// </summary>
+    Task NavigateRobotAsync(NavigateRobotRequestDto request, CancellationToken cancellationToken = default);
 }

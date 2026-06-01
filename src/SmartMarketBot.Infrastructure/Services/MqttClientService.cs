@@ -112,6 +112,11 @@ public sealed class MqttClientService(
             var payloadBytes = payloadSequence.IsSingleSegment
                 ? payloadSequence.First.ToArray()
                 : CopySequenceToArray(payloadSequence);
+            // Strip UTF-8 BOM nếu có (EF BB BF) — một số tool/client gửi BOM
+            if (payloadBytes.Length >= 3 && payloadBytes[0] == 0xEF && payloadBytes[1] == 0xBB && payloadBytes[2] == 0xBF)
+            {
+                payloadBytes = payloadBytes[3..];
+            }
             var payloadJson = payloadBytes.Length == 0 ? string.Empty : Encoding.UTF8.GetString(payloadBytes);
             var topicParts = topic.Split('/', StringSplitOptions.RemoveEmptyEntries);
             if (topicParts.Length < 4)
@@ -122,7 +127,11 @@ public sealed class MqttClientService(
             var robotCode = topicParts[2];
             var eventType = topicParts[3];
 
-            var payload = JsonSerializer.Deserialize<IncomingRobotPayload>(payloadJson) ?? new IncomingRobotPayload();
+            logger.LogInformation("MQTT recv [{Topic}] {Bytes}B: {Payload}", topic, payloadJson.Length, payloadJson);
+            var payload = JsonSerializer.Deserialize<IncomingRobotPayload>(payloadJson, new JsonSerializerOptions
+            {
+                PropertyNameCaseInsensitive = true
+            }) ?? new IncomingRobotPayload();
             var timestamp = payload.Timestamp ?? DateTime.UtcNow;
 
             await using var scope = scopeFactory.CreateAsyncScope();

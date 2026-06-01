@@ -315,10 +315,11 @@ CREATE TABLE dbo.Robots (
     RobotName   NVARCHAR(100) NOT NULL,
     RobotCode   NVARCHAR(50) NOT NULL UNIQUE,
     MacAddress  NVARCHAR(50) NULL,
-    BatteryPct  INT NOT NULL DEFAULT 100,
-    Mode        NVARCHAR(20) NOT NULL DEFAULT 'idle', -- 'idle', 'navigating', 'scanning', 'charging'
-    IsOnline    BIT NOT NULL DEFAULT 0,
-    LastSeenAt  DATETIME2 NULL
+    BatteryPct    INT NOT NULL DEFAULT 100,
+    Mode          NVARCHAR(20) NOT NULL DEFAULT 'idle', -- 'idle', 'navigating', 'scanning', 'charging'
+    IsOnline      BIT NOT NULL DEFAULT 0,
+    LastSeenAt    DATETIME2 NULL,
+    CurrentNodeID INT NULL -- Node hiện tại của robot (Phase 2 — cập nhật từ MQTT telemetry)
 );
 GO
 
@@ -399,8 +400,9 @@ CREATE TABLE dbo.Robot_Logs (
     CurrentNodeID INT NULL FOREIGN KEY REFERENCES dbo.NavigationNodes(NodeID) ON DELETE NO ACTION,
     Mode          NVARCHAR(20) NULL,    -- Trạng thái hành động cụ thể ('navigating', 'scanning'...)
     IsOnline      BIT NULL,
-    XCoord        FLOAT NULL,           -- Toạ độ X thời gian thực
-    YCoord        FLOAT NULL            -- Toạ độ Y thời gian thực
+    XCoord        FLOAT NULL,           -- Toạ độ X thời gian thực (Dead Reckoning — Phase 2)
+    YCoord        FLOAT NULL,           -- Toạ độ Y thời gian thực (Dead Reckoning — Phase 2)
+    HeadingRad    FLOAT NULL            -- Heading robot (radian) từ Dead Reckoning — Phase 2
 );
 GO
 

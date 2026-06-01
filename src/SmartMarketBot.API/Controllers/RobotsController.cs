@@ -31,4 +31,14 @@ public sealed class RobotsController(IRobotService robotService) : ControllerBas
         await robotService.NavigateRobotAsync(request, cancellationToken);
         return Accepted(new { message = $"Navigate command sent to robot {request.RobotCode}." });
     }
+
+    /// <summary>
+    /// Lấy pose mới nhất của robot (Dead Reckoning — x, y, heading).
+    /// </summary>
+    [HttpGet("{robotCode}/pose")]
+    public async Task<ActionResult<RobotPoseDto>> GetPose(string robotCode, CancellationToken cancellationToken)
+    {
+        var pose = await robotService.GetPoseAsync(robotCode, cancellationToken);
+        return Ok(pose);
+    }
 }

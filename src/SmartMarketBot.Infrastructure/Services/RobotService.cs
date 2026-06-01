@@ -33,6 +33,27 @@ public sealed class RobotService(
         return commandPublisher.PublishCommandAsync(request.RobotCode, request.Command, request.Payload, cancellationToken);
     }
 
+    public async Task<RobotPoseDto> GetPoseAsync(string robotCode, CancellationToken cancellationToken = default)
+    {
+        var robot = await dbContext.Robots
+            .AsNoTracking()
+            .FirstOrDefaultAsync(r => r.RobotCode == robotCode, cancellationToken)
+            ?? throw new InvalidOperationException($"Robot '{robotCode}' not found.");
+
+        var latestLog = await dbContext.RobotLogs
+            .AsNoTracking()
+            .Where(l => l.RobotID == robot.RobotID && l.XCoord.HasValue && l.YCoord.HasValue)
+            .OrderByDescending(l => l.timestamp)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        double x = latestLog?.XCoord ?? 0;
+        double y = latestLog?.YCoord ?? 0;
+        double headingRad = latestLog?.HeadingRad ?? 0;
+        double headingDeg = headingRad * 180.0 / Math.PI;
+
+        return new RobotPoseDto(robotCode, x, y, headingRad, headingDeg, latestLog?.timestamp);
+    }
+
     public async Task NavigateRobotAsync(NavigateRobotRequestDto request, CancellationToken cancellationToken = default)
     {
         List<string> waypointIds;

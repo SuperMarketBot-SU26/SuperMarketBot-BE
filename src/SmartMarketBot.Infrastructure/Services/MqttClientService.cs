@@ -141,7 +141,8 @@ public sealed class MqttClientService(
                 Mode = payload.Mode,
                 IsOnline = payload.IsOnline,
                 XCoord = payload.XCoord,
-                YCoord = payload.YCoord
+                YCoord = payload.YCoord,
+                HeadingRad = payload.HeadingRad
             };
 
             dbContext.RobotLogs.Add(log);
@@ -238,6 +239,8 @@ public sealed class MqttClientService(
         public double? RpmRR { get; set; }
         public string? NavState { get; set; }
         public bool? Estop { get; set; }
+        // Phase 2 — Dead Reckoning
+        public double? HeadingRad { get; set; }
     }
 
     private static byte[] CopySequenceToArray(in ReadOnlySequence<byte> sequence)

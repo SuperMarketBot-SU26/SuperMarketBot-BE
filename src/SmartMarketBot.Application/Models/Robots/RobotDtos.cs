@@ -45,6 +45,17 @@ public sealed record RobotStatusDto(
     DateTime TimestampUtc);
 
 /// <summary>
+/// Pose hiện tại của robot từ Dead Reckoning (Phase 2).
+/// </summary>
+public sealed record RobotPoseDto(
+    string RobotCode,
+    double X,
+    double Y,
+    double HeadingRad,
+    double HeadingDeg,
+    DateTime? TimestampUtc);
+
+/// <summary>
 /// Lệnh điều hướng — gửi xuống robot qua MQTT topic .../command.
 /// </summary>
 public sealed record NavigateRobotRequestDto(

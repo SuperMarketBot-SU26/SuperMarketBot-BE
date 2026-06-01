@@ -13,6 +13,8 @@ public class RobotLog
     public bool? IsOnline { get; set; }
     public double? XCoord { get; set; }
     public double? YCoord { get; set; }
+    /// <summary>Heading (radian) từ Dead Reckoning của ESP32-S3 — Phase 2.</summary>
+    public double? HeadingRad { get; set; }
 
     public virtual Robot? Robot { get; set; }
     public virtual NavigationNode? CurrentNode { get; set; }

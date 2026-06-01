@@ -10,4 +10,8 @@ public interface IRobotService
     /// Tính đường đi (Dijkstra nếu cần) rồi publish lệnh navigate xuống robot qua MQTT.
     /// </summary>
     Task NavigateRobotAsync(NavigateRobotRequestDto request, CancellationToken cancellationToken = default);
+    /// <summary>
+    /// Trả về pose mới nhất của robot từ log Dead Reckoning.
+    /// </summary>
+    Task<RobotPoseDto> GetPoseAsync(string robotCode, CancellationToken cancellationToken = default);
 }

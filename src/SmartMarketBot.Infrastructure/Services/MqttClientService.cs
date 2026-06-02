@@ -26,14 +26,28 @@ public sealed class MqttClientService(
     private readonly MqttOptions _mqttOptions = mqttOptions.Value;
     private readonly IMqttClient _mqttClient = new MqttClientFactory().CreateMqttClient();
 
-    public async Task StartAsync(CancellationToken cancellationToken)
+    public Task StartAsync(CancellationToken cancellationToken)
     {
         _mqttClient.ApplicationMessageReceivedAsync += OnApplicationMessageReceivedAsync;
         _mqttClient.DisconnectedAsync += OnDisconnectedAsync;
 
-        var options = BuildClientOptions();
-        await _mqttClient.ConnectAsync(options, cancellationToken);
-        await SubscribeTopicsAsync(cancellationToken);
+        // Chạy kết nối trong background để tránh block tiến trình khởi động Web API trên Azure App Service khi không có MQTT Broker
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                var options = BuildClientOptions();
+                await _mqttClient.ConnectAsync(options, CancellationToken.None);
+                await SubscribeTopicsAsync(CancellationToken.None);
+                logger.LogInformation("Successfully connected to MQTT broker.");
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, "Failed to connect to MQTT broker during startup. API remains fully functional.");
+            }
+        });
+
+        return Task.CompletedTask;
     }
 
     public async Task StopAsync(CancellationToken cancellationToken)

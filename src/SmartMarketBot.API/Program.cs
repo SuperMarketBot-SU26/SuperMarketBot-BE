@@ -10,6 +10,8 @@ using SmartMarketBot.Infrastructure;
 using Scalar.AspNetCore;
 using SmartMarketBot.Infrastructure.Options;
 
+var exposeApiDocs = true; // Luôn bật tài liệu API để thuận tiện test và demo đồ án tốt nghiệp trên Cloud
+
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddControllers();

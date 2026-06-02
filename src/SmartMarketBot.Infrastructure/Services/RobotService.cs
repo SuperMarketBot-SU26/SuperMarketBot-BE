@@ -67,9 +67,7 @@ public sealed class RobotService(
             return;
         }
 
-        /* Tìm robot hiện tại để lấy CurrentNodeId làm điểm xuất phát */
-        {
-            var robot = await dbContext.Robots
+        var robot = await dbContext.Robots
                 .AsNoTracking()
                 .FirstOrDefaultAsync(r => r.RobotCode == request.RobotCode, cancellationToken)
                 ?? throw new InvalidOperationException($"Robot '{request.RobotCode}' not found.");
@@ -95,6 +93,5 @@ public sealed class RobotService(
                 "navigate",
                 payloadWithCoords,
                 cancellationToken);
-        return;
     }
 }

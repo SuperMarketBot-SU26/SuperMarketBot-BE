@@ -20,6 +20,27 @@ public sealed class NavigationController(
     }
 
     /// <summary>
+    /// Tính route Dijkstra và gửi waypoints (x, y, nodeId) xuống robot qua MQTT — dùng khi test AMR.
+    /// </summary>
+    [HttpPost("navigate")]
+    public async Task<IActionResult> NavigateRobot(
+        [FromBody] NavigateMapRequestDto request,
+        CancellationToken cancellationToken)
+    {
+        await navigationCommandService.SendNavigationAsync(
+            request.RobotCode,
+            request.StartNodeId,
+            request.EndNodeId,
+            cancellationToken);
+        return Accepted(new
+        {
+            message = $"Navigate command sent to {request.RobotCode}.",
+            request.StartNodeId,
+            request.EndNodeId
+        });
+    }
+
+    /// <summary>
     /// Phase 3 — Reroute: đánh dấu nodes bị chặn, tính lại đường đi và gửi lệnh navigate xuống robot.
     /// </summary>
     [HttpPost("reroute")]

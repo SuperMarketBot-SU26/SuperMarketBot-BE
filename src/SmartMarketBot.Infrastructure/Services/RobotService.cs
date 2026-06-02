@@ -56,15 +56,19 @@ public sealed class RobotService(
 
     public async Task NavigateRobotAsync(NavigateRobotRequestDto request, CancellationToken cancellationToken = default)
     {
-        List<string> waypointIds;
-
         if (request.WaypointNodeIds is { Count: > 0 })
         {
-            waypointIds = request.WaypointNodeIds;
+            var payloadIds = JsonSerializer.Serialize(new { waypoints = request.WaypointNodeIds });
+            await commandPublisher.PublishCommandAsync(
+                request.RobotCode,
+                "navigate",
+                payloadIds,
+                cancellationToken);
+            return;
         }
-        else
+
+        /* Tìm robot hiện tại để lấy CurrentNodeId làm điểm xuất phát */
         {
-            /* Tìm robot hiện tại để lấy CurrentNodeId làm điểm xuất phát */
             var robot = await dbContext.Robots
                 .AsNoTracking()
                 .FirstOrDefaultAsync(r => r.RobotCode == request.RobotCode, cancellationToken)
@@ -81,16 +85,16 @@ public sealed class RobotService(
                 new RoutePlanRequestDto(startNodeId, destId),
                 cancellationToken);
 
-            waypointIds = routeResult.Nodes
-                .Select(n => n.NodeId.ToString())
+            var waypoints = routeResult.Nodes
+                .Select(n => new { x = n.X, y = n.Y, nodeId = n.NodeId })
                 .ToList();
-        }
 
-        var payload = JsonSerializer.Serialize(new { waypoints = waypointIds });
-        await commandPublisher.PublishCommandAsync(
-            request.RobotCode,
-            "navigate",
-            payload,
-            cancellationToken);
+            var payloadWithCoords = JsonSerializer.Serialize(new { waypoints });
+            await commandPublisher.PublishCommandAsync(
+                request.RobotCode,
+                "navigate",
+                payloadWithCoords,
+                cancellationToken);
+        return;
     }
 }

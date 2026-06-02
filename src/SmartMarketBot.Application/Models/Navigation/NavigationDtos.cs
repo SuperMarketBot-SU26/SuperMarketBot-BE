@@ -2,6 +2,9 @@ namespace SmartMarketBot.Application.Models.Navigation;
 
 public sealed record RoutePlanRequestDto(int StartNodeId, int EndNodeId);
 
+/// <summary>Gửi lệnh navigate xuống robot (Dijkstra + MQTT waypoints có tọa độ).</summary>
+public sealed record NavigateMapRequestDto(string RobotCode, int StartNodeId, int EndNodeId);
+
 public sealed record RouteNodeDto(int NodeId, double X, double Y, double DistanceFromStart);
 
 public sealed record RoutePlanResultDto(double TotalDistance, IReadOnlyList<RouteNodeDto> Nodes);

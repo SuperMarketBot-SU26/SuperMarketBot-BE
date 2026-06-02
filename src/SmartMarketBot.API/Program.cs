@@ -50,22 +50,16 @@ builder.Services.AddAuthorization();
 
 var app = builder.Build();
 
-var exposeApiDocs = app.Environment.IsDevelopment()
-    || string.Equals(app.Environment.EnvironmentName, "Docker", StringComparison.OrdinalIgnoreCase);
-
-if (exposeApiDocs)
+// Scalar API docs — luôn bật (kể cả Production/Azure để demo capstone)
+app.MapOpenApi();
+app.MapScalarApiReference(options =>
 {
-    app.MapOpenApi();
-    app.MapScalarApiReference(options =>
-    {
-        options.WithTitle("SmartMarketBot API");
-        options.WithOpenApiRoutePattern("/openapi/{documentName}.json");
-    });
-    /* Bookmark cũ /swagger → Scalar UI (.NET 10 dùng OpenAPI + Scalar, không Swashbuckle). */
-    app.MapGet("/swagger", () => Results.Redirect("/scalar/v1", permanent: false));
-    app.MapGet("/swagger/index.html", () => Results.Redirect("/scalar/v1", permanent: false));
-    app.MapGet("/", () => Results.Redirect("/scalar/v1", permanent: false));
-}
+    options.WithTitle("SmartMarketBot API");
+    options.WithOpenApiRoutePattern("/openapi/{documentName}.json");
+});
+app.MapGet("/swagger", () => Results.Redirect("/scalar/v1", permanent: false));
+app.MapGet("/swagger/index.html", () => Results.Redirect("/scalar/v1", permanent: false));
+app.MapGet("/", () => Results.Redirect("/scalar/v1", permanent: false));
 
 app.UseMiddleware<GlobalExceptionMiddleware>();
 app.UseCors("AllowAll");

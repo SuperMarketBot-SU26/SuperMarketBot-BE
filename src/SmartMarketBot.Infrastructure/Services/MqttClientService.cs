@@ -95,6 +95,17 @@ public sealed class MqttClientService(
             builder.WithCredentials(_mqttOptions.Username, _mqttOptions.Password);
         }
 
+        if (_mqttOptions.UseTls)
+        {
+            builder.WithTlsOptions(tls =>
+            {
+                if (_mqttOptions.AllowUntrustedCertificates)
+                {
+                    tls.WithCertificateValidationHandler(_ => true);
+                }
+            });
+        }
+
         return builder.Build();
     }
 

@@ -40,6 +40,9 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
     public DbSet<Supermarket> Supermarkets => Set<Supermarket>();
     public DbSet<User> Users => Set<User>();
     public DbSet<UserRole> UserRoles => Set<UserRole>();
+    public DbSet<UserToken> UserTokens => Set<UserToken>();
+    public DbSet<EmailOtp> EmailOtps => Set<EmailOtp>();
+    public DbSet<Payment> Payments => Set<Payment>();
     public DbSet<Workstation> Workstations => Set<Workstation>();
     public DbSet<Zone> Zones => Set<Zone>();
 
@@ -264,6 +267,62 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
             entity.ToTable("Users");
             entity.HasKey(x => x.UserID);
             entity.HasIndex(x => x.Username).IsUnique();
+            entity.HasIndex(x => x.Email).IsUnique();
+            entity.Property(x => x.Email).HasMaxLength(256);
+            entity.Property(x => x.FullName).HasMaxLength(100);
+            entity.Property(x => x.Phone).HasMaxLength(20);
+        });
+
+        modelBuilder.Entity<UserToken>(entity =>
+        {
+            entity.ToTable("UserTokens");
+            entity.HasKey(x => x.TokenId);
+            entity.Property(x => x.TokenId).HasDefaultValueSql("(newid())");
+            entity.Property(x => x.RefreshToken).IsRequired().HasMaxLength(512);
+            entity.Property(x => x.DeviceInfo).HasMaxLength(256);
+            entity.Property(x => x.IpAddress).HasMaxLength(64);
+            entity.Property(x => x.IsRevoked).HasDefaultValue(false);
+            entity.Property(x => x.CreatedAt).HasDefaultValueSql("(getutcdate())");
+            entity.HasIndex(x => x.RefreshToken);
+            entity.HasIndex(x => new { x.UserId, x.IsRevoked });
+            entity.HasOne(x => x.User).WithMany(u => u.UserTokens)
+                .HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<EmailOtp>(entity =>
+        {
+            entity.ToTable("EmailOtps");
+            entity.HasKey(x => x.OtpId);
+            entity.Property(x => x.OtpId).HasDefaultValueSql("(newid())");
+            entity.Property(x => x.Email).IsRequired().HasMaxLength(256);
+            entity.Property(x => x.OtpCode).IsRequired().HasMaxLength(6);
+            entity.Property(x => x.OtpType).IsRequired().HasMaxLength(50).HasDefaultValue("Registration");
+            entity.Property(x => x.IsUsed).HasDefaultValue(false);
+            entity.Property(x => x.CreatedAt).HasDefaultValueSql("(getutcdate())");
+            entity.Property(x => x.TemporaryFullName).HasMaxLength(100);
+            entity.Property(x => x.TemporaryPhone).HasMaxLength(20);
+            entity.HasIndex(x => new { x.Email, x.OtpType, x.IsUsed })
+                .HasFilter("[IsUsed] = 0");
+            entity.HasIndex(x => x.ExpiredAt).HasFilter("[IsUsed] = 0");
+        });
+
+        modelBuilder.Entity<Payment>(entity =>
+        {
+            entity.ToTable("Payments");
+            entity.HasKey(x => x.PaymentId);
+            entity.Property(x => x.PaymentId).HasDefaultValueSql("(newid())");
+            entity.Property(x => x.OrderCode).IsRequired().HasMaxLength(100);
+            entity.Property(x => x.Amount).HasColumnType("decimal(18,2)");
+            entity.Property(x => x.Currency).HasMaxLength(10).HasDefaultValue("VND");
+            entity.Property(x => x.Status).IsRequired().HasMaxLength(20).HasDefaultValue("Pending");
+            entity.Property(x => x.Description).HasMaxLength(500);
+            entity.Property(x => x.QrCodeUrl).HasMaxLength(1000);
+            entity.Property(x => x.SepayTransactionId).HasMaxLength(100);
+            entity.Property(x => x.CreatedAt).HasDefaultValueSql("(getutcdate())");
+            entity.HasIndex(x => x.OrderCode).IsUnique();
+            entity.HasIndex(x => new { x.UserId, x.Status });
+            entity.HasOne(x => x.User).WithMany(u => u.Payments)
+                .HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Cascade);
         });
 
         modelBuilder.Entity<UserRole>(entity =>

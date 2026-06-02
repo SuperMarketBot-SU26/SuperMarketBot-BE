@@ -39,6 +39,9 @@ public interface IAppDbContext
     DbSet<Supermarket> Supermarkets { get; }
     DbSet<User> Users { get; }
     DbSet<UserRole> UserRoles { get; }
+    DbSet<UserToken> UserTokens { get; }
+    DbSet<EmailOtp> EmailOtps { get; }
+    DbSet<Payment> Payments { get; }
     DbSet<Workstation> Workstations { get; }
     DbSet<Zone> Zones { get; }
 

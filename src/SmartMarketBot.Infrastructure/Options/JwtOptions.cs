@@ -6,6 +6,11 @@ public sealed class JwtOptions
 
     public string Issuer { get; set; } = "SmartMarketBot";
     public string Audience { get; set; } = "SmartMarketBot.Client";
-    public string SecretKey { get; set; } = "change_this_secret_key_very_long_1234567890";
-    public int ExpiryMinutes { get; set; } = 120;
+    public string SecretKey { get; set; } = "REPLACE_IN_AZURE_APP_SETTINGS_OR_ENV";
+
+    /// <summary>Access token hết hạn sau N phút (mặc định 15 phút)</summary>
+    public int AccessTokenExpiryMinutes { get; set; } = 15;
+
+    /// <summary>Refresh token hết hạn sau N ngày (mặc định 7 ngày)</summary>
+    public int RefreshTokenExpiryDays { get; set; } = 7;
 }

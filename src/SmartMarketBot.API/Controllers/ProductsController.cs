@@ -24,4 +24,19 @@ public sealed class ProductsController(IProductService productService) : Control
         var product = await productService.GetProductByIdAsync(id, cancellationToken);
         return product is null ? NotFound() : Ok(product);
     }
+
+    /// <summary>
+    /// Flow 4 — Lấy danh sách sản phẩm thay thế an toàn cho hội viên.
+    /// Lọc theo: cùng ProductType, không chứa thành phần dị ứng của member, phân khúc giá tương đương.
+    /// </summary>
+    [HttpGet("{id:int}/alternatives")]
+    [AllowAnonymous]
+    public async Task<ActionResult<IReadOnlyList<ProductDto>>> GetAlternatives(
+        int id,
+        [FromQuery] int? memberId,
+        CancellationToken cancellationToken)
+    {
+        var alternatives = await productService.GetAlternativeProductsAsync(id, memberId, cancellationToken);
+        return Ok(alternatives);
+    }
 }

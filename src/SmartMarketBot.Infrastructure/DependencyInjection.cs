@@ -38,6 +38,12 @@ public static class DependencyInjection
         services.AddScoped<IRobotService, RobotService>();
         services.AddScoped<IShelfScanService, ShelfScanService>();
 
+        // Capstone 5-flow services
+        services.AddScoped<IPromotionService, PromotionService>();
+        services.AddScoped<IRecipeService, RecipeService>();
+        services.AddScoped<IMemberService, MemberService>();
+        services.AddScoped<IStaffService, StaffService>();
+
         services.AddHttpClient<IAiVisionProxy, AiVisionProxy>();
 
         // MQTT (Singleton + HostedService)

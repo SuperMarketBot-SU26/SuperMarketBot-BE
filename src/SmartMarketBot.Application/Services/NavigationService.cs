@@ -1,7 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using SmartMarketBot.Application.Interfaces;
 using SmartMarketBot.Application.Models.Navigation;
-using SmartMarketBot.Domain.Entities;
 
 namespace SmartMarketBot.Application.Services;
 
@@ -141,5 +140,113 @@ public sealed class NavigationService(IAppDbContext dbContext) : INavigationServ
         }
 
         return stack.ToList();
+    }
+
+    // ── Flow 1: Multi-stop Shopping Route ────────────────────────────────────
+
+    private sealed record ProductNodeInfo(int ProductId, int NodeId, double XCoord, double YCoord, string? SlotCode);
+
+    public async Task<OptimizeShoppingRouteResponseDto> OptimizeShoppingRouteAsync(
+        OptimizeShoppingRouteRequestDto request,
+        CancellationToken cancellationToken = default)
+    {
+        // 1. Load nodes, edges, forbidden zones
+        var nodes = await dbContext.NavigationNodes
+            .AsNoTracking()
+            .Select(n => new NodeData(n.NodeID, n.XCoord, n.YCoord, n.IsBlocked))
+            .ToDictionaryAsync(n => n.NodeId, cancellationToken);
+
+        var edges = await dbContext.NavigationEdges
+            .AsNoTracking()
+            .Select(e => new EdgeData(e.FromNodeID, e.ToNodeID, e.Distance, e.IsBidirectional))
+            .ToListAsync(cancellationToken);
+
+        var forbiddenZoneIds = await dbContext.ForbiddenZones
+            .AsNoTracking()
+            .Where(fz => fz.IsActive)
+            .Select(fz => fz.ForbiddenZoneID)
+            .ToListAsync(cancellationToken);
+
+        var adjacency = BuildAdjacency(edges, nodes);
+
+        // 2. Tìm NodeID gần nhất cho từng ProductID (qua Slots → ShelfLevel → Aisle → NavigationNode)
+        var rawMap = await dbContext.Slots
+            .AsNoTracking()
+            .Where(s => request.ProductIds.Contains(s.ProductID ?? 0) && s.ProductID != null)
+            .Join(dbContext.ShelfLevels, s => s.ShelfLevelID, sl => sl.ShelfLevelID,
+                  (s, sl) => new { s.ProductID, sl.AisleID, s.SlotCode })
+            .Join(dbContext.NavigationNodes, x => x.AisleID, n => n.LinkedAisleID,
+                  (x, n) => new ProductNodeInfo(x.ProductID!.Value, n.NodeID, n.XCoord, n.YCoord, x.SlotCode))
+            .ToListAsync(cancellationToken);
+
+        var productNodeMap = rawMap
+            .GroupBy(x => x.ProductId)
+            .ToDictionary(g => g.Key, g => g.First());
+
+        // 3. Nearest Neighbour TSP để tối ưu thứ tự ghé qua
+        var remaining = productNodeMap.Keys.ToList();
+        var orderedProductIds = new List<int>();
+        var currentNodeId = request.StartNodeId;
+
+        while (remaining.Count > 0)
+        {
+            var (distancesFromCurrent, _) = Dijkstra(adjacency, currentNodeId);
+            int best = -1;
+            double bestDist = double.PositiveInfinity;
+            foreach (var pid in remaining)
+            {
+                if (!productNodeMap.TryGetValue(pid, out var pni)) continue;
+                var d = distancesFromCurrent.ContainsKey(pni.NodeId) ? distancesFromCurrent[pni.NodeId] : double.PositiveInfinity;
+                if (d < bestDist) { bestDist = d; best = pid; }
+            }
+            if (best < 0) break;
+            orderedProductIds.Add(best);
+            currentNodeId = productNodeMap[best].NodeId;
+            remaining.Remove(best);
+        }
+
+        // 4. Xây waypoints theo thứ tự tối ưu
+        var waypoints = new List<ShoppingWaypointDto>();
+        double totalDistance = 0;
+        int prevNode = request.StartNodeId;
+
+        for (int i = 0; i < orderedProductIds.Count; i++)
+        {
+            var pid = orderedProductIds[i];
+            if (!productNodeMap.TryGetValue(pid, out var pn)) continue;
+
+            var (dist, _) = Dijkstra(adjacency, prevNode);
+            totalDistance += dist.ContainsKey(pn.NodeId) ? dist[pn.NodeId] : 0;
+            prevNode = pn.NodeId;
+
+            waypoints.Add(new ShoppingWaypointDto(
+                i + 1,
+                pn.NodeId,
+                nodes.ContainsKey(pn.NodeId) ? nodes[pn.NodeId].XCoord.ToString("F1") + "," + nodes[pn.NodeId].YCoord.ToString("F1") : $"Node {pn.NodeId}",
+                pn.XCoord,
+                pn.YCoord,
+                pid,
+                $"Product #{pid}",
+                null,
+                pn.SlotCode,
+                pn.SlotCode is null ? null : $"Slot {pn.SlotCode}"));
+        }
+
+        return new OptimizeShoppingRouteResponseDto(
+            Math.Round(totalDistance, 2),
+            waypoints.Count,
+            waypoints,
+            forbiddenZoneIds,
+            $"TSP Nearest-Neighbour + Dijkstra. {forbiddenZoneIds.Count} ForbiddenZone(s) excluded.");
+    }
+
+    public async Task SetNodeBlockedAsync(int nodeId, bool isBlocked, string? reason, CancellationToken cancellationToken = default)
+    {
+        var node = await dbContext.NavigationNodes
+            .FirstOrDefaultAsync(n => n.NodeID == nodeId, cancellationToken)
+            ?? throw new InvalidOperationException($"Node {nodeId} not found.");
+
+        node.IsBlocked = isBlocked;
+        await dbContext.SaveChangesAsync(cancellationToken);
     }
 }

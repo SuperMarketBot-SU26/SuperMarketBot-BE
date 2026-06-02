@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using SmartMarketBot.Application.Interfaces;
 using SmartMarketBot.Application.Models.Navigation;
@@ -56,5 +57,34 @@ public sealed class NavigationController(
     {
         await navigationCommandService.UnblockNodesAsync(request.NodeIds, cancellationToken);
         return Ok(new { message = $"Unblocked {request.NodeIds.Count} node(s)." });
+    }
+
+    /// <summary>
+    /// Flow 1 — Tối ưu hoá lộ trình mua sắm đa điểm (TSP + Dijkstra + ForbiddenZones).
+    /// Trả về danh sách Waypoints được sắp xếp thứ tự ngắn nhất để robot ghé qua tất cả kệ sản phẩm.
+    /// </summary>
+    [HttpPost("optimize-shopping-route")]
+    [AllowAnonymous]
+    public async Task<ActionResult<OptimizeShoppingRouteResponseDto>> OptimizeShoppingRoute(
+        [FromBody] OptimizeShoppingRouteRequestDto request,
+        CancellationToken cancellationToken)
+    {
+        var result = await navigationService.OptimizeShoppingRouteAsync(request, cancellationToken);
+        return Ok(result);
+    }
+
+    /// <summary>
+    /// Flow 1 — Block/Unblock một NavigationNode cụ thể theo thời gian thực.
+    /// VD: Robot phát hiện người cản, tràn dầu, thi công tạm thời.
+    /// </summary>
+    [HttpPost("nodes/{id:int}/block")]
+    [AllowAnonymous]
+    public async Task<IActionResult> BlockNode(
+        int id,
+        [FromBody] BlockNodeRequestDto request,
+        CancellationToken cancellationToken)
+    {
+        await navigationService.SetNodeBlockedAsync(id, request.IsBlocked, request.Reason, cancellationToken);
+        return Ok(new { nodeId = id, isBlocked = request.IsBlocked, reason = request.Reason });
     }
 }

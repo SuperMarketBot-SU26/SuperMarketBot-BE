@@ -29,6 +29,12 @@ DROP VIEW IF EXISTS dbo.PurchaseHistory;
 GO
 
 -- 2. Dọn dẹp Tables (Xóa theo thứ tự ngược chiều quan hệ khoá ngoại)
+DROP TABLE IF EXISTS dbo.MemberEvents;
+GO
+DROP TABLE IF EXISTS dbo.MemberAlerts;
+GO
+DROP TABLE IF EXISTS dbo.ForbiddenZones;
+GO
 DROP TABLE IF EXISTS dbo.SponsoredProducts;
 GO
 DROP TABLE IF EXISTS dbo.PromotionProducts;
@@ -101,7 +107,7 @@ DROP TABLE IF EXISTS dbo.Users;
 GO
 
 -- ============================================================================
--- PART 2: ĐỊNH NGHĨA HỆ THỐNG BẢNG (35 TABLES) - CÓ GO PHÂN TÁCH LÔ XỬ LÝ
+-- PART 2: ĐỊNH NGHĨA HỆ THỐNG BẢNG (38 TABLES) - CÓ GO PHÂN TÁCH LÔ XỬ LÝ
 -- ============================================================================
 
 -- 2.1. Phân hệ AUTH & USERS (5 Tables)
@@ -147,7 +153,10 @@ CREATE TABLE dbo.Members (
     Tier            NVARCHAR(20) NOT NULL DEFAULT 'Bronze', -- 'Bronze', 'Silver', 'Gold', 'Platinum'
     TotalPoints     INT NOT NULL DEFAULT 0,
     Avatar          NVARCHAR(500) NULL,
-    TierUpdatedAt   DATETIME2 NULL
+    TierUpdatedAt   DATETIME2 NULL,
+    -- Buổi 16: Cá nhân hoá chế độ mua sắm & ngân sách stop-loss
+    SearchMode      NVARCHAR(20) NOT NULL DEFAULT 'Normal', -- 'Normal', 'Healthy', 'Budget'
+    ShoppingBudget  DECIMAL(12,2) NULL  -- Hạn mức ngân sách phiên mua sắm (NULL = không giới hạn)
 );
 GO
 
@@ -228,7 +237,10 @@ CREATE TABLE dbo.Slots (
     SlotCode      NVARCHAR(10) NOT NULL, -- '01', '02', '03'
     ProductID     INT NULL, -- Khai báo FOREIGN KEY ở sau khi có bảng Products
     Quantity      INT NOT NULL DEFAULT 0,
-    LastScannedAt DATETIME2 NULL
+    LastScannedAt DATETIME2 NULL,
+    -- Buổi 13: Quản lý kho chi tiết tại ô trưng bày
+    ExpiryDate    DATE NULL,             -- Hạn sử dụng lô hàng đang đặt trong ô
+    Supplier      NVARCHAR(200) NULL     -- Nhà cung cấp sản phẩm cụ thể
 );
 GO
 
@@ -422,7 +434,10 @@ CREATE TABLE dbo.ShelfScans (
     ImageUrl        NVARCHAR(500) NULL, -- Đường dẫn ảnh chụp kệ hàng lưu trên Azure Blob Storage
     EmptyPercentage DECIMAL(5,2) NOT NULL DEFAULT 0.00, -- Tỷ lệ trống phát hiện (0.00 - 100.00 %)
     NeedsRestock    AS CAST(CASE WHEN EmptyPercentage > 30.0 THEN 1 ELSE 0 END AS BIT), -- Computed column: Trống > 30% tự động báo restock
-    AiResponseRaw   NVARCHAR(MAX) NULL -- Phản hồi thô định dạng JSON của Gemini Vision để phân tích sâu
+    AiResponseRaw   NVARCHAR(MAX) NULL, -- Phản hồi thô định dạng JSON của Gemini Vision để phân tích sâu
+    -- Buổi 15: Trạng thái bị che khuất camera (người đứng chắn)
+    IsOccluded      BIT NOT NULL DEFAULT 0,           -- 1 = bị che khuất, robot lên lịch quét lại
+    OcclusionReason NVARCHAR(255) NULL                -- Nguyên nhân che khuất ghi nhận
 );
 GO
 
@@ -452,11 +467,15 @@ GO
 
 -- 31. Recipes: Thực đơn thông minh gợi ý món ăn dinh dưỡng cho hội viên
 CREATE TABLE dbo.Recipes (
-    RecipeID      INT IDENTITY(1,1) NOT NULL PRIMARY KEY,
-    RecipeName    NVARCHAR(200) NOT NULL,
-    Description   NVARCHAR(MAX) NULL,
-    YieldPortions INT NOT NULL DEFAULT 1, -- Khẩu phần ăn cho x người
-    ImageUrl      NVARCHAR(500) NULL
+    RecipeID              INT IDENTITY(1,1) NOT NULL PRIMARY KEY,
+    RecipeName            NVARCHAR(200) NOT NULL,
+    Description           NVARCHAR(MAX) NULL,
+    YieldPortions         INT NOT NULL DEFAULT 1, -- Khẩu phần ăn cho x người
+    ImageUrl              NVARCHAR(500) NULL,
+    -- Buổi 13: Thông số dinh dưỡng phục vụ Health-Centric Flow
+    Calories              INT NULL,               -- Lượng calo ước tính toàn công thức
+    HealthyScore          INT NULL,               -- Điểm lành mạnh 1-100
+    AlternativeSuggestion NVARCHAR(500) NULL      -- Đề xuất thay thế lành mạnh hơn
 );
 GO
 
@@ -495,13 +514,55 @@ GO
 
 -- 35. SponsoredProducts: Sản phẩm được nhà sản xuất tài trợ quảng cáo (Mô hình kiếm tiền Ad Monetization)
 CREATE TABLE dbo.SponsoredProducts (
-    SponsoredID  INT IDENTITY(1,1) NOT NULL PRIMARY KEY,
-    ProductID    INT NOT NULL FOREIGN KEY REFERENCES dbo.Products(ProductID), -- Bỏ CASCADE tránh cycle
-    SponsorBrand NVARCHAR(100) NOT NULL,
-    StartDate    DATE NOT NULL,
-    EndDate      DATE NOT NULL,
-    Priority     INT NOT NULL DEFAULT 0,
-    IsActive     BIT NOT NULL DEFAULT 1
+    SponsoredID       INT IDENTITY(1,1) NOT NULL PRIMARY KEY,
+    ProductID         INT NOT NULL FOREIGN KEY REFERENCES dbo.Products(ProductID), -- Bỏ CASCADE tránh cycle
+    SponsorBrand      NVARCHAR(100) NOT NULL,
+    StartDate         DATE NOT NULL,
+    EndDate           DATE NOT NULL,
+    Priority          INT NOT NULL DEFAULT 0,
+    IsActive          BIT NOT NULL DEFAULT 1,
+    -- Buổi 14, 16, 17: Hệ thống đấu thầu quảng cáo đa chiều
+    AdScore           INT NOT NULL DEFAULT 0,           -- Điểm quảng cáo cơ sở của nhãn hàng
+    TimeSlotStart     TIME NULL,                        -- Khung giờ bắt đầu (NULL = cả ngày)
+    TimeSlotEnd       TIME NULL,                        -- Khung giờ kết thúc
+    IsWeekendOnly     BIT NOT NULL DEFAULT 0,           -- Chỉ hiển thị cuối tuần
+    BidPrice          DECIMAL(12,2) NOT NULL DEFAULT 0.00, -- Giá đấu thầu mỗi lượt hiển thị
+    WeekendMultiplier DECIMAL(3,2) NOT NULL DEFAULT 1.00   -- Hệ số nhân cuối tuần/ngày lễ
+);
+
+-- 36. ForbiddenZones: Vùng cấm robot đi vào theo toạ độ 2D (Buổi 10)
+CREATE TABLE dbo.ForbiddenZones (
+    ForbiddenZoneID INT IDENTITY(1,1) NOT NULL PRIMARY KEY,
+    MapID           INT NOT NULL FOREIGN KEY REFERENCES dbo.Maps(MapID) ON DELETE CASCADE,
+    ZoneName        NVARCHAR(100) NOT NULL,
+    XMin            FLOAT NOT NULL,  -- Toạ độ góc trái dưới (mét)
+    YMin            FLOAT NOT NULL,
+    XMax            FLOAT NOT NULL,  -- Toạ độ góc phải trên (mét)
+    YMax            FLOAT NOT NULL,
+    IsActive        BIT NOT NULL DEFAULT 1,
+    Reason          NVARCHAR(255) NULL -- Lý do cấm (VD: 'Khu vực trẻ em', 'Thi công tạm thời')
+);
+GO
+
+-- 37. MemberAlerts: Lịch sử cảnh báo cá nhân hóa (Buổi 16)
+CREATE TABLE dbo.MemberAlerts (
+    AlertID      INT IDENTITY(1,1) NOT NULL PRIMARY KEY,
+    MemberID     INT NOT NULL FOREIGN KEY REFERENCES dbo.Members(MemberID) ON DELETE CASCADE,
+    AlertType    NVARCHAR(50) NOT NULL, -- 'Allergy', 'BudgetExceeded', 'DuplicatePurchase', 'OutOfStock'
+    AlertMessage NVARCHAR(500) NOT NULL,
+    CreatedAt    DATETIME2 NOT NULL DEFAULT GETUTCDATE(),
+    IsRead       BIT NOT NULL DEFAULT 0
+);
+GO
+
+-- 38. MemberEvents: Sự kiện đặc biệt của hội viên để robot chủ động tặng ưu đãi (Buổi 16)
+CREATE TABLE dbo.MemberEvents (
+    EventID     INT IDENTITY(1,1) NOT NULL PRIMARY KEY,
+    MemberID    INT NOT NULL FOREIGN KEY REFERENCES dbo.Members(MemberID) ON DELETE CASCADE,
+    EventName   NVARCHAR(100) NOT NULL, -- 'Birthday', 'Anniversary', 'VIPUpgrade'
+    EventDate   DATE NOT NULL,
+    DiscountPct DECIMAL(5,2) NULL,      -- % giảm giá riêng cho sự kiện (VD: 15.00)
+    IsProcessed BIT NOT NULL DEFAULT 0  -- 0 = chưa tặng, 1 = đã gửi coupon/chào mừng
 );
 GO
 
@@ -842,8 +903,8 @@ GO
 
 -- 4.10. Định nghĩa Thực đơn Dinh dưỡng mẫu (Recipes & RecipeItems)
 -- Phục vụ chức năng "Thực đơn dinh dưỡng" gợi ý mua nguyên liệu trên app tablet robot
-INSERT INTO dbo.Recipes (RecipeName, Description, YieldPortions, ImageUrl) VALUES 
-(N'Món mì trộn chua cay đặc biệt', N'Công thức chế biến đĩa mì xốt trộn giòn bùi phối trộn xúc xích rau xanh cực nhanh', 2, N'/images/recipes/mi_tron.jpg');
+INSERT INTO dbo.Recipes (RecipeName, Description, YieldPortions, ImageUrl, Calories, HealthyScore, AlternativeSuggestion) VALUES 
+(N'Món mì trộn chua cay đặc biệt', N'Công thức chế biến đĩa mì xốt trộn giòn bùi phối trộn xúc xích rau xanh cực nhanh', 2, N'/images/recipes/mi_tron.jpg', 520, 45, N'Thay mì tôm bằng mì khoai tây Omachi để giảm dầu mỡ');
 GO
 
 -- Đăng ký nguyên liệu cho công thức mì trộn đặc biệt
@@ -865,9 +926,40 @@ INSERT INTO dbo.PromotionProducts (PromotionID, ProductID, Priority) VALUES
 GO
 
 -- Đăng ký sản phẩm quảng cáo tài trợ (Sponsored Products)
--- Hãng Orion tài trợ đẩy mạnh đề xuất Custas
-INSERT INTO dbo.SponsoredProducts (ProductID, SponsorBrand, StartDate, EndDate, Priority, IsActive) VALUES 
-(12, N'Orion Vina', CAST(GETUTCDATE() AS DATE), CAST(DATEADD(month, 1, GETUTCDATE()) AS DATE), 5, 1);
+-- Hãng Orion tài trợ đẩy mạnh đề xuất Custas — khung giờ sáng + cuối tuần x1.5
+INSERT INTO dbo.SponsoredProducts (ProductID, SponsorBrand, StartDate, EndDate, Priority, IsActive, AdScore, TimeSlotStart, TimeSlotEnd, IsWeekendOnly, BidPrice, WeekendMultiplier) VALUES 
+(12, N'Orion Vina', CAST(GETUTCDATE() AS DATE), CAST(DATEADD(month, 1, GETUTCDATE()) AS DATE), 5, 1, 85, '07:00:00', '12:00:00', 0, 500.00, 1.50);
+GO
+
+-- 4.12. Seed dữ liệu 3 bảng mới
+
+-- ForbiddenZones: 2 vùng cấm robot mẫu trên Bản đồ Tầng 1
+INSERT INTO dbo.ForbiddenZones (MapID, ZoneName, XMin, YMin, XMax, YMax, IsActive, Reason) VALUES 
+(1, N'Khu vực quầy thu ngân', 8.0, 0.0, 12.0, 3.0, 1, N'Robot không được đi gần quầy thu ngân khi có khách'),
+(1, N'Hành lang thoát hiểm', 0.0, 8.0, 2.0, 20.0, 1, N'Lối thoát hiểm bắt buộc luôn thông thoáng');
+GO
+
+-- MemberAlerts: Cảnh báo dị ứng cho Hùng (MemberID=2) khi quét đậu phộng
+INSERT INTO dbo.MemberAlerts (MemberID, AlertType, AlertMessage, IsRead) VALUES 
+(2, 'Allergy', N'⚠️ CẢNH BÁO DỊ ỨNG: Đậu phộng Tân Tân (Mã: 8935049500145) chứa hạt lạc — Hùng đã được ghi nhận dị ứng hạt lạc!', 0),
+(1, 'BudgetExceeded', N'💰 Tổng giỏ hàng hiện tại 210.000₫ đã vượt ngân sách 200.000₫ bạn đã cài đặt.', 0);
+GO
+
+-- MemberEvents: Sinh nhật Huy và kỷ niệm Hùng
+INSERT INTO dbo.MemberEvents (MemberID, EventName, EventDate, DiscountPct, IsProcessed) VALUES 
+(1, 'Birthday', CAST(DATEADD(day, 3, GETUTCDATE()) AS DATE), 15.00, 0),  -- Huy sinh nhật sau 3 ngày → robot chào mừng
+(2, 'Anniversary', CAST(DATEADD(day, 7, GETUTCDATE()) AS DATE), 10.00, 0); -- Hùng kỷ niệm 1 năm hội viên
+GO
+
+-- Cập nhật Members: SearchMode & ShoppingBudget cho Huy và Hùng
+UPDATE dbo.Members SET SearchMode = 'Healthy', ShoppingBudget = 200000.00 WHERE MemberID = 1; -- Huy chế độ lành mạnh, ngân sách 200k
+UPDATE dbo.Members SET SearchMode = 'Budget',  ShoppingBudget = 150000.00 WHERE MemberID = 2; -- Hùng chế độ tiết kiệm, ngân sách 150k
+GO
+
+-- Cập nhật Slots: thêm ExpiryDate + Supplier cho các ô quan trọng
+UPDATE dbo.Slots SET ExpiryDate = CAST(DATEADD(day, 30, GETUTCDATE()) AS DATE), Supplier = N'Công ty CP Sữa Việt Nam (Vinamilk)' WHERE ProductID IN (5, 6, 7);
+UPDATE dbo.Slots SET ExpiryDate = CAST(DATEADD(day, 180, GETUTCDATE()) AS DATE), Supplier = N'Acecook Việt Nam' WHERE ProductID IN (8, 9);
+UPDATE dbo.Slots SET ExpiryDate = CAST(DATEADD(day, 365, GETUTCDATE()) AS DATE), Supplier = N'Tân Tân Food' WHERE ProductID = 14;
 GO
 
 -- ============================================================================
@@ -875,6 +967,7 @@ GO
 -- ============================================================================
 PRINT '====================================================================';
 PRINT '  SUCCESS: DATABASE [SuperMarketBot] MERGED SCHEMA INITIALIZED!';
-PRINT '  35 Tables, 4 Dynamic Views & Full Supermarket Seed Data Ready!';
+PRINT '  38 Tables, 4 Dynamic Views & Full Supermarket Seed Data Ready!';
+PRINT '  V4.0 - Capstone Full Schema (Buổi 10, 13, 14, 15, 16, 17)';
 PRINT '====================================================================';
 GO

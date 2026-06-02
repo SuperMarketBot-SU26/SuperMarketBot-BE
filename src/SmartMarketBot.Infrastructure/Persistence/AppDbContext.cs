@@ -43,6 +43,9 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
     public DbSet<UserToken> UserTokens => Set<UserToken>();
     public DbSet<EmailOtp> EmailOtps => Set<EmailOtp>();
     public DbSet<Payment> Payments => Set<Payment>();
+    public DbSet<ForbiddenZone> ForbiddenZones => Set<ForbiddenZone>();
+    public DbSet<MemberAlert> MemberAlerts => Set<MemberAlert>();
+    public DbSet<MemberEvent> MemberEvents => Set<MemberEvent>();
     public DbSet<Workstation> Workstations => Set<Workstation>();
     public DbSet<Zone> Zones => Set<Zone>();
 
@@ -323,6 +326,35 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
             entity.HasIndex(x => new { x.UserId, x.Status });
             entity.HasOne(x => x.User).WithMany(u => u.Payments)
                 .HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<ForbiddenZone>(entity =>
+        {
+            entity.ToTable("ForbiddenZones");
+            entity.HasKey(x => x.ForbiddenZoneID);
+            entity.HasOne(x => x.Map).WithMany()
+                .HasForeignKey(x => x.MapID).OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<MemberAlert>(entity =>
+        {
+            entity.ToTable("MemberAlerts");
+            entity.HasKey(x => x.AlertID);
+            entity.Property(x => x.CreatedAt).HasDefaultValueSql("(getutcdate())");
+            entity.Property(x => x.IsRead).HasDefaultValue(false);
+            entity.HasIndex(x => new { x.MemberID, x.IsRead });
+            entity.HasOne(x => x.Member).WithMany(m => m.MemberAlerts)
+                .HasForeignKey(x => x.MemberID).OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<MemberEvent>(entity =>
+        {
+            entity.ToTable("MemberEvents");
+            entity.HasKey(x => x.EventID);
+            entity.Property(x => x.IsProcessed).HasDefaultValue(false);
+            entity.HasIndex(x => new { x.EventDate, x.IsProcessed });
+            entity.HasOne(x => x.Member).WithMany(m => m.MemberEvents)
+                .HasForeignKey(x => x.MemberID).OnDelete(DeleteBehavior.Cascade);
         });
 
         modelBuilder.Entity<UserRole>(entity =>

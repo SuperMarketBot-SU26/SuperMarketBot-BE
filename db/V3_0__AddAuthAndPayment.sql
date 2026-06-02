@@ -7,6 +7,8 @@ USE SuperMarketBot;
 GO
 
 SET NOCOUNT ON;
+SET QUOTED_IDENTIFIER ON;
+GO
 
 -- ── Users: cột mới ──────────────────────────────────────────────
 IF COL_LENGTH('dbo.Users', 'EmailConfirmed') IS NULL
@@ -28,10 +30,8 @@ GO
 
 -- Unique Email (chỉ khi có giá trị, cho phép nhiều NULL)
 IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_Users_Email' AND object_id = OBJECT_ID('dbo.Users'))
-BEGIN
     CREATE UNIQUE NONCLUSTERED INDEX IX_Users_Email ON dbo.Users(Email)
         WHERE Email IS NOT NULL;
-END
 GO
 
 -- ── EmailOtps ───────────────────────────────────────────────────
@@ -51,11 +51,8 @@ BEGIN
         CONSTRAINT PK_EmailOtps PRIMARY KEY (OtpId)
     );
 
-    CREATE NONCLUSTERED INDEX IX_EmailOtps_Email_OtpType_IsUsed
-        ON dbo.EmailOtps(Email, OtpType, IsUsed) WHERE IsUsed = 0;
-
-    CREATE NONCLUSTERED INDEX IX_EmailOtps_ExpiredAt
-        ON dbo.EmailOtps(ExpiredAt) WHERE IsUsed = 0;
+    EXEC('CREATE NONCLUSTERED INDEX IX_EmailOtps_Email_OtpType_IsUsed ON dbo.EmailOtps(Email, OtpType, IsUsed) WHERE IsUsed = 0');
+    EXEC('CREATE NONCLUSTERED INDEX IX_EmailOtps_ExpiredAt ON dbo.EmailOtps(ExpiredAt) WHERE IsUsed = 0');
 END
 GO
 

@@ -249,7 +249,7 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
 
         modelBuilder.Entity<Staff>(entity =>
         {
-            entity.ToTable("Staffs");
+            entity.ToTable("Staff");
             entity.HasKey(x => x.StaffID);
         });
 
@@ -378,25 +378,25 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
         modelBuilder.Entity<BlockedAisleView>(entity =>
         {
             entity.HasNoKey();
-            entity.ToView("BlockedAisleView");
+            entity.ToView("Blocked_Aisles");
         });
 
         modelBuilder.Entity<PurchaseHistoryView>(entity =>
         {
             entity.HasNoKey();
-            entity.ToView("PurchaseHistoryView");
+            entity.ToView("PurchaseHistory");
         });
 
         modelBuilder.Entity<RealTimeStockView>(entity =>
         {
             entity.HasNoKey();
-            entity.ToView("RealTimeStockView");
+            entity.ToView("Real_Time_Stock");
         });
 
         modelBuilder.Entity<StoreMapView>(entity =>
         {
             entity.HasNoKey();
-            entity.ToView("StoreMapView");
+            entity.ToView("Store_Map");
         });
     }
 }

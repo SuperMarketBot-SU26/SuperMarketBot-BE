@@ -7,6 +7,7 @@ using SmartMarketBot.API.Realtime;
 using SmartMarketBot.Application;
 using SmartMarketBot.Application.Interfaces;
 using SmartMarketBot.Infrastructure;
+using Scalar.AspNetCore;
 using SmartMarketBot.Infrastructure.Options;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -48,9 +49,21 @@ builder.Services.AddAuthorization();
 
 var app = builder.Build();
 
-if (app.Environment.IsDevelopment())
+var exposeApiDocs = app.Environment.IsDevelopment()
+    || string.Equals(app.Environment.EnvironmentName, "Docker", StringComparison.OrdinalIgnoreCase);
+
+if (exposeApiDocs)
 {
     app.MapOpenApi();
+    app.MapScalarApiReference(options =>
+    {
+        options.WithTitle("SmartMarketBot API");
+        options.WithOpenApiRoutePattern("/openapi/{documentName}.json");
+    });
+    /* Bookmark cũ /swagger → Scalar UI (.NET 10 dùng OpenAPI + Scalar, không Swashbuckle). */
+    app.MapGet("/swagger", () => Results.Redirect("/scalar/v1", permanent: false));
+    app.MapGet("/swagger/index.html", () => Results.Redirect("/scalar/v1", permanent: false));
+    app.MapGet("/", () => Results.Redirect("/scalar/v1", permanent: false));
 }
 
 app.UseMiddleware<GlobalExceptionMiddleware>();

@@ -10,7 +10,8 @@ namespace SmartMarketBot.Infrastructure.Services;
 public sealed class RobotService(
     AppDbContext dbContext,
     IRobotCommandPublisher commandPublisher,
-    INavigationService navigationService) : IRobotService
+    INavigationService navigationService,
+    ILocalizationService localizer) : IRobotService
 {
     public async Task<IReadOnlyList<RobotDto>> GetRobotsAsync(CancellationToken cancellationToken = default)
     {
@@ -38,7 +39,7 @@ public sealed class RobotService(
         var robot = await dbContext.Robots
             .AsNoTracking()
             .FirstOrDefaultAsync(r => r.RobotCode == robotCode, cancellationToken)
-            ?? throw new InvalidOperationException($"Robot '{robotCode}' not found.");
+            ?? throw new InvalidOperationException(localizer.Get("RobotNotFound", robotCode));
 
         var latestLog = await dbContext.RobotLogs
             .AsNoTracking()
@@ -70,11 +71,11 @@ public sealed class RobotService(
         var robot = await dbContext.Robots
                 .AsNoTracking()
                 .FirstOrDefaultAsync(r => r.RobotCode == request.RobotCode, cancellationToken)
-                ?? throw new InvalidOperationException($"Robot '{request.RobotCode}' not found.");
+                ?? throw new InvalidOperationException(localizer.Get("RobotNotFound", request.RobotCode));
 
             if (!int.TryParse(request.DestinationNodeId, out int destId))
             {
-                throw new ArgumentException("DestinationNodeId phải là số nguyên hợp lệ.");
+                throw new ArgumentException(localizer.Get("DestNodeInvalid"));
             }
 
             var startNodeId = robot.CurrentNodeID ?? 1;

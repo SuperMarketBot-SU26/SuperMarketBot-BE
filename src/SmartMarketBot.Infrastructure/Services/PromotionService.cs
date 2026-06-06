@@ -10,7 +10,7 @@ namespace SmartMarketBot.Infrastructure.Services;
 /// Flow 5 — Ads Monetization.
 /// Priority Score = AdScore (AdPackage) + CustomerMatchScore (SearchMode/Allergy) + PromotionScore.
 /// </summary>
-public sealed class PromotionService(AppDbContext db) : IPromotionService
+public sealed class PromotionService(AppDbContext db, ILocalizationService localizer) : IPromotionService
 {
     public async Task<SponsoredRecommendationResponseDto> GetSponsoredRecommendationsAsync(
         SponsoredRecommendationQueryDto query,
@@ -141,7 +141,7 @@ public sealed class PromotionService(AppDbContext db) : IPromotionService
                 discountedPrice,
                 sponsorBrand,
                 hasAllergyWarning,
-                hasAllergyWarning ? "Sản phẩm chứa thành phần dị ứng đã đăng ký." : null);
+                hasAllergyWarning ? localizer.Get("AllergenRegistered") : null);
         })
         .OrderByDescending(r => r.PriorityScore)
         .Take(query.Limit)

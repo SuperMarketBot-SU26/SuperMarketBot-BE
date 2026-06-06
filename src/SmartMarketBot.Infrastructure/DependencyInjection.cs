@@ -27,6 +27,8 @@ public static class DependencyInjection
         services.AddScoped<IAppDbContext>(sp => sp.GetRequiredService<AppDbContext>());
 
         // Auth / Token / Email
+        services.AddHttpContextAccessor();
+        services.AddScoped<ILocalizationService, LocalizationService>();
         services.AddScoped<ITokenService, TokenService>();
         services.AddScoped<IEmailService, EmailService>();
         services.AddScoped<IAuthService, AuthService>();

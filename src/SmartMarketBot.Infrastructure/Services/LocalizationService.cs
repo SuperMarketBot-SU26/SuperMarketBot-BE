@@ -1,0 +1,166 @@
+using Microsoft.AspNetCore.Http;
+using SmartMarketBot.Application.Interfaces;
+
+namespace SmartMarketBot.Infrastructure.Services;
+
+public sealed class LocalizationService : ILocalizationService
+{
+    private readonly IHttpContextAccessor _httpContextAccessor;
+    private readonly Dictionary<string, Dictionary<string, string>> _translations;
+
+    public LocalizationService(IHttpContextAccessor httpContextAccessor)
+    {
+        _httpContextAccessor = httpContextAccessor;
+
+        _translations = new Dictionary<string, Dictionary<string, string>>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["vi"] = new Dictionary<string, string>
+            {
+                // Auth
+                ["EmailInUse"] = "Email đã được sử dụng.",
+                ["OtpResendCooldown"] = "Vui lòng chờ {0} giây trước khi yêu cầu OTP mới.",
+                ["RegistrationOtpSent"] = "Mã OTP đã được gửi về email của bạn.",
+                ["OtpInvalid"] = "Mã OTP không chính xác.",
+                ["OtpUsed"] = "Mã OTP đã được sử dụng.",
+                ["OtpExpired"] = "Mã OTP đã hết hạn.",
+                ["OtpRequestNotFound"] = "Không tìm thấy yêu cầu OTP. Vui lòng bắt đầu lại.",
+                ["OtpResent"] = "OTP mới đã được gửi.",
+                ["LoginInvalid"] = "Email hoặc mật khẩu không đúng.",
+                ["AccountLocked"] = "Tài khoản đã bị khóa.",
+                ["EmailNotConfirmed"] = "Email chưa được xác minh. Vui lòng kiểm tra hộp thư.",
+                ["RefreshTokenInvalid"] = "Refresh token không hợp lệ hoặc đã hết hạn.",
+                ["LogoutSuccess"] = "Đăng xuất thành công.",
+                ["ForgotPasswordOtpSent"] = "Nếu email tồn tại, mã OTP đã được gửi.",
+                ["AccountNotFound"] = "Không tìm thấy tài khoản.",
+                ["PasswordResetSuccess"] = "Mật khẩu đã được đặt lại thành công.",
+
+                // Member
+                ["MemberNotFound"] = "Không tìm thấy hội viên {0}.",
+                ["BudgetSet"] = "Đã cài ngân sách {0:N0}₫ cho phiên mua sắm.",
+                ["ProductNotFound"] = "Không tìm thấy sản phẩm với barcode {0}.",
+                ["AllergyAlert"] = "⚠️ CẢNH BÁO DỊ ỨNG: {0} chứa thành phần dị ứng của bạn!",
+                ["BudgetExceededAlert"] = "💰 Thêm {0} ({1:N0}₫) sẽ vượt ngân sách {2:N0}₫ của bạn!",
+                ["DuplicatePurchaseAlert"] = "🔄 Bạn đã mua {0} trong 7 ngày gần đây.",
+                ["AltReasonAllergy"] = "Không chứa thành phần dị ứng",
+                ["AltReasonBudget"] = "Giá phù hợp hơn với ngân sách",
+                ["BdayDeal"] = "🎂 Quà sinh nhật",
+                ["AnniversaryDeal"] = "🎉 Kỷ niệm hội viên",
+                ["EventDealReason"] = "{0:N0}% giảm giá cho toàn bộ đơn hàng dịp {1}",
+
+                // Staff & OOS
+                ["SlotNotFound"] = "Không tìm thấy vị trí ô kệ {0}.",
+                ["OosEventWithStock"] = "Ghi nhận sự cố hết hàng (ScanID={0}). Đã gửi thông báo cho nhân viên.",
+                ["OosEventNoStock"] = "Ghi nhận sự cố hết hàng (ScanID={0}). Kho tổng hết hàng - đề xuất sản phẩm thay thế.",
+
+                // Navigation & Robot
+                ["StartEndNodeNotExist"] = "Node bắt đầu hoặc kết thúc không tồn tại trên sơ đồ.",
+                ["StartEndNodeBlocked"] = "Node bắt đầu hoặc kết thúc đã bị chặn.",
+                ["RouteNotFound"] = "Không tìm thấy đường đi từ node {0} đến node {1}.",
+                ["NodeNotFound"] = "Không tìm thấy node {0}.",
+                ["DestNodeInvalid"] = "DestinationNodeId phải là số nguyên hợp lệ.",
+                ["RobotNotFound"] = "Không tìm thấy robot '{0}'.",
+                ["AllergenRegistered"] = "Sản phẩm chứa thành phần dị ứng đã đăng ký.",
+                ["UnexpectedError"] = "Đã xảy ra lỗi không mong muốn."
+            },
+            ["en"] = new Dictionary<string, string>
+            {
+                // Auth
+                ["EmailInUse"] = "Email is already in use.",
+                ["OtpResendCooldown"] = "Please wait {0} seconds before requesting a new OTP.",
+                ["RegistrationOtpSent"] = "OTP code has been sent to your email.",
+                ["OtpInvalid"] = "Invalid OTP code.",
+                ["OtpUsed"] = "OTP code has already been used.",
+                ["OtpExpired"] = "OTP code has expired.",
+                ["OtpRequestNotFound"] = "No OTP request found. Please start over.",
+                ["OtpResent"] = "New OTP has been sent.",
+                ["LoginInvalid"] = "Incorrect email or password.",
+                ["AccountLocked"] = "Account has been locked.",
+                ["EmailNotConfirmed"] = "Email is not verified. Please check your inbox.",
+                ["RefreshTokenInvalid"] = "Invalid or expired refresh token.",
+                ["LogoutSuccess"] = "Logged out successfully.",
+                ["ForgotPasswordOtpSent"] = "If the email exists, an OTP has been sent.",
+                ["AccountNotFound"] = "Account not found.",
+                ["PasswordResetSuccess"] = "Password has been reset successfully.",
+
+                // Member
+                ["MemberNotFound"] = "Member {0} not found.",
+                ["BudgetSet"] = "Shopping budget of {0:N0}₫ has been set.",
+                ["ProductNotFound"] = "Product with barcode {0} not found.",
+                ["AllergyAlert"] = "⚠️ ALLERGY WARNING: {0} contains your allergen ingredients!",
+                ["BudgetExceededAlert"] = "💰 Adding {0} ({1:N0}₫) will exceed your budget of {2:N0}₫!",
+                ["DuplicatePurchaseAlert"] = "🔄 You purchased {0} in the last 7 days.",
+                ["AltReasonAllergy"] = "Does not contain allergen ingredients",
+                ["AltReasonBudget"] = "Price fits your budget better",
+                ["BdayDeal"] = "🎂 Birthday Gift",
+                ["AnniversaryDeal"] = "🎉 Member Anniversary",
+                ["EventDealReason"] = "{0:N0}% discount storewide for {1}",
+
+                // Staff & OOS
+                ["SlotNotFound"] = "Shelf slot {0} not found.",
+                ["OosEventWithStock"] = "Out-of-stock event logged (ScanID={0}). Staff notification sent.",
+                ["OosEventNoStock"] = "Out-of-stock event logged (ScanID={0}). No warehouse stock - product substitution recommended.",
+
+                // Navigation & Robot
+                ["StartEndNodeNotExist"] = "Start or end node does not exist on map.",
+                ["StartEndNodeBlocked"] = "Start or end node is blocked.",
+                ["RouteNotFound"] = "No route found from node {0} to node {1}.",
+                ["NodeNotFound"] = "Node {0} not found.",
+                ["DestNodeInvalid"] = "DestinationNodeId must be a valid integer.",
+                ["RobotNotFound"] = "Robot '{0}' not found.",
+                ["AllergenRegistered"] = "Product contains a registered allergen ingredient.",
+                ["UnexpectedError"] = "An unexpected error occurred."
+            }
+        };
+    }
+
+    public string Get(string key)
+    {
+        var lang = GetCurrentLanguage();
+        if (_translations.TryGetValue(lang, out var dict) && dict.TryGetValue(key, out var val))
+        {
+            return val;
+        }
+        if (_translations["vi"].TryGetValue(key, out var viVal))
+        {
+            return viVal;
+        }
+        return key;
+    }
+
+    public string Get(string key, params object[] args)
+    {
+        var template = Get(key);
+        try
+        {
+            return string.Format(template, args);
+        }
+        catch
+        {
+            return template;
+        }
+    }
+
+    private string GetCurrentLanguage()
+    {
+        var context = _httpContextAccessor.HttpContext;
+        if (context is null) return "vi";
+
+        // 1. Check Query Parameter: ?lang=en
+        if (context.Request.Query.TryGetValue("lang", out var langQuery))
+        {
+            var l = langQuery.ToString().ToLowerInvariant();
+            if (l == "en" || l.StartsWith("en-")) return "en";
+            if (l == "vi" || l.StartsWith("vi-")) return "vi";
+        }
+
+        // 2. Check Header: Accept-Language
+        if (context.Request.Headers.TryGetValue("Accept-Language", out var langHeader))
+        {
+            var l = langHeader.ToString().ToLowerInvariant();
+            if (l.Contains("en")) return "en";
+            if (l.Contains("vi")) return "vi";
+        }
+
+        return "vi"; // default
+    }
+}

@@ -7,7 +7,7 @@ using SmartMarketBot.Infrastructure.Persistence;
 namespace SmartMarketBot.Infrastructure.Services;
 
 /// <summary>Flow 4 — Out-of-Stock Handler.</summary>
-public sealed class StaffService(AppDbContext db) : IStaffService
+public sealed class StaffService(AppDbContext db, ILocalizationService localizer) : IStaffService
 {
     public async Task<ReportOosResponseDto> ReportOutOfStockAsync(
         ReportOosRequestDto request, CancellationToken ct = default)
@@ -18,7 +18,7 @@ public sealed class StaffService(AppDbContext db) : IStaffService
             .Include(s => s.ShelfLevel)
                 .ThenInclude(sl => sl.Aisle)
             .FirstOrDefaultAsync(s => s.SlotID == request.SlotId, ct)
-            ?? throw new KeyNotFoundException($"Slot {request.SlotId} not found.");
+            ?? throw new KeyNotFoundException(localizer.Get("SlotNotFound", request.SlotId));
 
         int aisleId = slot.ShelfLevel.Aisle.AisleID;
 
@@ -47,8 +47,8 @@ public sealed class StaffService(AppDbContext db) : IStaffService
         await db.SaveChangesAsync(ct);
 
         string message = hasWarehouseStock
-            ? $"Out-of-stock event logged (ScanID={scan.ScanID}). Staff notification sent."
-            : $"Out-of-stock event logged (ScanID={scan.ScanID}). No warehouse stock — product substitution recommended.";
+            ? localizer.Get("OosEventWithStock", scan.ScanID)
+            : localizer.Get("OosEventNoStock", scan.ScanID);
 
         return new ReportOosResponseDto(scan.ScanID, scan.EmptyPercentage > 30, hasWarehouseStock, message);
     }
@@ -83,7 +83,7 @@ public sealed class StaffService(AppDbContext db) : IStaffService
     public async Task CompleteRestockAsync(CompleteRestockRequestDto request, CancellationToken ct = default)
     {
         var slot = await db.Slots.FindAsync([request.SlotId], ct)
-            ?? throw new KeyNotFoundException($"Slot {request.SlotId} not found. Restock could not be recorded.");
+            ?? throw new KeyNotFoundException(localizer.Get("SlotNotFound", request.SlotId));
 
         if (request.QuantityAdded <= 0)
             throw new ArgumentException("QuantityAdded must be >= 1.", nameof(request));

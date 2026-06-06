@@ -1,11 +1,12 @@
 using System.Net;
 using System.Text.Json;
+using SmartMarketBot.Application.Interfaces;
 
 namespace SmartMarketBot.API.Middleware;
 
 public sealed class GlobalExceptionMiddleware(RequestDelegate next, ILogger<GlobalExceptionMiddleware> logger)
 {
-    public async Task InvokeAsync(HttpContext context)
+    public async Task InvokeAsync(HttpContext context, ILocalizationService localizer)
     {
         try
         {
@@ -34,7 +35,7 @@ public sealed class GlobalExceptionMiddleware(RequestDelegate next, ILogger<Glob
         catch (Exception ex)
         {
             logger.LogError(ex, "Unhandled server exception.");
-            await WriteErrorAsync(context, HttpStatusCode.InternalServerError, "An unexpected error occurred.");
+            await WriteErrorAsync(context, HttpStatusCode.InternalServerError, localizer.Get("UnexpectedError"));
         }
     }
 

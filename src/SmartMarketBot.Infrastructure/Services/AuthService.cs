@@ -17,7 +17,8 @@ public sealed class AuthService(
     IEmailService emailService,
     IOptions<EmailOptions> emailOptions,
     IOptions<JwtOptions> jwtOptions,
-    ILogger<AuthService> logger) : IAuthService
+    ILogger<AuthService> logger,
+    ILocalizationService localizer) : IAuthService
 {
     private readonly EmailOptions _emailOpts = emailOptions.Value;
     private readonly JwtOptions _jwtOpts = jwtOptions.Value;
@@ -30,7 +31,7 @@ public sealed class AuthService(
 
         var existingAccount = await db.Accounts.AnyAsync(a => a.Email == email, ct);
         if (existingAccount)
-            throw new InvalidOperationException("Email đã được sử dụng.");
+            throw new InvalidOperationException(localizer.Get("EmailInUse"));
 
         var recentOtp = await db.EmailOtps
             .Where(o => o.Email == email && o.OtpType == "Registration" && !o.IsUsed)
@@ -41,7 +42,7 @@ public sealed class AuthService(
         {
             var cooldown = TimeSpan.FromSeconds(_emailOpts.OtpResendCooldownSeconds);
             if (VnDateTime.Now - recentOtp.CreatedAt < cooldown)
-                throw new InvalidOperationException($"Vui lòng chờ {_emailOpts.OtpResendCooldownSeconds}s trước khi yêu cầu OTP mới.");
+                throw new InvalidOperationException(localizer.Get("OtpResendCooldown", _emailOpts.OtpResendCooldownSeconds));
         }
 
         var otpCode = GenerateOtp();
@@ -105,11 +106,11 @@ public sealed class AuthService(
             .FirstOrDefaultAsync(ct);
 
         if (lastOtp == null)
-            throw new InvalidOperationException("Không tìm thấy yêu cầu OTP. Vui lòng bắt đầu lại.");
+            throw new InvalidOperationException(localizer.Get("OtpRequestNotFound"));
 
         var cooldown = TimeSpan.FromSeconds(_emailOpts.OtpResendCooldownSeconds);
         if (VnDateTime.Now - lastOtp.CreatedAt < cooldown)
-            throw new InvalidOperationException($"Vui lòng chờ {_emailOpts.OtpResendCooldownSeconds}s trước khi gửi lại.");
+            throw new InvalidOperationException(localizer.Get("OtpResendCooldown", _emailOpts.OtpResendCooldownSeconds));
 
         lastOtp.IsUsed = true;
         var newCode = GenerateOtp();
@@ -142,13 +143,13 @@ public sealed class AuthService(
             .FirstOrDefaultAsync(a => a.Email == email, ct);
 
         if (account is null || !VerifyPassword(request.Password, account.PasswordHash))
-            throw new UnauthorizedAccessException("Email hoặc mật khẩu không đúng.");
+            throw new UnauthorizedAccessException(localizer.Get("LoginInvalid"));
 
         if (!account.IsActive)
-            throw new UnauthorizedAccessException("Tài khoản đã bị khóa.");
+            throw new UnauthorizedAccessException(localizer.Get("AccountLocked"));
 
         if (!account.EmailConfirmed)
-            throw new UnauthorizedAccessException("Email chưa được xác minh. Vui lòng kiểm tra hộp thư.");
+            throw new UnauthorizedAccessException(localizer.Get("EmailNotConfirmed"));
 
         return await BuildAuthResponseAsync(account, ct);
     }
@@ -160,7 +161,7 @@ public sealed class AuthService(
             .FirstOrDefaultAsync(t => t.RefreshToken == request.RefreshToken && !t.IsRevoked, ct);
 
         if (tokenEntity is null || tokenEntity.ExpiryDate < VnDateTime.Now)
-            throw new UnauthorizedAccessException("Refresh token không hợp lệ hoặc đã hết hạn.");
+            throw new UnauthorizedAccessException(localizer.Get("RefreshTokenInvalid"));
 
         var account = tokenEntity.Account;
 
@@ -197,7 +198,7 @@ public sealed class AuthService(
         {
             var cooldown = TimeSpan.FromSeconds(_emailOpts.OtpResendCooldownSeconds);
             if (VnDateTime.Now - recent.CreatedAt < cooldown)
-                throw new InvalidOperationException($"Vui lòng chờ {_emailOpts.OtpResendCooldownSeconds}s.");
+                throw new InvalidOperationException(localizer.Get("OtpResendCooldown", _emailOpts.OtpResendCooldownSeconds));
         }
 
         var code = GenerateOtp();
@@ -224,7 +225,7 @@ public sealed class AuthService(
         ValidateOtp(otp, request.OtpCode);
 
         var account = await db.Accounts.FirstOrDefaultAsync(a => a.Email == email, ct)
-                   ?? throw new KeyNotFoundException("Không tìm thấy tài khoản.");
+                   ?? throw new KeyNotFoundException(localizer.Get("AccountNotFound"));
 
         account.PasswordHash = HashPassword(request.NewPassword);
         account.UpdatedAt = VnDateTime.Now;
@@ -263,14 +264,14 @@ public sealed class AuthService(
             roles);
     }
 
-    private static void ValidateOtp(EmailOtp? otp, string code)
+    private void ValidateOtp(EmailOtp? otp, string code)
     {
         if (otp is null || otp.OtpCode != code)
-            throw new InvalidOperationException("Mã OTP không chính xác.");
+            throw new InvalidOperationException(localizer.Get("OtpInvalid"));
         if (otp.IsUsed)
-            throw new InvalidOperationException("Mã OTP đã được sử dụng.");
+            throw new InvalidOperationException(localizer.Get("OtpUsed"));
         if (otp.ExpiredAt < VnDateTime.Now)
-            throw new InvalidOperationException("Mã OTP đã hết hạn.");
+            throw new InvalidOperationException(localizer.Get("OtpExpired"));
     }
 
     private static string GenerateOtp()

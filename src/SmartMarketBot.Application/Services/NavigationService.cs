@@ -4,7 +4,7 @@ using SmartMarketBot.Application.Models.Navigation;
 
 namespace SmartMarketBot.Application.Services;
 
-public sealed class NavigationService(IAppDbContext dbContext) : INavigationService
+public sealed class NavigationService(IAppDbContext dbContext, ILocalizationService localizer) : INavigationService
 {
     private sealed record NodeData(int NodeId, double XCoord, double YCoord, bool IsBlocked);
     private sealed record EdgeData(int FromNodeId, int ToNodeId, double Distance, bool IsBidirectional);
@@ -61,10 +61,10 @@ public sealed class NavigationService(IAppDbContext dbContext) : INavigationServ
         var nodes = await LoadNodesWithForbiddenZonesAsync(cancellationToken);
 
         if (!nodes.ContainsKey(request.StartNodeId) || !nodes.ContainsKey(request.EndNodeId))
-            throw new InvalidOperationException("Start or end node does not exist.");
+            throw new InvalidOperationException(localizer.Get("StartEndNodeNotExist"));
 
         if (nodes[request.StartNodeId].IsBlocked || nodes[request.EndNodeId].IsBlocked)
-            throw new InvalidOperationException("Start or end node is blocked or inside a ForbiddenZone.");
+            throw new InvalidOperationException(localizer.Get("StartEndNodeBlocked"));
 
         var edges = await dbContext.NavigationEdges
             .AsNoTracking()
@@ -196,7 +196,7 @@ public sealed class NavigationService(IAppDbContext dbContext) : INavigationServ
     {
         var node = await dbContext.NavigationNodes
             .FirstOrDefaultAsync(n => n.NodeID == nodeId, cancellationToken)
-            ?? throw new InvalidOperationException($"Node {nodeId} not found.");
+            ?? throw new InvalidOperationException(localizer.Get("NodeNotFound", nodeId));
 
         node.IsBlocked = isBlocked;
         await dbContext.SaveChangesAsync(cancellationToken);

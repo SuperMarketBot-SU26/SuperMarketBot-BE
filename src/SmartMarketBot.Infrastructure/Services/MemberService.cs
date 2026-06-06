@@ -9,7 +9,7 @@ using SmartMarketBot.Infrastructure.Persistence;
 namespace SmartMarketBot.Infrastructure.Services;
 
 /// <summary>Flow 3 — Budget &amp; Health + Flow 2 Deal Hunter + Member Alerts.</summary>
-public sealed class MemberService(AppDbContext db) : IMemberService
+public sealed class MemberService(AppDbContext db, ILocalizationService localizer) : IMemberService
 {
     // ── Budget ───────────────────────────────────────────────────────────────
 
@@ -17,7 +17,7 @@ public sealed class MemberService(AppDbContext db) : IMemberService
         int memberId, SetBudgetRequestDto request, CancellationToken ct = default)
     {
         var member = await db.Members.FindAsync([memberId], ct)
-            ?? throw new KeyNotFoundException($"Member {memberId} not found.");
+            ?? throw new KeyNotFoundException(localizer.Get("MemberNotFound", memberId));
 
         member.ShoppingBudget = request.Budget;
         await db.SaveChangesAsync(ct);
@@ -26,7 +26,7 @@ public sealed class MemberService(AppDbContext db) : IMemberService
             memberId,
             request.Budget,
             member.SearchMode,
-            $"Đã cài ngân sách {request.Budget:N0}₫ cho phiên mua sắm.");
+            localizer.Get("BudgetSet", request.Budget));
     }
 
     // ── Scan Item ────────────────────────────────────────────────────────────
@@ -37,14 +37,14 @@ public sealed class MemberService(AppDbContext db) : IMemberService
         var member = await db.Members
             .AsNoTracking()
             .FirstOrDefaultAsync(m => m.MemberID == memberId, ct)
-            ?? throw new KeyNotFoundException($"Member {memberId} not found.");
+            ?? throw new KeyNotFoundException(localizer.Get("MemberNotFound", memberId));
 
         var product = await db.Products
             .AsNoTracking()
             .FirstOrDefaultAsync(p => p.Barcode == request.Barcode, ct);
 
         if (product is null)
-            return new ScanItemResponseDto(false, null, $"Không tìm thấy sản phẩm với barcode {request.Barcode}.",
+            return new ScanItemResponseDto(false, null, localizer.Get("ProductNotFound", request.Barcode),
                 0, "Unknown", 0, request.CurrentCartTotal, null, []);
 
         // 1. Kiểm tra dị ứng
@@ -77,17 +77,17 @@ public sealed class MemberService(AppDbContext db) : IMemberService
         if (hasAllergy)
         {
             alertType = "Allergy";
-            alertMessage = $"⚠️ CẢNH BÁO DỊ ỨNG: {product.ProductName} chứa thành phần dị ứng của bạn!";
+            alertMessage = localizer.Get("AllergyAlert", product.ProductName);
         }
         else if (overBudget)
         {
             alertType = "BudgetExceeded";
-            alertMessage = $"💰 Thêm {product.ProductName} ({product.UnitPrice:N0}₫) sẽ vượt ngân sách {member.ShoppingBudget:N0}₫ của bạn!";
+            alertMessage = localizer.Get("BudgetExceededAlert", product.ProductName, product.UnitPrice, member.ShoppingBudget.GetValueOrDefault());
         }
         else if (isDuplicate)
         {
             alertType = "DuplicatePurchase";
-            alertMessage = $"🔄 Bạn đã mua {product.ProductName} trong 7 ngày gần đây.";
+            alertMessage = localizer.Get("DuplicatePurchaseAlert", product.ProductName);
         }
 
         // Lưu alert nếu có
@@ -118,7 +118,7 @@ public sealed class MemberService(AppDbContext db) : IMemberService
 
             alternatives = altProducts.Select(p => new AlternativeProductDto(
                 p.ProductID, p.ProductName, p.UnitPrice, p.ImageUrl,
-                alertType == "Allergy" ? "Không chứa thành phần dị ứng" : "Giá phù hợp hơn với ngân sách")).ToList();
+                alertType == "Allergy" ? localizer.Get("AltReasonAllergy") : localizer.Get("AltReasonBudget"))).ToList();
         }
 
         return new ScanItemResponseDto(
@@ -172,9 +172,9 @@ public sealed class MemberService(AppDbContext db) : IMemberService
 
         foreach (var ev in events)
         {
-            deals.Add(new MemberDealDto(0, ev.EventName == "Birthday" ? "🎂 Quà sinh nhật" : "🎉 Kỷ niệm hội viên",
+            deals.Add(new MemberDealDto(0, ev.EventName == "Birthday" ? localizer.Get("BdayDeal") : localizer.Get("AnniversaryDeal"),
                 0, 0, ev.DiscountPct!.Value, ev.EventName,
-                $"{ev.DiscountPct:N0}% giảm giá cho toàn bộ đơn hàng dịp {ev.EventName}", null));
+                localizer.Get("EventDealReason", ev.DiscountPct!.Value, ev.EventName), null));
         }
 
         return new MemberDealsResponseDto(memberId, deals, deals.Count);

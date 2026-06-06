@@ -16,6 +16,16 @@ public sealed class GlobalExceptionMiddleware(RequestDelegate next, ILogger<Glob
             logger.LogWarning(ex, "Unauthorized request.");
             await WriteErrorAsync(context, HttpStatusCode.Unauthorized, ex.Message);
         }
+        catch (KeyNotFoundException ex)
+        {
+            logger.LogWarning(ex, "Resource not found.");
+            await WriteErrorAsync(context, HttpStatusCode.NotFound, ex.Message);
+        }
+        catch (ArgumentException ex)
+        {
+            logger.LogWarning(ex, "Invalid argument.");
+            await WriteErrorAsync(context, HttpStatusCode.BadRequest, ex.Message);
+        }
         catch (InvalidOperationException ex)
         {
             logger.LogWarning(ex, "Business validation error.");

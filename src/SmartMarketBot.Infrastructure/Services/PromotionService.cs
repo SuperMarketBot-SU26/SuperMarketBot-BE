@@ -11,13 +11,13 @@ namespace SmartMarketBot.Infrastructure.Services;
 /// </summary>
 public sealed class PromotionService(AppDbContext db) : IPromotionService
 {
-    private static readonly TimeOnly CurrentTime = TimeOnly.FromDateTime(DateTime.Now);
-    private static readonly bool IsWeekend = DateTime.Today.DayOfWeek is DayOfWeek.Saturday or DayOfWeek.Sunday;
-
     public async Task<SponsoredRecommendationResponseDto> GetSponsoredRecommendationsAsync(
         SponsoredRecommendationQueryDto query,
         CancellationToken ct = default)
     {
+        // Đánh giá động mỗi request — tránh stale time khi API chạy lâu dài trên Azure
+        var currentTime = TimeOnly.FromDateTime(DateTime.Now);
+        var isWeekend = DateTime.Today.DayOfWeek is DayOfWeek.Saturday or DayOfWeek.Sunday;
         // 1. Lấy SearchMode + allergy tags của member
         var member = await db.Members
             .AsNoTracking()
@@ -96,8 +96,8 @@ public sealed class PromotionService(AppDbContext db) : IPromotionService
             if (sponsored.TryGetValue(p.ProductID, out var sp))
             {
                 bool timeOk = (sp.TimeSlotStart == null && sp.TimeSlotEnd == null)
-                    || (sp.TimeSlotStart <= CurrentTime && CurrentTime <= sp.TimeSlotEnd);
-                bool weekendOk = !sp.IsWeekendOnly || IsWeekend;
+                    || (sp.TimeSlotStart <= currentTime && currentTime <= sp.TimeSlotEnd);
+                bool weekendOk = !sp.IsWeekendOnly || isWeekend;
                 if (timeOk && weekendOk)
                 {
                     adScore = sp.AdScore;

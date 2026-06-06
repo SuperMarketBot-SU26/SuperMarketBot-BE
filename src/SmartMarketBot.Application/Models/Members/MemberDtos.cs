@@ -1,8 +1,12 @@
+using System.ComponentModel.DataAnnotations;
+
 namespace SmartMarketBot.Application.Models.Members;
 
 // ─── Flow 3: Budget & Health ──────────────────────────────────────────────────
 
-public sealed record SetBudgetRequestDto(decimal Budget);
+public sealed record SetBudgetRequestDto(
+    [property: Range(0, 999_999_999, ErrorMessage = "Ngân sách phải >= 0.")]
+    decimal Budget);
 
 public sealed record SetBudgetResponseDto(
     int MemberId,
@@ -11,8 +15,14 @@ public sealed record SetBudgetResponseDto(
     string Message);
 
 public sealed record ScanItemRequestDto(
+    [property: Required(ErrorMessage = "Barcode không được để trống.")]
+    [property: MinLength(1, ErrorMessage = "Barcode không hợp lệ.")]
     string Barcode,
+
+    [property: Range(0, 999_999_999, ErrorMessage = "Tổng giỏ hàng hiện tại phải >= 0.")]
     decimal CurrentCartTotal,
+
+    [property: Range(1, 999, ErrorMessage = "Số lượng quét phải >= 1.")]
     int Quantity = 1);
 
 public sealed record AlternativeProductDto(

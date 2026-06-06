@@ -81,12 +81,14 @@ public sealed class StaffService(AppDbContext db) : IStaffService
 
     public async Task CompleteRestockAsync(CompleteRestockRequestDto request, CancellationToken ct = default)
     {
-        var slot = await db.Slots.FindAsync([request.SlotId], ct);
-        if (slot is not null)
-        {
-            slot.Quantity += request.QuantityAdded;
-            slot.LastScannedAt = DateTime.UtcNow;
-            await db.SaveChangesAsync(ct);
-        }
+        var slot = await db.Slots.FindAsync([request.SlotId], ct)
+            ?? throw new KeyNotFoundException($"Slot {request.SlotId} not found. Restock could not be recorded.");
+
+        if (request.QuantityAdded <= 0)
+            throw new ArgumentException("QuantityAdded must be >= 1.", nameof(request));
+
+        slot.Quantity += request.QuantityAdded;
+        slot.LastScannedAt = DateTime.UtcNow;
+        await db.SaveChangesAsync(ct);
     }
 }

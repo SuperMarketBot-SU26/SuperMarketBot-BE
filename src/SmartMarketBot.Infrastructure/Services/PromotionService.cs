@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using SmartMarketBot.Application.Interfaces;
 using SmartMarketBot.Application.Models.Promotions;
+using SmartMarketBot.Domain.Common;
 using SmartMarketBot.Infrastructure.Persistence;
 
 namespace SmartMarketBot.Infrastructure.Services;
@@ -15,9 +16,9 @@ public sealed class PromotionService(AppDbContext db) : IPromotionService
         SponsoredRecommendationQueryDto query,
         CancellationToken ct = default)
     {
-        // Đánh giá động mỗi request — tránh stale time khi API chạy lâu dài trên Azure
-        var currentTime = TimeOnly.FromDateTime(DateTime.Now);
-        var isWeekend = DateTime.Today.DayOfWeek is DayOfWeek.Saturday or DayOfWeek.Sunday;
+        // Đánh giá động mỗi request, dùng giờ Việt Nam — tránh stale time khi deploy Azure (UTC)
+        var currentTime = VnDateTime.TimeNow;
+        var isWeekend = VnDateTime.Today.DayOfWeek is DayOfWeek.Saturday or DayOfWeek.Sunday;
         // 1. Lấy SearchMode + allergy tags của member
         var member = await db.Members
             .AsNoTracking()
@@ -63,7 +64,7 @@ public sealed class PromotionService(AppDbContext db) : IPromotionService
             .ToListAsync(ct);
 
         // 3. Lấy SponsoredProducts đang active, join với Brand và AdPackage
-        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var today = VnDateTime.DateToday;
         var sponsored = await db.SponsoredProducts
             .AsNoTracking()
             .Include(sp => sp.Brand)

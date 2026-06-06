@@ -5,6 +5,7 @@ using System.Text;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 using SmartMarketBot.Application.Interfaces;
+using SmartMarketBot.Domain.Common;
 using SmartMarketBot.Domain.Entities;
 using SmartMarketBot.Infrastructure.Options;
 
@@ -16,7 +17,7 @@ public sealed class TokenService(IOptions<JwtOptions> jwtOptions) : ITokenServic
 
     public (string Token, DateTime ExpiresAt) CreateAccessToken(Account account, IReadOnlyList<string> roles)
     {
-        var expiresAt = DateTime.UtcNow.AddMinutes(_opts.AccessTokenExpiryMinutes);
+        var expiresAt = VnDateTime.Now.AddMinutes(_opts.AccessTokenExpiryMinutes);
 
         var claims = new List<Claim>
         {

@@ -1,3 +1,5 @@
+using SmartMarketBot.Domain.Common;
+
 namespace SmartMarketBot.Domain.Entities;
 
 /// <summary>
@@ -19,7 +21,7 @@ public class EmailOtp
 
     public DateTime ExpiredAt { get; set; }
     public bool IsUsed { get; set; } = false;
-    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+    public DateTime CreatedAt { get; set; } = VnDateTime.Now;
 
     // Tạm lưu dữ liệu đăng ký cho đến khi OTP được xác nhận
     public string? TemporaryPasswordHash { get; set; }

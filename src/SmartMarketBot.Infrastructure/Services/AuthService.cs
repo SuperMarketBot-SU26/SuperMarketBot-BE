@@ -4,6 +4,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using SmartMarketBot.Application.Interfaces;
 using SmartMarketBot.Application.Models.Auth;
+using SmartMarketBot.Domain.Common;
 using SmartMarketBot.Domain.Entities;
 using SmartMarketBot.Infrastructure.Options;
 using SmartMarketBot.Infrastructure.Persistence;
@@ -39,7 +40,7 @@ public sealed class AuthService(
         if (recentOtp != null)
         {
             var cooldown = TimeSpan.FromSeconds(_emailOpts.OtpResendCooldownSeconds);
-            if (DateTime.UtcNow - recentOtp.CreatedAt < cooldown)
+            if (VnDateTime.Now - recentOtp.CreatedAt < cooldown)
                 throw new InvalidOperationException($"Vui lòng chờ {_emailOpts.OtpResendCooldownSeconds}s trước khi yêu cầu OTP mới.");
         }
 
@@ -49,7 +50,7 @@ public sealed class AuthService(
             Email = email,
             OtpCode = otpCode,
             OtpType = "Registration",
-            ExpiredAt = DateTime.UtcNow.AddMinutes(_emailOpts.OtpExpiryMinutes),
+            ExpiredAt = VnDateTime.Now.AddMinutes(_emailOpts.OtpExpiryMinutes),
             TemporaryPasswordHash = HashPassword(request.Password),
             TemporaryFullName = request.FullName,
             TemporaryPhone = request.Phone
@@ -82,7 +83,7 @@ public sealed class AuthService(
             Phone = otp.TemporaryPhone,
             EmailConfirmed = true,
             IsActive = true,
-            CreatedAt = DateTime.UtcNow,
+            CreatedAt = VnDateTime.Now,
             Role = AccountRole.Member
         };
 
@@ -107,7 +108,7 @@ public sealed class AuthService(
             throw new InvalidOperationException("Không tìm thấy yêu cầu OTP. Vui lòng bắt đầu lại.");
 
         var cooldown = TimeSpan.FromSeconds(_emailOpts.OtpResendCooldownSeconds);
-        if (DateTime.UtcNow - lastOtp.CreatedAt < cooldown)
+        if (VnDateTime.Now - lastOtp.CreatedAt < cooldown)
             throw new InvalidOperationException($"Vui lòng chờ {_emailOpts.OtpResendCooldownSeconds}s trước khi gửi lại.");
 
         lastOtp.IsUsed = true;
@@ -117,7 +118,7 @@ public sealed class AuthService(
             Email = email,
             OtpCode = newCode,
             OtpType = lastOtp.OtpType,
-            ExpiredAt = DateTime.UtcNow.AddMinutes(_emailOpts.OtpExpiryMinutes),
+            ExpiredAt = VnDateTime.Now.AddMinutes(_emailOpts.OtpExpiryMinutes),
             TemporaryPasswordHash = lastOtp.TemporaryPasswordHash,
             TemporaryFullName = lastOtp.TemporaryFullName,
             TemporaryPhone = lastOtp.TemporaryPhone
@@ -158,7 +159,7 @@ public sealed class AuthService(
             .Include(t => t.Account)
             .FirstOrDefaultAsync(t => t.RefreshToken == request.RefreshToken && !t.IsRevoked, ct);
 
-        if (tokenEntity is null || tokenEntity.ExpiryDate < DateTime.UtcNow)
+        if (tokenEntity is null || tokenEntity.ExpiryDate < VnDateTime.Now)
             throw new UnauthorizedAccessException("Refresh token không hợp lệ hoặc đã hết hạn.");
 
         var account = tokenEntity.Account;
@@ -195,7 +196,7 @@ public sealed class AuthService(
         if (recent != null)
         {
             var cooldown = TimeSpan.FromSeconds(_emailOpts.OtpResendCooldownSeconds);
-            if (DateTime.UtcNow - recent.CreatedAt < cooldown)
+            if (VnDateTime.Now - recent.CreatedAt < cooldown)
                 throw new InvalidOperationException($"Vui lòng chờ {_emailOpts.OtpResendCooldownSeconds}s.");
         }
 
@@ -205,7 +206,7 @@ public sealed class AuthService(
             Email = email,
             OtpCode = code,
             OtpType = "PasswordReset",
-            ExpiredAt = DateTime.UtcNow.AddMinutes(_emailOpts.OtpExpiryMinutes)
+            ExpiredAt = VnDateTime.Now.AddMinutes(_emailOpts.OtpExpiryMinutes)
         });
         await db.SaveChangesAsync(ct);
         await emailService.SendPasswordResetOtpAsync(email, code, ct);
@@ -226,7 +227,7 @@ public sealed class AuthService(
                    ?? throw new KeyNotFoundException("Không tìm thấy tài khoản.");
 
         account.PasswordHash = HashPassword(request.NewPassword);
-        account.UpdatedAt = DateTime.UtcNow;
+        account.UpdatedAt = VnDateTime.Now;
         otp!.IsUsed = true;
 
         // Revoke tất cả refresh token của account này
@@ -248,7 +249,7 @@ public sealed class AuthService(
         {
             AccountId = account.AccountID,
             RefreshToken = refreshToken,
-            ExpiryDate = DateTime.UtcNow.AddDays(_jwtOpts.RefreshTokenExpiryDays)
+            ExpiryDate = VnDateTime.Now.AddDays(_jwtOpts.RefreshTokenExpiryDays)
         });
         await db.SaveChangesAsync(ct);
 
@@ -268,7 +269,7 @@ public sealed class AuthService(
             throw new InvalidOperationException("Mã OTP không chính xác.");
         if (otp.IsUsed)
             throw new InvalidOperationException("Mã OTP đã được sử dụng.");
-        if (otp.ExpiredAt < DateTime.UtcNow)
+        if (otp.ExpiredAt < VnDateTime.Now)
             throw new InvalidOperationException("Mã OTP đã hết hạn.");
     }
 

@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using SmartMarketBot.Application.Interfaces;
 using SmartMarketBot.Application.Models.Members;
 using SmartMarketBot.Application.Models.Products;
+using SmartMarketBot.Domain.Common;
 using SmartMarketBot.Domain.Entities;
 using SmartMarketBot.Infrastructure.Persistence;
 
@@ -62,7 +63,7 @@ public sealed class MemberService(AppDbContext db) : IMemberService
         bool overBudget = member.ShoppingBudget.HasValue && newTotal > member.ShoppingBudget.Value;
 
         // 3. Kiểm tra mua trùng trong 7 ngày gần nhất
-        var sevenDaysAgo = DateTime.UtcNow.AddDays(-7);
+        var sevenDaysAgo = VnDateTime.Now.AddDays(-7);
         bool isDuplicate = await db.HistoryItems
             .AsNoTracking()
             .AnyAsync(hi => hi.ProductID == product.ProductID
@@ -140,7 +141,7 @@ public sealed class MemberService(AppDbContext db) : IMemberService
         var member = await db.Members.AsNoTracking().FirstOrDefaultAsync(m => m.MemberID == memberId, ct);
         if (member is null) return new MemberDealsResponseDto(memberId, [], 0);
 
-        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var today = VnDateTime.DateToday;
         var deals = new List<MemberDealDto>();
 
         // 1. Khuyến mãi đang active

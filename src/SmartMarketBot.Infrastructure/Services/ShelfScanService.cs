@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using SmartMarketBot.Application.Interfaces;
 using SmartMarketBot.Application.Models.ShelfScans;
+using SmartMarketBot.Domain.Common;
 using SmartMarketBot.Domain.Entities;
 using SmartMarketBot.Infrastructure.Persistence;
 
@@ -42,7 +43,7 @@ public sealed class ShelfScanService(AppDbContext dbContext) : IShelfScanService
             EmptyPercentage = request.EmptyPercentage,
             ImageUrl = request.ImageUrl,
             AiResponseRaw = request.AiResponseRaw,
-            ScannedAt = DateTime.UtcNow
+            ScannedAt = VnDateTime.Now
         };
 
         dbContext.ShelfScans.Add(entity);

@@ -1,3 +1,5 @@
+using SmartMarketBot.Domain.Common;
+
 namespace SmartMarketBot.Domain.Entities;
 
 public class ShelfScan
@@ -6,7 +8,7 @@ public class ShelfScan
     public int AisleID { get; set; }
     public int? ShelfLevelID { get; set; }
     public int RobotID { get; set; }
-    public DateTime ScannedAt { get; set; } = DateTime.UtcNow;
+    public DateTime ScannedAt { get; set; } = VnDateTime.Now;
     public string? ImageUrl { get; set; }
     public decimal EmptyPercentage { get; set; } = 0.00m;
 

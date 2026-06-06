@@ -1,3 +1,5 @@
+using SmartMarketBot.Domain.Common;
+
 namespace SmartMarketBot.Domain.Entities;
 
 public class Map
@@ -6,7 +8,7 @@ public class Map
     public int FloorID { get; set; }
     public string MapName { get; set; } = string.Empty;
     public string? MapData { get; set; }
-    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+    public DateTime CreatedAt { get; set; } = VnDateTime.Now;
 
     public virtual Floor Floor { get; set; } = null!;
     public virtual ICollection<NavigationNode> NavigationNodes { get; set; } = new List<NavigationNode>();

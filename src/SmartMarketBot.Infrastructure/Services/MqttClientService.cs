@@ -12,6 +12,7 @@ using MQTTnet.Protocol;
 using SmartMarketBot.Application.Interfaces;
 using SmartMarketBot.Application.Models.Robots;
 using SmartMarketBot.Application.Services;
+using SmartMarketBot.Domain.Common;
 using SmartMarketBot.Domain.Entities;
 using SmartMarketBot.Infrastructure.Options;
 using SmartMarketBot.Infrastructure.Persistence;
@@ -65,7 +66,7 @@ public sealed class MqttClientService(
         {
             command,
             payload,
-            timestamp = DateTime.UtcNow
+            timestamp = VnDateTime.Now
         });
 
         var message = new MqttApplicationMessageBuilder()
@@ -159,7 +160,7 @@ public sealed class MqttClientService(
             {
                 PropertyNameCaseInsensitive = true
             }) ?? new IncomingRobotPayload();
-            var timestamp = payload.Timestamp ?? DateTime.UtcNow;
+            var timestamp = payload.Timestamp ?? VnDateTime.Now;
 
             await using var scope = scopeFactory.CreateAsyncScope();
             var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
@@ -302,7 +303,7 @@ public sealed class MqttClientService(
                     {
                         command = "navigate",
                         payload,
-                        timestamp = DateTime.UtcNow
+                        timestamp = VnDateTime.Now
                     }))
                     .WithQualityOfServiceLevel(MqttQualityOfServiceLevel.AtLeastOnce)
                     .Build());

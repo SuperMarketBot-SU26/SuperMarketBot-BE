@@ -1,3 +1,5 @@
+using SmartMarketBot.Domain.Common;
+
 namespace SmartMarketBot.Domain.Entities;
 
 public enum AccountRole
@@ -26,7 +28,7 @@ public class Account
     public string? AvatarUrl { get; set; }
 
     public bool IsActive { get; set; } = true;
-    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+    public DateTime CreatedAt { get; set; } = VnDateTime.Now;
     public DateTime? UpdatedAt { get; set; }
 
     /// <summary>Phân quyền tĩnh: Admin=1, Staff=2, Member=3</summary>

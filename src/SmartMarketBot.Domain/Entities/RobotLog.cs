@@ -1,3 +1,5 @@
+using SmartMarketBot.Domain.Common;
+
 namespace SmartMarketBot.Domain.Entities;
 
 public class RobotLog
@@ -7,7 +9,7 @@ public class RobotLog
     public int? battery { get; set; }
     public string? location { get; set; }
     public string? status { get; set; }
-    public DateTime timestamp { get; set; } = DateTime.UtcNow;
+    public DateTime timestamp { get; set; } = VnDateTime.Now;
     public int? CurrentNodeID { get; set; }
     public string? Mode { get; set; }
     public bool? IsOnline { get; set; }

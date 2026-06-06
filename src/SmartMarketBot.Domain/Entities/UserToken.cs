@@ -1,3 +1,5 @@
+using SmartMarketBot.Domain.Common;
+
 namespace SmartMarketBot.Domain.Entities;
 
 /// <summary>
@@ -13,7 +15,7 @@ public class UserToken
     public DateTime ExpiryDate { get; set; }
     public bool IsRevoked { get; set; } = false;
 
-    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+    public DateTime CreatedAt { get; set; } = VnDateTime.Now;
 
     /// <summary>Device/browser info (tuỳ chọn — hữu ích cho "active sessions")</summary>
     public string? DeviceInfo { get; set; }

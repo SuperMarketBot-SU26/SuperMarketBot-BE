@@ -1,3 +1,5 @@
+using SmartMarketBot.Domain.Common;
+
 namespace SmartMarketBot.Domain.Entities;
 
 /// <summary>
@@ -14,7 +16,7 @@ public class MemberAlert
     public string AlertType { get; set; } = string.Empty;
 
     public string AlertMessage { get; set; } = string.Empty;
-    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+    public DateTime CreatedAt { get; set; } = VnDateTime.Now;
     public bool IsRead { get; set; } = false;
 
     public virtual Member Member { get; set; } = null!;

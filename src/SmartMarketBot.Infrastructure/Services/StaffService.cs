@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using SmartMarketBot.Application.Interfaces;
 using SmartMarketBot.Application.Models.Staff;
+using SmartMarketBot.Domain.Common;
 using SmartMarketBot.Infrastructure.Persistence;
 
 namespace SmartMarketBot.Infrastructure.Services;
@@ -88,7 +89,7 @@ public sealed class StaffService(AppDbContext db) : IStaffService
             throw new ArgumentException("QuantityAdded must be >= 1.", nameof(request));
 
         slot.Quantity += request.QuantityAdded;
-        slot.LastScannedAt = DateTime.UtcNow;
+        slot.LastScannedAt = VnDateTime.Now;
         await db.SaveChangesAsync(ct);
     }
 }

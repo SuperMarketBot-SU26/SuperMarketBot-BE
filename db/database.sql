@@ -37,6 +37,10 @@ DROP TABLE IF EXISTS dbo.ForbiddenZones;
 GO
 DROP TABLE IF EXISTS dbo.SponsoredProducts;
 GO
+DROP TABLE IF EXISTS dbo.AdPackages;
+GO
+DROP TABLE IF EXISTS dbo.Brands;
+GO
 DROP TABLE IF EXISTS dbo.PromotionProducts;
 GO
 DROP TABLE IF EXISTS dbo.Promotions;
@@ -91,7 +95,9 @@ DROP TABLE IF EXISTS dbo.Zones;
 GO
 DROP TABLE IF EXISTS dbo.Floors;
 GO
-DROP TABLE IF EXISTS dbo.Supermarkets;
+DROP TABLE IF EXISTS dbo.UserTokens;
+GO
+DROP TABLE IF EXISTS dbo.EmailOtps;
 GO
 DROP TABLE IF EXISTS dbo.Staff;
 GO
@@ -99,80 +105,103 @@ DROP TABLE IF EXISTS dbo.Admins;
 GO
 DROP TABLE IF EXISTS dbo.Members;
 GO
-DROP TABLE IF EXISTS dbo.UserRoles;
-GO
-DROP TABLE IF EXISTS dbo.Roles;
-GO
-DROP TABLE IF EXISTS dbo.Users;
+DROP TABLE IF EXISTS dbo.Accounts;
 GO
 
 -- ============================================================================
--- PART 2: ĐỊNH NGHĨA HỆ THỐNG BẢNG (38 TABLES) - CÓ GO PHÂN TÁCH LÔ XỬ LÝ
+-- PART 2: ĐỊNH NGHĨA HỆ THỐNG BẢNG (37 TABLES) - CÓ GO PHÂN TÁCH LÔ XỬ LÝ
+-- Cấu trúc 4 phân vùng chức năng theo thiết kế Thầy Đỗ Tấn Nhàn (V3.2)
 -- ============================================================================
 
--- 2.1. Phân hệ AUTH & USERS (5 Tables)
+-- ───────────────────────────────────────────────
+-- REGION 1: CUSTOMER & IDENTITY (7 Tables)
+-- ───────────────────────────────────────────────
 
--- 1. Users: Tài khoản đăng nhập chung của hệ thống (Admin, Staff, Member)
-CREATE TABLE dbo.Users (
-    UserID        INT IDENTITY(1,1) NOT NULL PRIMARY KEY,
+-- 1. Accounts: Tài khoản hệ thống — phân quyền enum tĩnh (Admin=1, Staff=2, Member=3)
+CREATE TABLE dbo.Accounts (
+    AccountID     INT IDENTITY(1,1) NOT NULL PRIMARY KEY,
     Username      NVARCHAR(100) NOT NULL UNIQUE,
     PasswordHash  NVARCHAR(500) NOT NULL,
-    Email         NVARCHAR(200) NULL,
+    Email         NVARCHAR(256) NULL,
     Phone         NVARCHAR(20) NULL,
     IsActive      BIT NOT NULL DEFAULT 1,
-    CreatedAt     DATETIME2 NOT NULL DEFAULT GETUTCDATE()
+    CreatedAt     DATETIME2 NOT NULL DEFAULT GETUTCDATE(),
+    EmailConfirmed BIT NOT NULL DEFAULT 0,
+    FullName      NVARCHAR(100) NULL,
+    AvatarUrl     NVARCHAR(500) NULL,
+    UpdatedAt     DATETIME2 NULL,
+    Role          INT NOT NULL DEFAULT 3  -- 1=Admin, 2=Staff, 3=Member
 );
 GO
 
--- 2. Roles: Vai trò hệ thống ('Admin', 'Staff', 'Member')
-CREATE TABLE dbo.Roles (
-    RoleID      INT IDENTITY(1,1) NOT NULL PRIMARY KEY,
-    RoleName    NVARCHAR(50) NOT NULL UNIQUE,
-    Description NVARCHAR(200) NULL
+CREATE UNIQUE NONCLUSTERED INDEX IX_Accounts_Email ON dbo.Accounts(Email) WHERE Email IS NOT NULL;
+GO
+
+-- 2. EmailOtps: OTP xác thực email (đăng ký, đặt lại mật khẩu)
+CREATE TABLE dbo.EmailOtps (
+    OtpId                 UNIQUEIDENTIFIER NOT NULL DEFAULT NEWID() PRIMARY KEY,
+    Email                 NVARCHAR(256)    NOT NULL,
+    OtpCode               NVARCHAR(6)      NOT NULL,
+    OtpType               NVARCHAR(50)     NOT NULL DEFAULT 'Registration',
+    ExpiredAt             DATETIME2        NOT NULL,
+    IsUsed                BIT              NOT NULL DEFAULT 0,
+    CreatedAt             DATETIME2        NOT NULL DEFAULT GETUTCDATE(),
+    TemporaryPasswordHash NVARCHAR(MAX)    NULL,
+    TemporaryFullName     NVARCHAR(100)    NULL,
+    TemporaryPhone        NVARCHAR(20)     NULL
 );
 GO
 
--- 3. UserRoles: Bảng liên kết nhiều-nhiều giữa User và Role
-CREATE TABLE dbo.UserRoles (
-    UserID INT NOT NULL FOREIGN KEY REFERENCES dbo.Users(UserID) ON DELETE CASCADE,
-    RoleID INT NOT NULL FOREIGN KEY REFERENCES dbo.Roles(RoleID) ON DELETE CASCADE,
-    PRIMARY KEY (UserID, RoleID)
+EXEC('CREATE NONCLUSTERED INDEX IX_EmailOtps_Email_Type ON dbo.EmailOtps(Email, OtpType, IsUsed) WHERE IsUsed = 0');
+EXEC('CREATE NONCLUSTERED INDEX IX_EmailOtps_ExpiredAt ON dbo.EmailOtps(ExpiredAt) WHERE IsUsed = 0');
+GO
+
+-- 3. UserTokens: Refresh token lưu theo session/thiết bị
+CREATE TABLE dbo.UserTokens (
+    TokenId      UNIQUEIDENTIFIER NOT NULL DEFAULT NEWID() PRIMARY KEY,
+    AccountId    INT              NOT NULL FOREIGN KEY REFERENCES dbo.Accounts(AccountID) ON DELETE CASCADE,
+    RefreshToken NVARCHAR(512)    NOT NULL,
+    ExpiryDate   DATETIME2        NOT NULL,
+    IsRevoked    BIT              NOT NULL DEFAULT 0,
+    CreatedAt    DATETIME2        NOT NULL DEFAULT GETUTCDATE(),
+    DeviceInfo   NVARCHAR(256)    NULL,
+    IpAddress    NVARCHAR(64)     NULL
 );
 GO
 
--- 4. Members: Hồ sơ khách hàng hội viên (Merge hoàn hảo với bảng Members của AI)
--- Giữ nguyên MemberID, FullName, PhoneNumber, FacePath, FaceVector và MemberName (computed) để tương thích ngược 100% với AI FastAPI + n8n
+CREATE NONCLUSTERED INDEX IX_UserTokens_RefreshToken ON dbo.UserTokens(RefreshToken);
+CREATE NONCLUSTERED INDEX IX_UserTokens_AccountId_IsRevoked ON dbo.UserTokens(AccountId, IsRevoked);
+GO
+
+-- 4. Members: Hồ sơ khách hàng hội viên (tương thích 100% với AI FastAPI + n8n)
 CREATE TABLE dbo.Members (
     MemberID        INT IDENTITY(1,1) NOT NULL PRIMARY KEY,
-    UserID          INT NULL FOREIGN KEY REFERENCES dbo.Users(UserID) ON DELETE SET NULL, -- Nullable đề phòng đăng ký nhanh qua Face Login trước khi lập tài khoản web
+    AccountID       INT NULL FOREIGN KEY REFERENCES dbo.Accounts(AccountID) ON DELETE SET NULL,
     FullName        NVARCHAR(255) NOT NULL,
     PhoneNumber     VARCHAR(20) NOT NULL,
     FacePath        NVARCHAR(500) NULL,
-    FaceVector      NVARCHAR(MAX) NULL, -- JSON lưu mảng nhúng khuôn mặt 128 chiều
-    MemberName      AS (FullName),      -- Cột computed giữ độ tương thích ngược với câu query cũ của n8n/FastAPI
-    Tier            NVARCHAR(20) NOT NULL DEFAULT 'Bronze', -- 'Bronze', 'Silver', 'Gold', 'Platinum'
+    FaceVector      NVARCHAR(MAX) NULL,
+    MemberName      AS (FullName),
+    Tier            NVARCHAR(20) NOT NULL DEFAULT 'Bronze',
     TotalPoints     INT NOT NULL DEFAULT 0,
     Avatar          NVARCHAR(500) NULL,
     TierUpdatedAt   DATETIME2 NULL,
-    -- Buổi 16: Cá nhân hoá chế độ mua sắm & ngân sách stop-loss
-    SearchMode      NVARCHAR(20) NOT NULL DEFAULT 'Normal', -- 'Normal', 'Healthy', 'Budget'
-    ShoppingBudget  DECIMAL(12,2) NULL  -- Hạn mức ngân sách phiên mua sắm (NULL = không giới hạn)
+    SearchMode      NVARCHAR(20) NOT NULL DEFAULT 'Normal',
+    ShoppingBudget  DECIMAL(12,2) NULL
 );
 GO
 
 -- 5. Admins: Hồ sơ quản trị viên
 CREATE TABLE dbo.Admins (
-    AdminID INT IDENTITY(1,1) NOT NULL PRIMARY KEY,
-    UserID  INT NOT NULL FOREIGN KEY REFERENCES dbo.Users(UserID) ON DELETE CASCADE
+    AdminID   INT IDENTITY(1,1) NOT NULL PRIMARY KEY,
+    AccountID INT NOT NULL FOREIGN KEY REFERENCES dbo.Accounts(AccountID) ON DELETE CASCADE
 );
 GO
 
--- 2.2. Phân hệ STAFF (1 Table)
-
--- 6. Staff: Hồ sơ nhân viên siêu thị (Nhận cảnh báo hết hàng, xử lý robot)
+-- 6. Staff: Hồ sơ nhân viên siêu thị
 CREATE TABLE dbo.Staff (
     StaffID   INT IDENTITY(1,1) NOT NULL PRIMARY KEY,
-    UserID    INT NOT NULL FOREIGN KEY REFERENCES dbo.Users(UserID) ON DELETE CASCADE,
+    AccountID INT NOT NULL FOREIGN KEY REFERENCES dbo.Accounts(AccountID) ON DELETE CASCADE,
     FirstName NVARCHAR(100) NULL,
     LastName  NVARCHAR(100) NULL,
     Phone     NVARCHAR(20) NULL,
@@ -180,22 +209,14 @@ CREATE TABLE dbo.Staff (
 );
 GO
 
--- 2.3. Phân hệ STORE STRUCTURE (6 Tables)
+-- ───────────────────────────────────────────────
+-- REGION 2: SPACE & GOODS — Store Structure (5 Tables)
+-- ───────────────────────────────────────────────
 
--- 7. Supermarkets: Thông tin siêu thị
-CREATE TABLE dbo.Supermarkets (
-    SupermarketID   INT IDENTITY(1,1) NOT NULL PRIMARY KEY,
-    SupermarketName NVARCHAR(200) NOT NULL,
-    Address         NVARCHAR(500) NULL,
-    Status          NVARCHAR(50) NOT NULL DEFAULT 'Active'
-);
-GO
-
--- 8. Floors: Tầng lầu trong siêu thị
+-- 7. Floors: Tầng lầu trong siêu thị (không còn FK tới Supermarkets — 1 siêu thị cố định)
 CREATE TABLE dbo.Floors (
-    FloorID       INT IDENTITY(1,1) NOT NULL PRIMARY KEY,
-    SupermarketID INT NOT NULL FOREIGN KEY REFERENCES dbo.Supermarkets(SupermarketID), -- Bỏ CASCADE để tránh Msg 1785
-    FloorNumber   INT NOT NULL
+    FloorID     INT IDENTITY(1,1) NOT NULL PRIMARY KEY,
+    FloorNumber INT NOT NULL
 );
 GO
 
@@ -512,22 +533,40 @@ CREATE TABLE dbo.PromotionProducts (
 );
 GO
 
--- 35. SponsoredProducts: Sản phẩm được nhà sản xuất tài trợ quảng cáo (Mô hình kiếm tiền Ad Monetization)
+-- ───────────────────────────────────────────────
+-- REGION 3: ADS & REVENUE (5 Tables incl. Brands + AdPackages)
+-- ───────────────────────────────────────────────
+
+-- 33. Brands: Nhãn hàng tài trợ quảng cáo (Ad Monetization)
+CREATE TABLE dbo.Brands (
+    BrandID     INT IDENTITY(1,1) NOT NULL PRIMARY KEY,
+    BrandName   NVARCHAR(100) NOT NULL,
+    Description NVARCHAR(500) NULL
+);
+GO
+
+-- 34. AdPackages: Gói quảng cáo — xác định AdScore, khung giờ và giá thầu
+CREATE TABLE dbo.AdPackages (
+    PackageID     INT IDENTITY(1,1) NOT NULL PRIMARY KEY,
+    PackageName   NVARCHAR(100) NOT NULL,
+    Price         DECIMAL(18,2) NOT NULL DEFAULT 0.00,
+    AdScore       INT NOT NULL DEFAULT 0,
+    TimeSlotStart TIME NULL,
+    TimeSlotEnd   TIME NULL,
+    IsWeekendOnly BIT NOT NULL DEFAULT 0
+);
+GO
+
+-- 35. SponsoredProducts: Sản phẩm được nhà sản xuất tài trợ quảng cáo
 CREATE TABLE dbo.SponsoredProducts (
-    SponsoredID       INT IDENTITY(1,1) NOT NULL PRIMARY KEY,
-    ProductID         INT NOT NULL FOREIGN KEY REFERENCES dbo.Products(ProductID), -- Bỏ CASCADE tránh cycle
-    SponsorBrand      NVARCHAR(100) NOT NULL,
-    StartDate         DATE NOT NULL,
-    EndDate           DATE NOT NULL,
-    Priority          INT NOT NULL DEFAULT 0,
-    IsActive          BIT NOT NULL DEFAULT 1,
-    -- Buổi 14, 16, 17: Hệ thống đấu thầu quảng cáo đa chiều
-    AdScore           INT NOT NULL DEFAULT 0,           -- Điểm quảng cáo cơ sở của nhãn hàng
-    TimeSlotStart     TIME NULL,                        -- Khung giờ bắt đầu (NULL = cả ngày)
-    TimeSlotEnd       TIME NULL,                        -- Khung giờ kết thúc
-    IsWeekendOnly     BIT NOT NULL DEFAULT 0,           -- Chỉ hiển thị cuối tuần
-    BidPrice          DECIMAL(12,2) NOT NULL DEFAULT 0.00, -- Giá đấu thầu mỗi lượt hiển thị
-    WeekendMultiplier DECIMAL(3,2) NOT NULL DEFAULT 1.00   -- Hệ số nhân cuối tuần/ngày lễ
+    SponsoredID INT IDENTITY(1,1) NOT NULL PRIMARY KEY,
+    ProductID   INT NOT NULL FOREIGN KEY REFERENCES dbo.Products(ProductID) ON DELETE CASCADE,
+    BrandID     INT NOT NULL FOREIGN KEY REFERENCES dbo.Brands(BrandID),
+    PackageID   INT NOT NULL FOREIGN KEY REFERENCES dbo.AdPackages(PackageID),
+    StartDate   DATE NOT NULL,
+    EndDate     DATE NOT NULL,
+    Priority    INT NOT NULL DEFAULT 0,
+    IsActive    BIT NOT NULL DEFAULT 1
 );
 
 -- 36. ForbiddenZones: Vùng cấm robot đi vào theo toạ độ 2D (Buổi 10)
@@ -630,47 +669,32 @@ GO
 -- và biểu đồ mạng lưới đường đi cho Robot di chuyển tự hành.
 -- ============================================================================
 
--- 4.1. Khởi tạo Vai trò hệ thống
-INSERT INTO dbo.Roles (RoleName, Description) VALUES 
-(N'Admin', N'Quản trị viên tối cao'),
-(N'Staff', N'Nhân viên điều phối/quét kệ siêu thị'),
-(N'Member', N'Khách hàng hội viên thân thiết');
+-- 4.1. Khởi tạo Tài khoản hệ thống (Role: 1=Admin, 2=Staff, 3=Member)
+-- Mật khẩu giả lập: 'hash_pbkdf2_code_123'
+INSERT INTO dbo.Accounts (Username, PasswordHash, Email, Phone, IsActive, EmailConfirmed, FullName, Role) VALUES 
+('admin_lth',    'hash_pbkdf2_code_123', 'hieultse161727@fpt.edu.vn', '0986515253', 1, 1, N'Lê Tiến Hiếu',  1),
+('member_qhuy',  'hash_pbkdf2_code_123', 'huynqse160498@fpt.edu.vn',  '0782766322', 1, 1, N'Nguyễn Quang Huy', 3),
+('member_ahung', 'hash_pbkdf2_code_123', 'hungnase180159@fpt.ecu.vn', '0868205403', 1, 1, N'Nguyễn Anh Hùng',  3),
+('staff_dtnhan', 'hash_pbkdf2_code_123', 'nhandt35@fe.edu.vn',        '0903056041', 1, 1, N'Đỗ Tấn Nhàn',     2);
 GO
 
--- 4.2. Khởi tạo Tài khoản & Hội viên (Mẫu ban chủ nhiệm đồ án)
--- Mật khẩu mã hoá giả lập: 'hash_pbkdf2_code_123'
-INSERT INTO dbo.Users (Username, PasswordHash, Email, Phone, IsActive) VALUES 
-('admin_lth', 'hash_pbkdf2_code_123', 'hieultse161727@fpt.edu.vn', '0986515253', 1),
-('member_qhuy', 'hash_pbkdf2_code_123', 'huynqse160498@fpt.edu.vn', '0782766322', 1),
-('member_ahung', 'hash_pbkdf2_code_123', 'hungnase180159@fpt.ecu.vn', '0868205403', 1),
-('staff_dtnhan', 'hash_pbkdf2_code_123', 'nhandt35@fe.edu.vn', '0903056041', 1);
-GO
-
--- Gắn vai trò cho tài khoản
-INSERT INTO dbo.UserRoles (UserID, RoleID) VALUES 
-(1, 1), -- admin_lth -> Admin
-(2, 3), -- member_qhuy -> Member
-(3, 3), -- member_ahung -> Member
-(4, 2); -- staff_dtnhan -> Staff
-GO
-
--- Tạo chi tiết hồ sơ Member (Hùng & Huy sẽ dùng khuôn mặt giả lập để AI quét khớp)
-INSERT INTO dbo.Members (UserID, FullName, PhoneNumber, FacePath, FaceVector, Tier, TotalPoints) VALUES 
+-- 4.2. Tạo chi tiết hồ sơ Member (Hùng & Huy dùng khuôn mặt giả lập để AI quét khớp)
+INSERT INTO dbo.Members (AccountID, FullName, PhoneNumber, FacePath, FaceVector, Tier, TotalPoints) VALUES 
 (2, N'Nguyễn Quang Huy', '0782766322', N'/storage/faces/huy_nq.jpg', N'[0.015, -0.042, 0.125, -0.098]', N'Gold', 1500),
 (3, N'Nguyễn Anh Hùng', '0868205403', N'/storage/faces/hung_na.jpg', N'[-0.032, 0.088, 0.054, 0.112]', N'Silver', 800);
 GO
 
--- Tạo hồ sơ Nhân viên (Thầy Đỗ Tấn Nhàn giám sát dự án đóng vai nhân viên kiểm kệ)
-INSERT INTO dbo.Staff (UserID, FirstName, LastName, Phone, Email) VALUES 
+-- Tạo hồ sơ Admin (Tiến Hiếu)
+INSERT INTO dbo.Admins (AccountID) VALUES (1);
+GO
+
+-- Tạo hồ sơ Nhân viên (Thầy Đỗ Tấn Nhàn)
+INSERT INTO dbo.Staff (AccountID, FirstName, LastName, Phone, Email) VALUES 
 (4, N'Nhàn', N'Đỗ Tấn', '0903056041', 'nhandt35@fe.edu.vn');
 GO
 
--- 4.3. Thiết kế Cấu trúc Siêu thị & Phân khu (Store Layout)
-INSERT INTO dbo.Supermarkets (SupermarketName, Address) VALUES 
-(N'SmartMarket FPT Campus', N'Khu Công nghệ cao Hoà Lạc, Thạch Thất, Hà Nội');
-GO
-
-INSERT INTO dbo.Floors (SupermarketID, FloorNumber) VALUES (1, 1);
+-- 4.3. Thiết kế Cấu trúc Siêu thị (1 tầng cố định — không cần Supermarkets)
+INSERT INTO dbo.Floors (FloorNumber) VALUES (1);
 GO
 
 INSERT INTO dbo.Zones (FloorID, ZoneCode, ZoneName, Description) VALUES 
@@ -842,7 +866,7 @@ INSERT INTO dbo.RobotZones (RobotID, ZoneID) VALUES
 GO
 
 -- 4.8. Bản đồ và Biểu đồ dẫn đường thông minh (Navigation Graph cho Robot)
-INSERT INTO dbo.Maps (FloorID, MapName, MapData) VALUES 
+INSERT INTO dbo.Maps (FloorID, MapName, MapData) VALUES
 (1, N'Bản đồ Tầng 1 chính thức', N'{"grid_width": 20, "grid_height": 20, "obstacle_count": 8}');
 GO
 
@@ -925,10 +949,25 @@ INSERT INTO dbo.PromotionProducts (PromotionID, ProductID, Priority) VALUES
 (1, 1, 2); -- Coca cola
 GO
 
+-- 4.11b. Khởi tạo Brands và AdPackages (Region 3: Ads & Revenue)
+INSERT INTO dbo.Brands (BrandName, Description) VALUES
+(N'Orion Vina',    N'Tập đoàn bánh kẹo Orion Vina Hàn Quốc'),
+(N'TH True Milk',  N'Công ty cổ phần thực phẩm sữa TH'),
+(N'Vinamilk',      N'Công ty cổ phần sữa Việt Nam'),
+(N'Acecook',       N'Công ty TNHH Acecook Việt Nam');
+GO
+
+INSERT INTO dbo.AdPackages (PackageName, Price, AdScore, TimeSlotStart, TimeSlotEnd, IsWeekendOnly) VALUES
+(N'Gói Sáng Sớm (07:00-12:00)',  500000.00, 85, '07:00:00', '12:00:00', 0),
+(N'Gói Cả Ngày (All Day)',        800000.00, 70, NULL,       NULL,       0),
+(N'Gói Cuối Tuần',               1200000.00,100, NULL,       NULL,       1),
+(N'Gói Giờ Vàng (17:00-21:00)',   700000.00, 90, '17:00:00','21:00:00', 0);
+GO
+
 -- Đăng ký sản phẩm quảng cáo tài trợ (Sponsored Products)
--- Hãng Orion tài trợ đẩy mạnh đề xuất Custas — khung giờ sáng + cuối tuần x1.5
-INSERT INTO dbo.SponsoredProducts (ProductID, SponsorBrand, StartDate, EndDate, Priority, IsActive, AdScore, TimeSlotStart, TimeSlotEnd, IsWeekendOnly, BidPrice, WeekendMultiplier) VALUES 
-(12, N'Orion Vina', CAST(GETUTCDATE() AS DATE), CAST(DATEADD(month, 1, GETUTCDATE()) AS DATE), 5, 1, 85, '07:00:00', '12:00:00', 0, 500.00, 1.50);
+-- Hãng Orion tài trợ Custas — dùng gói Sáng Sớm (PackageID=1, BrandID=1)
+INSERT INTO dbo.SponsoredProducts (ProductID, BrandID, PackageID, StartDate, EndDate, Priority, IsActive) VALUES 
+(12, 1, 1, CAST(GETUTCDATE() AS DATE), CAST(DATEADD(month, 1, GETUTCDATE()) AS DATE), 5, 1);
 GO
 
 -- 4.12. Seed dữ liệu 3 bảng mới
@@ -967,7 +1006,7 @@ GO
 -- ============================================================================
 PRINT '====================================================================';
 PRINT '  SUCCESS: DATABASE [SuperMarketBot] MERGED SCHEMA INITIALIZED!';
-PRINT '  38 Tables, 4 Dynamic Views & Full Supermarket Seed Data Ready!';
-PRINT '  V4.0 - Capstone Full Schema (Buổi 10, 13, 14, 15, 16, 17)';
+PRINT '  37 Tables, 4 Dynamic Views & Full Supermarket Seed Data Ready!';
+PRINT '  V3.2 - Nhàn DT Refactor: Accounts+Role, Brands, AdPackages';
 PRINT '====================================================================';
 GO

@@ -1,5 +1,4 @@
 using System.Security.Cryptography;
-using System.Text;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -28,8 +27,8 @@ public sealed class AuthService(
     {
         var email = request.Email.Trim().ToLowerInvariant();
 
-        var existingUser = await db.Users.AnyAsync(u => u.Email == email, ct);
-        if (existingUser)
+        var existingAccount = await db.Accounts.AnyAsync(a => a.Email == email, ct);
+        if (existingAccount)
             throw new InvalidOperationException("Email đã được sử dụng.");
 
         var recentOtp = await db.EmailOtps
@@ -74,33 +73,25 @@ public sealed class AuthService(
 
         ValidateOtp(otp, request.OtpCode);
 
-        // Tạo user
-        var user = new User
+        var account = new Account
         {
-            Username = email, // dùng email làm username mặc định
+            Username = email,
             Email = email,
             PasswordHash = otp!.TemporaryPasswordHash!,
             FullName = otp.TemporaryFullName,
             Phone = otp.TemporaryPhone,
             EmailConfirmed = true,
             IsActive = true,
-            CreatedAt = DateTime.UtcNow
+            CreatedAt = DateTime.UtcNow,
+            Role = AccountRole.Member
         };
 
         otp.IsUsed = true;
-        db.Users.Add(user);
+        db.Accounts.Add(account);
         await db.SaveChangesAsync(ct);
 
-        // Gán role Member mặc định
-        var memberRole = await db.Roles.FirstOrDefaultAsync(r => r.RoleName == "Member", ct);
-        if (memberRole != null)
-        {
-            db.UserRoles.Add(new UserRole { UserID = user.UserID, RoleID = memberRole.RoleID });
-            await db.SaveChangesAsync(ct);
-        }
-
-        logger.LogInformation("[Auth] User registered: {Email}", email);
-        return await BuildAuthResponseAsync(user, ct);
+        logger.LogInformation("[Auth] Account registered: {Email}", email);
+        return await BuildAuthResponseAsync(account, ct);
     }
 
     public async Task ResendOtpAsync(ResendOtpDto request, CancellationToken ct = default)
@@ -119,7 +110,6 @@ public sealed class AuthService(
         if (DateTime.UtcNow - lastOtp.CreatedAt < cooldown)
             throw new InvalidOperationException($"Vui lòng chờ {_emailOpts.OtpResendCooldownSeconds}s trước khi gửi lại.");
 
-        // Vô hiệu hoá OTP cũ → tạo mới
         lastOtp.IsUsed = true;
         var newCode = GenerateOtp();
         var newOtp = new EmailOtp
@@ -147,42 +137,40 @@ public sealed class AuthService(
     {
         var email = request.Email.Trim().ToLowerInvariant();
 
-        var user = await db.Users
-            .Include(u => u.UserRoles).ThenInclude(ur => ur.Role)
-            .FirstOrDefaultAsync(u => u.Email == email, ct);
+        var account = await db.Accounts
+            .FirstOrDefaultAsync(a => a.Email == email, ct);
 
-        if (user is null || !VerifyPassword(request.Password, user.PasswordHash))
+        if (account is null || !VerifyPassword(request.Password, account.PasswordHash))
             throw new UnauthorizedAccessException("Email hoặc mật khẩu không đúng.");
 
-        if (!user.IsActive)
+        if (!account.IsActive)
             throw new UnauthorizedAccessException("Tài khoản đã bị khóa.");
 
-        if (!user.EmailConfirmed)
+        if (!account.EmailConfirmed)
             throw new UnauthorizedAccessException("Email chưa được xác minh. Vui lòng kiểm tra hộp thư.");
 
-        return await BuildAuthResponseAsync(user, ct);
+        return await BuildAuthResponseAsync(account, ct);
     }
 
     public async Task<AuthResponseDto> RefreshTokenAsync(RefreshTokenRequestDto request, CancellationToken ct = default)
     {
         var tokenEntity = await db.UserTokens
-            .Include(t => t.User).ThenInclude(u => u.UserRoles).ThenInclude(ur => ur.Role)
+            .Include(t => t.Account)
             .FirstOrDefaultAsync(t => t.RefreshToken == request.RefreshToken && !t.IsRevoked, ct);
 
         if (tokenEntity is null || tokenEntity.ExpiryDate < DateTime.UtcNow)
             throw new UnauthorizedAccessException("Refresh token không hợp lệ hoặc đã hết hạn.");
 
-        var user = tokenEntity.User;
+        var account = tokenEntity.Account;
 
-        // Token rotation: revoke cái cũ → cấp mới
         tokenEntity.IsRevoked = true;
-        return await BuildAuthResponseAsync(user, ct);
+        return await BuildAuthResponseAsync(account, ct);
     }
 
     public async Task LogoutAsync(int userId, string refreshToken, CancellationToken ct = default)
     {
         var token = await db.UserTokens
-            .FirstOrDefaultAsync(t => t.UserId == userId && t.RefreshToken == refreshToken, ct);
+            .FirstOrDefaultAsync(t => t.AccountId == userId && t.RefreshToken == refreshToken, ct);
         if (token != null)
         {
             token.IsRevoked = true;
@@ -196,8 +184,8 @@ public sealed class AuthService(
     {
         var email = request.Email.Trim().ToLowerInvariant();
 
-        var user = await db.Users.FirstOrDefaultAsync(u => u.Email == email, ct);
-        if (user is null) return; // không tiết lộ email có tồn tại hay không
+        var account = await db.Accounts.FirstOrDefaultAsync(a => a.Email == email, ct);
+        if (account is null) return; // không tiết lộ email có tồn tại hay không
 
         var recent = await db.EmailOtps
             .Where(o => o.Email == email && o.OtpType == "PasswordReset" && !o.IsUsed)
@@ -234,15 +222,15 @@ public sealed class AuthService(
 
         ValidateOtp(otp, request.OtpCode);
 
-        var user = await db.Users.FirstOrDefaultAsync(u => u.Email == email, ct)
-                   ?? throw new KeyNotFoundException("Không tìm thấy người dùng.");
+        var account = await db.Accounts.FirstOrDefaultAsync(a => a.Email == email, ct)
+                   ?? throw new KeyNotFoundException("Không tìm thấy tài khoản.");
 
-        user.PasswordHash = HashPassword(request.NewPassword);
-        user.UpdatedAt = DateTime.UtcNow;
+        account.PasswordHash = HashPassword(request.NewPassword);
+        account.UpdatedAt = DateTime.UtcNow;
         otp!.IsUsed = true;
 
-        // Revoke tất cả refresh token
-        var tokens = db.UserTokens.Where(t => t.UserId == user.UserID && !t.IsRevoked);
+        // Revoke tất cả refresh token của account này
+        var tokens = db.UserTokens.Where(t => t.AccountId == account.AccountID && !t.IsRevoked);
         await tokens.ForEachAsync(t => t.IsRevoked = true, ct);
 
         await db.SaveChangesAsync(ct);
@@ -250,15 +238,15 @@ public sealed class AuthService(
 
     // ────────────────────── HELPERS ────────────────────────────────
 
-    private async Task<AuthResponseDto> BuildAuthResponseAsync(User user, CancellationToken ct)
+    private async Task<AuthResponseDto> BuildAuthResponseAsync(Account account, CancellationToken ct)
     {
-        var roles = user.UserRoles.Select(ur => ur.Role.RoleName).Distinct().ToList();
-        var (accessToken, expiresAt) = tokenService.CreateAccessToken(user, roles);
+        var roles = new List<string> { account.Role.ToString() };
+        var (accessToken, expiresAt) = tokenService.CreateAccessToken(account, roles);
         var refreshToken = tokenService.GenerateRefreshToken();
 
         db.UserTokens.Add(new UserToken
         {
-            UserId = user.UserID,
+            AccountId = account.AccountID,
             RefreshToken = refreshToken,
             ExpiryDate = DateTime.UtcNow.AddDays(_jwtOpts.RefreshTokenExpiryDays)
         });
@@ -268,9 +256,9 @@ public sealed class AuthService(
             accessToken,
             refreshToken,
             expiresAt,
-            user.UserID,
-            user.Email ?? string.Empty,
-            user.FullName,
+            account.AccountID,
+            account.Email ?? string.Empty,
+            account.FullName,
             roles);
     }
 

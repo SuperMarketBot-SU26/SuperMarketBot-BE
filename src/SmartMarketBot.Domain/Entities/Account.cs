@@ -1,10 +1,17 @@
 namespace SmartMarketBot.Domain.Entities;
 
-public class User
+public enum AccountRole
 {
-    public int UserID { get; set; }
+    Admin = 1,
+    Staff = 2,
+    Member = 3
+}
 
-    /// <summary>Tên đăng nhập (unique). Có thể để trống khi đăng ký qua email.</summary>
+public class Account
+{
+    public int AccountID { get; set; }
+
+    /// <summary>Tên đăng nhập (unique). Dùng email làm username mặc định.</summary>
     public string Username { get; set; } = string.Empty;
 
     public string PasswordHash { get; set; } = string.Empty;
@@ -22,10 +29,11 @@ public class User
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public DateTime? UpdatedAt { get; set; }
 
+    /// <summary>Phân quyền tĩnh: Admin=1, Staff=2, Member=3</summary>
+    public AccountRole Role { get; set; } = AccountRole.Member;
+
     // Navigation
-    public virtual ICollection<UserRole> UserRoles { get; set; } = new List<UserRole>();
     public virtual ICollection<UserToken> UserTokens { get; set; } = new List<UserToken>();
-    public virtual ICollection<Payment> Payments { get; set; } = new List<Payment>();
     public virtual Member? Member { get; set; }
     public virtual Admin? Admin { get; set; }
     public virtual Staff? Staff { get; set; }

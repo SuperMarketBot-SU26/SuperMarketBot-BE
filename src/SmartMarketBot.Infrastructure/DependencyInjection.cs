@@ -20,18 +20,16 @@ public static class DependencyInjection
         services.Configure<MqttOptions>(configuration.GetSection(MqttOptions.SectionName));
         services.Configure<AiServiceOptions>(configuration.GetSection(AiServiceOptions.SectionName));
         services.Configure<EmailOptions>(configuration.GetSection(EmailOptions.SectionName));
-        services.Configure<SePayOptions>(configuration.GetSection(SePayOptions.SectionName));
 
         // Database
         services.AddDbContext<AppDbContext>(options =>
             options.UseSqlServer(connectionString));
         services.AddScoped<IAppDbContext>(sp => sp.GetRequiredService<AppDbContext>());
 
-        // Auth / Token / Email / Payment
+        // Auth / Token / Email
         services.AddScoped<ITokenService, TokenService>();
         services.AddScoped<IEmailService, EmailService>();
         services.AddScoped<IAuthService, AuthService>();
-        services.AddScoped<ISePayService, SePayService>();
 
         // Domain services
         services.AddScoped<IProductService, ProductService>();

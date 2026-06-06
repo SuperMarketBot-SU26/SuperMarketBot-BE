@@ -7,7 +7,7 @@ namespace SmartMarketBot.Domain.Entities;
 public class UserToken
 {
     public Guid TokenId { get; set; } = Guid.NewGuid();
-    public int UserId { get; set; }
+    public int AccountId { get; set; }
 
     public string RefreshToken { get; set; } = string.Empty;
     public DateTime ExpiryDate { get; set; }
@@ -21,5 +21,5 @@ public class UserToken
     /// <summary>IP lúc cấp token</summary>
     public string? IpAddress { get; set; }
 
-    public virtual User User { get; set; } = null!;
+    public virtual Account Account { get; set; } = null!;
 }

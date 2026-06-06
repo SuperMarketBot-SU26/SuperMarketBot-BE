@@ -3,7 +3,7 @@ namespace SmartMarketBot.Domain.Entities;
 public class Member
 {
     public int MemberID { get; set; }
-    public int? UserID { get; set; }
+    public int? AccountID { get; set; }
     public string FullName { get; set; } = string.Empty;
     public string PhoneNumber { get; set; } = string.Empty;
     public string? FacePath { get; set; }
@@ -23,7 +23,7 @@ public class Member
     /// <summary>Ngân sách stop-loss (VND) — null = không giới hạn (Buổi 16)</summary>
     public decimal? ShoppingBudget { get; set; }
 
-    public virtual User? User { get; set; }
+    public virtual Account? Account { get; set; }
     public virtual ICollection<MemberHealthPreference> MemberHealthPreferences { get; set; } = new List<MemberHealthPreference>();
     public virtual ICollection<ShoppingHistory> ShoppingHistories { get; set; } = new List<ShoppingHistory>();
     public virtual ICollection<MemberAlert> MemberAlerts { get; set; } = new List<MemberAlert>();

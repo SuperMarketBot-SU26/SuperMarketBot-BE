@@ -14,16 +14,16 @@ public sealed class TokenService(IOptions<JwtOptions> jwtOptions) : ITokenServic
 {
     private readonly JwtOptions _opts = jwtOptions.Value;
 
-    public (string Token, DateTime ExpiresAt) CreateAccessToken(User user, IReadOnlyList<string> roles)
+    public (string Token, DateTime ExpiresAt) CreateAccessToken(Account account, IReadOnlyList<string> roles)
     {
         var expiresAt = DateTime.UtcNow.AddMinutes(_opts.AccessTokenExpiryMinutes);
 
         var claims = new List<Claim>
         {
-            new(JwtRegisteredClaimNames.Sub, user.UserID.ToString()),
-            new(JwtRegisteredClaimNames.Email, user.Email ?? string.Empty),
-            new(JwtRegisteredClaimNames.UniqueName, user.Username),
-            new(ClaimTypes.NameIdentifier, user.UserID.ToString()),
+            new(JwtRegisteredClaimNames.Sub, account.AccountID.ToString()),
+            new(JwtRegisteredClaimNames.Email, account.Email ?? string.Empty),
+            new(JwtRegisteredClaimNames.UniqueName, account.Username),
+            new(ClaimTypes.NameIdentifier, account.AccountID.ToString()),
             new(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString())
         };
 
@@ -55,7 +55,7 @@ public sealed class TokenService(IOptions<JwtOptions> jwtOptions) : ITokenServic
         {
             ValidateIssuer = true,
             ValidateAudience = true,
-            ValidateLifetime = false, // cho phép expired
+            ValidateLifetime = false,
             ValidateIssuerSigningKey = true,
             ValidIssuer = _opts.Issuer,
             ValidAudience = _opts.Audience,

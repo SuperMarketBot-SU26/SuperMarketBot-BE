@@ -7,7 +7,7 @@ namespace SmartMarketBot.Infrastructure.Services;
 
 /// <summary>
 /// Flow 5 — Ads Monetization.
-/// Priority Score = AdScore (SponsoredProducts bidding) + CustomerMatchScore (SearchMode/Allergy) + PromotionScore.
+/// Priority Score = AdScore (AdPackage) + CustomerMatchScore (SearchMode/Allergy) + PromotionScore.
 /// </summary>
 public sealed class PromotionService(AppDbContext db) : IPromotionService
 {
@@ -50,7 +50,7 @@ public sealed class PromotionService(AppDbContext db) : IPromotionService
             productsQuery = productsQuery.Where(p => p.ProductName.Contains(query.Query));
 
         var products = await productsQuery
-            .Take(query.Limit * 4) // lấy rộng để tính score rồi sort
+            .Take(query.Limit * 4)
             .Select(p => new
             {
                 p.ProductID,
@@ -62,21 +62,21 @@ public sealed class PromotionService(AppDbContext db) : IPromotionService
             })
             .ToListAsync(ct);
 
-        // 3. Lấy SponsoredProducts đang active
+        // 3. Lấy SponsoredProducts đang active, join với Brand và AdPackage
         var today = DateOnly.FromDateTime(DateTime.UtcNow);
         var sponsored = await db.SponsoredProducts
             .AsNoTracking()
+            .Include(sp => sp.Brand)
+            .Include(sp => sp.AdPackage)
             .Where(sp => sp.IsActive && sp.StartDate <= today && sp.EndDate >= today)
             .Select(sp => new
             {
                 sp.ProductID,
-                sp.SponsorBrand,
-                sp.AdScore,
-                sp.TimeSlotStart,
-                sp.TimeSlotEnd,
-                sp.IsWeekendOnly,
-                sp.BidPrice,
-                sp.WeekendMultiplier
+                BrandName = sp.Brand.BrandName,
+                AdScore = sp.AdPackage.AdScore,
+                TimeSlotStart = sp.AdPackage.TimeSlotStart,
+                TimeSlotEnd = sp.AdPackage.TimeSlotEnd,
+                IsWeekendOnly = sp.AdPackage.IsWeekendOnly
             })
             .ToDictionaryAsync(sp => sp.ProductID, ct);
 
@@ -91,7 +91,6 @@ public sealed class PromotionService(AppDbContext db) : IPromotionService
         // 5. Tính Priority Score
         var recommendations = products.Select(p =>
         {
-            // Ad Score
             int adScore = 0;
             string? sponsorBrand = null;
             if (sponsored.TryGetValue(p.ProductID, out var sp))
@@ -102,29 +101,20 @@ public sealed class PromotionService(AppDbContext db) : IPromotionService
                 if (timeOk && weekendOk)
                 {
                     adScore = sp.AdScore;
-                    if (IsWeekend) adScore = (int)(adScore * (double)sp.WeekendMultiplier);
-                    sponsorBrand = sp.SponsorBrand;
+                    sponsorBrand = sp.BrandName;
                 }
             }
 
-            // Customer Match Score
             int customerMatchScore = 0;
             bool hasAllergyWarning = allergenProductIds.Contains(p.ProductID);
 
             if (hasAllergyWarning)
-            {
-                customerMatchScore = -100; // trừ điểm nặng
-            }
+                customerMatchScore = -100;
             else if (searchMode == "Healthy")
-            {
                 customerMatchScore = 20;
-            }
             else if (searchMode == "Budget" && p.UnitPrice < 50000)
-            {
                 customerMatchScore = 15;
-            }
 
-            // Promotion Score
             int promotionScore = 0;
             decimal? discountedPrice = null;
             if (activePromos.TryGetValue(p.ProductID, out var promo))

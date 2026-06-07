@@ -84,8 +84,11 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
         {
             entity.ToTable("Admins");
             entity.HasKey(x => x.AdminID);
-            entity.HasOne(x => x.Account).WithMany()
-                .HasForeignKey(x => x.AccountID).OnDelete(DeleteBehavior.Cascade);
+            // 1-to-1: Account.Admin back-navigation — use WithOne to prevent shadow FK
+            entity.HasOne(x => x.Account)
+                .WithOne(a => a.Admin)
+                .HasForeignKey<Admin>(x => x.AccountID)
+                .OnDelete(DeleteBehavior.Cascade);
         });
 
         modelBuilder.Entity<Member>(entity =>
@@ -94,14 +97,24 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
             entity.HasKey(x => x.MemberID);
             entity.Property(x => x.MemberName)
                 .HasComputedColumnSql("[FullName]", stored: false);
-            entity.HasOne(x => x.Account).WithMany()
-                .HasForeignKey(x => x.AccountID).OnDelete(DeleteBehavior.SetNull);
+            entity.Property(x => x.ShoppingBudget).HasPrecision(18, 2);
+            // 1-to-1 nullable: Account.Member back-navigation
+            entity.HasOne(x => x.Account)
+                .WithOne(a => a.Member)
+                .HasForeignKey<Member>(x => x.AccountID)
+                .IsRequired(false)
+                .OnDelete(DeleteBehavior.SetNull);
         });
 
         modelBuilder.Entity<MemberHealthPreference>(entity =>
         {
             entity.ToTable("MemberHealthPreferences");
             entity.HasKey(x => new { x.MemberID, x.TagID });
+            // Explicit FK: TagID IS the FK to HealthTags — prevents shadow 'HealthTagTagID'
+            entity.HasOne(x => x.HealthTag)
+                .WithMany(h => h.MemberHealthPreferences)
+                .HasForeignKey(x => x.TagID)
+                .OnDelete(DeleteBehavior.Cascade);
         });
 
         modelBuilder.Entity<MemberAlert>(entity =>
@@ -120,6 +133,7 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
             entity.ToTable("MemberEvents");
             entity.HasKey(x => x.EventID);
             entity.Property(x => x.IsProcessed).HasDefaultValue(false);
+            entity.Property(x => x.DiscountPct).HasPrecision(18, 2);
             entity.HasIndex(x => new { x.EventDate, x.IsProcessed });
             entity.HasOne(x => x.Member).WithMany(m => m.MemberEvents)
                 .HasForeignKey(x => x.MemberID).OnDelete(DeleteBehavior.Cascade);
@@ -129,8 +143,11 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
         {
             entity.ToTable("Staff");
             entity.HasKey(x => x.StaffID);
-            entity.HasOne(x => x.Account).WithMany()
-                .HasForeignKey(x => x.AccountID).OnDelete(DeleteBehavior.Cascade);
+            // 1-to-1: Account.Staff back-navigation — use WithOne to prevent shadow FK
+            entity.HasOne(x => x.Account)
+                .WithOne(a => a.Staff)
+                .HasForeignKey<Staff>(x => x.AccountID)
+                .OnDelete(DeleteBehavior.Cascade);
         });
 
         modelBuilder.Entity<UserToken>(entity =>
@@ -196,12 +213,15 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
         {
             entity.ToTable("HistoryItems");
             entity.HasKey(x => x.HistoryItemID);
+            entity.Property(x => x.UnitPrice).HasPrecision(18, 2);
         });
 
         modelBuilder.Entity<Product>(entity =>
         {
             entity.ToTable("Products");
             entity.HasKey(x => x.ProductID);
+            entity.Property(x => x.UnitPrice).HasPrecision(18, 2);
+            entity.Property(x => x.WeightOrVolume).HasPrecision(18, 3);
             entity.HasOne(x => x.SubstituteProduct)
                 .WithMany()
                 .HasForeignKey(x => x.SubstituteProductID)
@@ -212,6 +232,15 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
         {
             entity.ToTable("ProductHealthTags");
             entity.HasKey(x => new { x.ProductID, x.TagID });
+            // Explicit FK: TagID IS the FK to HealthTags — prevents shadow 'HealthTagTagID'
+            entity.HasOne(x => x.HealthTag)
+                .WithMany(h => h.ProductHealthTags)
+                .HasForeignKey(x => x.TagID)
+                .OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne(x => x.Product)
+                .WithMany(p => p.ProductHealthTags)
+                .HasForeignKey(x => x.ProductID)
+                .OnDelete(DeleteBehavior.Cascade);
         });
 
         modelBuilder.Entity<ProductType>(entity =>
@@ -230,6 +259,7 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
         {
             entity.ToTable("ShelfScans");
             entity.HasKey(x => x.ScanID);
+            entity.Property(x => x.EmptyPercentage).HasPrecision(5, 2);
             entity.Property(x => x.NeedsRestock)
                 .HasComputedColumnSql("CASE WHEN [EmptyPercentage] > 30 THEN CAST(1 AS bit) ELSE CAST(0 AS bit) END", stored: false);
         });
@@ -238,6 +268,7 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
         {
             entity.ToTable("ShoppingHistories");
             entity.HasKey(x => x.ShoppingHistoryID);
+            entity.Property(x => x.TotalAmount).HasPrecision(18, 2);
         });
 
         modelBuilder.Entity<Slot>(entity =>
@@ -281,18 +312,26 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
         {
             entity.ToTable("SponsoredProducts");
             entity.HasKey(x => x.SponsoredID);
-            entity.HasOne(x => x.Brand).WithMany(b => b.SponsoredProducts)
-                .HasForeignKey(x => x.BrandID).OnDelete(DeleteBehavior.Restrict);
-            entity.HasOne(x => x.AdPackage).WithMany(ap => ap.SponsoredProducts)
-                .HasForeignKey(x => x.PackageID).OnDelete(DeleteBehavior.Restrict);
-            entity.HasOne(x => x.Product).WithMany()
-                .HasForeignKey(x => x.ProductID).OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne(x => x.Brand)
+                .WithMany(b => b.SponsoredProducts)
+                .HasForeignKey(x => x.BrandID)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne(x => x.AdPackage)
+                .WithMany(ap => ap.SponsoredProducts)
+                .HasForeignKey(x => x.PackageID)
+                .OnDelete(DeleteBehavior.Restrict);
+            // Explicit back-nav: prevents shadow property 'ProductID1'
+            entity.HasOne(x => x.Product)
+                .WithMany(p => p.SponsoredProducts)
+                .HasForeignKey(x => x.ProductID)
+                .OnDelete(DeleteBehavior.Cascade);
         });
 
         modelBuilder.Entity<Promotion>(entity =>
         {
             entity.ToTable("Promotions");
             entity.HasKey(x => x.PromotionID);
+            entity.Property(x => x.DiscountValue).HasPrecision(18, 2);
         });
 
         modelBuilder.Entity<PromotionProduct>(entity =>
@@ -311,6 +350,7 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
         {
             entity.ToTable("RecipeItems");
             entity.HasKey(x => new { x.RecipeID, x.ProductID });
+            entity.Property(x => x.QuantityRequired).HasPrecision(18, 3);
         });
 
         // ── Region 4: Robot & Navigation ───────────────────────────────────
@@ -382,6 +422,16 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
         {
             entity.ToTable("Workstations");
             entity.HasKey(x => x.WorkstationID);
+            // Explicit back-navs: prevents shadow FKs 'ZoneID1' and 'NavigationNodeNodeID'
+            // Zone → Workstation: NoAction to break cascade cycle
+            entity.HasOne(x => x.Zone)
+                .WithMany(z => z.Workstations)
+                .HasForeignKey(x => x.ZoneID)
+                .OnDelete(DeleteBehavior.NoAction);
+            entity.HasOne(x => x.Node)
+                .WithMany(n => n.Workstations)
+                .HasForeignKey(x => x.NodeID)
+                .OnDelete(DeleteBehavior.Cascade);
         });
 
         // ── Views ──────────────────────────────────────────────────────────

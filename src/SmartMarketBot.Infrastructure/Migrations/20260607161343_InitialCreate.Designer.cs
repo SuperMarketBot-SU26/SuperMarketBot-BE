@@ -12,8 +12,8 @@ using SmartMarketBot.Infrastructure.Persistence;
 namespace SmartMarketBot.Infrastructure.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    [Migration("20260602131847_AddAuthAndPayment")]
-    partial class AddAuthAndPayment
+    [Migration("20260607161343_InitialCreate")]
+    partial class InitialCreate
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -25,6 +25,102 @@ namespace SmartMarketBot.Infrastructure.Migrations
 
             SqlServerModelBuilderExtensions.UseIdentityColumns(modelBuilder);
 
+            modelBuilder.Entity("SmartMarketBot.Domain.Entities.Account", b =>
+                {
+                    b.Property<int>("AccountID")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("AccountID"));
+
+                    b.Property<string>("AvatarUrl")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Email")
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
+
+                    b.Property<bool>("EmailConfirmed")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("FullName")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("PasswordHash")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Phone")
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<int>("Role")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int")
+                        .HasDefaultValue(3);
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Username")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(450)");
+
+                    b.HasKey("AccountID");
+
+                    b.HasIndex("Email")
+                        .IsUnique()
+                        .HasFilter("[Email] IS NOT NULL");
+
+                    b.HasIndex("Username")
+                        .IsUnique();
+
+                    b.ToTable("Accounts", (string)null);
+                });
+
+            modelBuilder.Entity("SmartMarketBot.Domain.Entities.AdPackage", b =>
+                {
+                    b.Property<int>("PackageID")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("PackageID"));
+
+                    b.Property<int>("AdScore")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int")
+                        .HasDefaultValue(0);
+
+                    b.Property<bool>("IsWeekendOnly")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bit")
+                        .HasDefaultValue(false);
+
+                    b.Property<string>("PackageName")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<decimal>("Price")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<TimeOnly?>("TimeSlotEnd")
+                        .HasColumnType("time");
+
+                    b.Property<TimeOnly?>("TimeSlotStart")
+                        .HasColumnType("time");
+
+                    b.HasKey("PackageID");
+
+                    b.ToTable("AdPackages", (string)null);
+                });
+
             modelBuilder.Entity("SmartMarketBot.Domain.Entities.Admin", b =>
                 {
                     b.Property<int>("AdminID")
@@ -33,12 +129,12 @@ namespace SmartMarketBot.Infrastructure.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("AdminID"));
 
-                    b.Property<int>("UserID")
+                    b.Property<int>("AccountID")
                         .HasColumnType("int");
 
                     b.HasKey("AdminID");
 
-                    b.HasIndex("UserID")
+                    b.HasIndex("AccountID")
                         .IsUnique();
 
                     b.ToTable("Admins", (string)null);
@@ -73,6 +169,28 @@ namespace SmartMarketBot.Infrastructure.Migrations
                     b.HasIndex("ZoneID");
 
                     b.ToTable("Aisles", (string)null);
+                });
+
+            modelBuilder.Entity("SmartMarketBot.Domain.Entities.Brand", b =>
+                {
+                    b.Property<int>("BrandID")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("BrandID"));
+
+                    b.Property<string>("BrandName")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.HasKey("BrandID");
+
+                    b.ToTable("Brands", (string)null);
                 });
 
             modelBuilder.Entity("SmartMarketBot.Domain.Entities.Category", b =>
@@ -165,14 +283,49 @@ namespace SmartMarketBot.Infrastructure.Migrations
                     b.Property<int>("FloorNumber")
                         .HasColumnType("int");
 
-                    b.Property<int>("SupermarketID")
-                        .HasColumnType("int");
-
                     b.HasKey("FloorID");
 
-                    b.HasIndex("SupermarketID");
-
                     b.ToTable("Floors", (string)null);
+                });
+
+            modelBuilder.Entity("SmartMarketBot.Domain.Entities.ForbiddenZone", b =>
+                {
+                    b.Property<int>("ForbiddenZoneID")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("ForbiddenZoneID"));
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
+
+                    b.Property<int>("MapID")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Reason")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<double>("XMax")
+                        .HasColumnType("float");
+
+                    b.Property<double>("XMin")
+                        .HasColumnType("float");
+
+                    b.Property<double>("YMax")
+                        .HasColumnType("float");
+
+                    b.Property<double>("YMin")
+                        .HasColumnType("float");
+
+                    b.Property<string>("ZoneName")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.HasKey("ForbiddenZoneID");
+
+                    b.HasIndex("MapID");
+
+                    b.ToTable("ForbiddenZones", (string)null);
                 });
 
             modelBuilder.Entity("SmartMarketBot.Domain.Entities.HealthTag", b =>
@@ -214,6 +367,7 @@ namespace SmartMarketBot.Infrastructure.Migrations
                         .HasColumnType("int");
 
                     b.Property<decimal>("UnitPrice")
+                        .HasPrecision(18, 2)
                         .HasColumnType("decimal(18,2)");
 
                     b.HasKey("HistoryItemID");
@@ -261,6 +415,9 @@ namespace SmartMarketBot.Infrastructure.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("MemberID"));
 
+                    b.Property<int?>("AccountID")
+                        .HasColumnType("int");
+
                     b.Property<string>("Avatar")
                         .HasColumnType("nvarchar(max)");
 
@@ -284,6 +441,14 @@ namespace SmartMarketBot.Infrastructure.Migrations
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
+                    b.Property<string>("SearchMode")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<decimal?>("ShoppingBudget")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
                     b.Property<string>("Tier")
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
@@ -294,16 +459,85 @@ namespace SmartMarketBot.Infrastructure.Migrations
                     b.Property<int>("TotalPoints")
                         .HasColumnType("int");
 
-                    b.Property<int?>("UserID")
-                        .HasColumnType("int");
-
                     b.HasKey("MemberID");
 
-                    b.HasIndex("UserID")
+                    b.HasIndex("AccountID")
                         .IsUnique()
-                        .HasFilter("[UserID] IS NOT NULL");
+                        .HasFilter("[AccountID] IS NOT NULL");
 
                     b.ToTable("Members", (string)null);
+                });
+
+            modelBuilder.Entity("SmartMarketBot.Domain.Entities.MemberAlert", b =>
+                {
+                    b.Property<int>("AlertID")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("AlertID"));
+
+                    b.Property<string>("AlertMessage")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("AlertType")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("datetime2")
+                        .HasDefaultValueSql("(getutcdate())");
+
+                    b.Property<bool>("IsRead")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bit")
+                        .HasDefaultValue(false);
+
+                    b.Property<int>("MemberID")
+                        .HasColumnType("int");
+
+                    b.HasKey("AlertID");
+
+                    b.HasIndex("MemberID", "IsRead");
+
+                    b.ToTable("MemberAlerts", (string)null);
+                });
+
+            modelBuilder.Entity("SmartMarketBot.Domain.Entities.MemberEvent", b =>
+                {
+                    b.Property<int>("EventID")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("EventID"));
+
+                    b.Property<decimal?>("DiscountPct")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<DateOnly>("EventDate")
+                        .HasColumnType("date");
+
+                    b.Property<string>("EventName")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<bool>("IsProcessed")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bit")
+                        .HasDefaultValue(false);
+
+                    b.Property<int>("MemberID")
+                        .HasColumnType("int");
+
+                    b.HasKey("EventID");
+
+                    b.HasIndex("MemberID");
+
+                    b.HasIndex("EventDate", "IsProcessed");
+
+                    b.ToTable("MemberEvents", (string)null);
                 });
 
             modelBuilder.Entity("SmartMarketBot.Domain.Entities.MemberHealthPreference", b =>
@@ -314,15 +548,12 @@ namespace SmartMarketBot.Infrastructure.Migrations
                     b.Property<int>("TagID")
                         .HasColumnType("int");
 
-                    b.Property<int>("HealthTagTagID")
-                        .HasColumnType("int");
-
                     b.Property<bool>("IsAllergy")
                         .HasColumnType("bit");
 
                     b.HasKey("MemberID", "TagID");
 
-                    b.HasIndex("HealthTagTagID");
+                    b.HasIndex("TagID");
 
                     b.ToTable("MemberHealthPreferences", (string)null);
                 });
@@ -396,71 +627,6 @@ namespace SmartMarketBot.Infrastructure.Migrations
                     b.ToTable("NavigationNodes", (string)null);
                 });
 
-            modelBuilder.Entity("SmartMarketBot.Domain.Entities.Payment", b =>
-                {
-                    b.Property<Guid>("PaymentId")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uniqueidentifier")
-                        .HasDefaultValueSql("(newid())");
-
-                    b.Property<decimal>("Amount")
-                        .HasColumnType("decimal(18,2)");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("datetime2")
-                        .HasDefaultValueSql("(getutcdate())");
-
-                    b.Property<string>("Currency")
-                        .IsRequired()
-                        .ValueGeneratedOnAdd()
-                        .HasMaxLength(10)
-                        .HasColumnType("nvarchar(10)")
-                        .HasDefaultValue("VND");
-
-                    b.Property<string>("Description")
-                        .HasMaxLength(500)
-                        .HasColumnType("nvarchar(500)");
-
-                    b.Property<string>("OrderCode")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
-
-                    b.Property<DateTime?>("PaidAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<string>("QrCodeUrl")
-                        .HasMaxLength(1000)
-                        .HasColumnType("nvarchar(1000)");
-
-                    b.Property<string>("SepayTransactionId")
-                        .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
-
-                    b.Property<string>("Status")
-                        .IsRequired()
-                        .ValueGeneratedOnAdd()
-                        .HasMaxLength(20)
-                        .HasColumnType("nvarchar(20)")
-                        .HasDefaultValue("Pending");
-
-                    b.Property<int>("UserId")
-                        .HasColumnType("int");
-
-                    b.Property<string>("WebhookPayload")
-                        .HasColumnType("nvarchar(max)");
-
-                    b.HasKey("PaymentId");
-
-                    b.HasIndex("OrderCode")
-                        .IsUnique();
-
-                    b.HasIndex("UserId", "Status");
-
-                    b.ToTable("Payments", (string)null);
-                });
-
             modelBuilder.Entity("SmartMarketBot.Domain.Entities.Product", b =>
                 {
                     b.Property<int>("ProductID")
@@ -495,10 +661,12 @@ namespace SmartMarketBot.Infrastructure.Migrations
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<decimal>("UnitPrice")
+                        .HasPrecision(18, 2)
                         .HasColumnType("decimal(18,2)");
 
                     b.Property<decimal?>("WeightOrVolume")
-                        .HasColumnType("decimal(18,2)");
+                        .HasPrecision(18, 3)
+                        .HasColumnType("decimal(18,3)");
 
                     b.HasKey("ProductID");
 
@@ -517,12 +685,9 @@ namespace SmartMarketBot.Infrastructure.Migrations
                     b.Property<int>("TagID")
                         .HasColumnType("int");
 
-                    b.Property<int>("HealthTagTagID")
-                        .HasColumnType("int");
-
                     b.HasKey("ProductID", "TagID");
 
-                    b.HasIndex("HealthTagTagID");
+                    b.HasIndex("TagID");
 
                     b.ToTable("ProductHealthTags", (string)null);
                 });
@@ -558,6 +723,7 @@ namespace SmartMarketBot.Infrastructure.Migrations
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("PromotionID"));
 
                     b.Property<decimal>("DiscountValue")
+                        .HasPrecision(18, 2)
                         .HasColumnType("decimal(18,2)");
 
                     b.Property<DateOnly>("EndDate")
@@ -608,8 +774,17 @@ namespace SmartMarketBot.Infrastructure.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("RecipeID"));
 
+                    b.Property<string>("AlternativeSuggestion")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int?>("Calories")
+                        .HasColumnType("int");
+
                     b.Property<string>("Description")
                         .HasColumnType("nvarchar(max)");
+
+                    b.Property<int?>("HealthyScore")
+                        .HasColumnType("int");
 
                     b.Property<string>("ImageUrl")
                         .HasColumnType("nvarchar(max)");
@@ -635,7 +810,8 @@ namespace SmartMarketBot.Infrastructure.Migrations
                         .HasColumnType("int");
 
                     b.Property<decimal>("QuantityRequired")
-                        .HasColumnType("decimal(18,2)");
+                        .HasPrecision(18, 3)
+                        .HasColumnType("decimal(18,3)");
 
                     b.Property<string>("UnitOfMeasure")
                         .IsRequired()
@@ -760,26 +936,6 @@ namespace SmartMarketBot.Infrastructure.Migrations
                     b.ToTable("RobotZones", (string)null);
                 });
 
-            modelBuilder.Entity("SmartMarketBot.Domain.Entities.Role", b =>
-                {
-                    b.Property<int>("RoleID")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("RoleID"));
-
-                    b.Property<string>("Description")
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<string>("RoleName")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
-
-                    b.HasKey("RoleID");
-
-                    b.ToTable("Roles", (string)null);
-                });
-
             modelBuilder.Entity("SmartMarketBot.Domain.Entities.SemanticObject", b =>
                 {
                     b.Property<int>("ObjectID")
@@ -850,15 +1006,22 @@ namespace SmartMarketBot.Infrastructure.Migrations
                         .HasColumnType("int");
 
                     b.Property<decimal>("EmptyPercentage")
-                        .HasColumnType("decimal(18,2)");
+                        .HasPrecision(5, 2)
+                        .HasColumnType("decimal(5,2)");
 
                     b.Property<string>("ImageUrl")
                         .HasColumnType("nvarchar(max)");
+
+                    b.Property<bool>("IsOccluded")
+                        .HasColumnType("bit");
 
                     b.Property<bool>("NeedsRestock")
                         .ValueGeneratedOnAddOrUpdate()
                         .HasColumnType("bit")
                         .HasComputedColumnSql("CASE WHEN [EmptyPercentage] > 30 THEN CAST(1 AS bit) ELSE CAST(0 AS bit) END", false);
+
+                    b.Property<string>("OcclusionReason")
+                        .HasColumnType("nvarchar(max)");
 
                     b.Property<int>("RobotID")
                         .HasColumnType("int");
@@ -898,6 +1061,7 @@ namespace SmartMarketBot.Infrastructure.Migrations
                         .HasColumnType("datetime2");
 
                     b.Property<decimal>("TotalAmount")
+                        .HasPrecision(18, 2)
                         .HasColumnType("decimal(18,2)");
 
                     b.HasKey("ShoppingHistoryID");
@@ -915,6 +1079,9 @@ namespace SmartMarketBot.Infrastructure.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("SlotID"));
 
+                    b.Property<DateOnly?>("ExpiryDate")
+                        .HasColumnType("date");
+
                     b.Property<DateTime?>("LastScannedAt")
                         .HasColumnType("datetime2");
 
@@ -929,6 +1096,9 @@ namespace SmartMarketBot.Infrastructure.Migrations
 
                     b.Property<string>("SlotCode")
                         .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Supplier")
                         .HasColumnType("nvarchar(max)");
 
                     b.HasKey("SlotID");
@@ -948,11 +1118,17 @@ namespace SmartMarketBot.Infrastructure.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("SponsoredID"));
 
+                    b.Property<int>("BrandID")
+                        .HasColumnType("int");
+
                     b.Property<DateOnly>("EndDate")
                         .HasColumnType("date");
 
                     b.Property<bool>("IsActive")
                         .HasColumnType("bit");
+
+                    b.Property<int>("PackageID")
+                        .HasColumnType("int");
 
                     b.Property<int>("Priority")
                         .HasColumnType("int");
@@ -960,14 +1136,14 @@ namespace SmartMarketBot.Infrastructure.Migrations
                     b.Property<int>("ProductID")
                         .HasColumnType("int");
 
-                    b.Property<string>("SponsorBrand")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
-
                     b.Property<DateOnly>("StartDate")
                         .HasColumnType("date");
 
                     b.HasKey("SponsoredID");
+
+                    b.HasIndex("BrandID");
+
+                    b.HasIndex("PackageID");
 
                     b.HasIndex("ProductID");
 
@@ -982,6 +1158,9 @@ namespace SmartMarketBot.Infrastructure.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("StaffID"));
 
+                    b.Property<int>("AccountID")
+                        .HasColumnType("int");
+
                     b.Property<string>("Email")
                         .HasColumnType("nvarchar(max)");
 
@@ -994,15 +1173,12 @@ namespace SmartMarketBot.Infrastructure.Migrations
                     b.Property<string>("Phone")
                         .HasColumnType("nvarchar(max)");
 
-                    b.Property<int>("UserID")
-                        .HasColumnType("int");
-
                     b.HasKey("StaffID");
 
-                    b.HasIndex("UserID")
+                    b.HasIndex("AccountID")
                         .IsUnique();
 
-                    b.ToTable("Staffs", (string)null);
+                    b.ToTable("Staff", (string)null);
                 });
 
             modelBuilder.Entity("SmartMarketBot.Domain.Entities.Subcategory", b =>
@@ -1027,106 +1203,15 @@ namespace SmartMarketBot.Infrastructure.Migrations
                     b.ToTable("Subcategories", (string)null);
                 });
 
-            modelBuilder.Entity("SmartMarketBot.Domain.Entities.Supermarket", b =>
-                {
-                    b.Property<int>("SupermarketID")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("SupermarketID"));
-
-                    b.Property<string>("Address")
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<string>("Status")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<string>("SupermarketName")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
-
-                    b.HasKey("SupermarketID");
-
-                    b.ToTable("Supermarkets", (string)null);
-                });
-
-            modelBuilder.Entity("SmartMarketBot.Domain.Entities.User", b =>
-                {
-                    b.Property<int>("UserID")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("UserID"));
-
-                    b.Property<string>("AvatarUrl")
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<string>("Email")
-                        .HasMaxLength(256)
-                        .HasColumnType("nvarchar(256)");
-
-                    b.Property<bool>("EmailConfirmed")
-                        .HasColumnType("bit");
-
-                    b.Property<string>("FullName")
-                        .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
-
-                    b.Property<bool>("IsActive")
-                        .HasColumnType("bit");
-
-                    b.Property<string>("PasswordHash")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<string>("Phone")
-                        .HasMaxLength(20)
-                        .HasColumnType("nvarchar(20)");
-
-                    b.Property<DateTime?>("UpdatedAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<string>("Username")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(450)");
-
-                    b.HasKey("UserID");
-
-                    b.HasIndex("Email")
-                        .IsUnique()
-                        .HasFilter("[Email] IS NOT NULL");
-
-                    b.HasIndex("Username")
-                        .IsUnique();
-
-                    b.ToTable("Users", (string)null);
-                });
-
-            modelBuilder.Entity("SmartMarketBot.Domain.Entities.UserRole", b =>
-                {
-                    b.Property<int>("UserID")
-                        .HasColumnType("int");
-
-                    b.Property<int>("RoleID")
-                        .HasColumnType("int");
-
-                    b.HasKey("UserID", "RoleID");
-
-                    b.HasIndex("RoleID");
-
-                    b.ToTable("UserRoles", (string)null);
-                });
-
             modelBuilder.Entity("SmartMarketBot.Domain.Entities.UserToken", b =>
                 {
                     b.Property<Guid>("TokenId")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uniqueidentifier")
                         .HasDefaultValueSql("(newid())");
+
+                    b.Property<int>("AccountId")
+                        .HasColumnType("int");
 
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
@@ -1154,14 +1239,11 @@ namespace SmartMarketBot.Infrastructure.Migrations
                         .HasMaxLength(512)
                         .HasColumnType("nvarchar(512)");
 
-                    b.Property<int>("UserId")
-                        .HasColumnType("int");
-
                     b.HasKey("TokenId");
 
                     b.HasIndex("RefreshToken");
 
-                    b.HasIndex("UserId", "IsRevoked");
+                    b.HasIndex("AccountId", "IsRevoked");
 
                     b.ToTable("UserTokens", (string)null);
                 });
@@ -1183,7 +1265,7 @@ namespace SmartMarketBot.Infrastructure.Migrations
 
                     b.ToTable((string)null);
 
-                    b.ToView("BlockedAisleView", (string)null);
+                    b.ToView("Blocked_Aisles", (string)null);
                 });
 
             modelBuilder.Entity("SmartMarketBot.Domain.Entities.Views.PurchaseHistoryView", b =>
@@ -1203,7 +1285,7 @@ namespace SmartMarketBot.Infrastructure.Migrations
 
                     b.ToTable((string)null);
 
-                    b.ToView("PurchaseHistoryView", (string)null);
+                    b.ToView("PurchaseHistory", (string)null);
                 });
 
             modelBuilder.Entity("SmartMarketBot.Domain.Entities.Views.RealTimeStockView", b =>
@@ -1223,7 +1305,7 @@ namespace SmartMarketBot.Infrastructure.Migrations
 
                     b.ToTable((string)null);
 
-                    b.ToView("RealTimeStockView", (string)null);
+                    b.ToView("Real_Time_Stock", (string)null);
                 });
 
             modelBuilder.Entity("SmartMarketBot.Domain.Entities.Views.StoreMapView", b =>
@@ -1249,7 +1331,7 @@ namespace SmartMarketBot.Infrastructure.Migrations
 
                     b.ToTable((string)null);
 
-                    b.ToView("StoreMapView", (string)null);
+                    b.ToView("Store_Map", (string)null);
                 });
 
             modelBuilder.Entity("SmartMarketBot.Domain.Entities.Workstation", b =>
@@ -1313,13 +1395,13 @@ namespace SmartMarketBot.Infrastructure.Migrations
 
             modelBuilder.Entity("SmartMarketBot.Domain.Entities.Admin", b =>
                 {
-                    b.HasOne("SmartMarketBot.Domain.Entities.User", "User")
+                    b.HasOne("SmartMarketBot.Domain.Entities.Account", "Account")
                         .WithOne("Admin")
-                        .HasForeignKey("SmartMarketBot.Domain.Entities.Admin", "UserID")
+                        .HasForeignKey("SmartMarketBot.Domain.Entities.Admin", "AccountID")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.Navigation("User");
+                    b.Navigation("Account");
                 });
 
             modelBuilder.Entity("SmartMarketBot.Domain.Entities.Aisle", b =>
@@ -1333,15 +1415,15 @@ namespace SmartMarketBot.Infrastructure.Migrations
                     b.Navigation("Zone");
                 });
 
-            modelBuilder.Entity("SmartMarketBot.Domain.Entities.Floor", b =>
+            modelBuilder.Entity("SmartMarketBot.Domain.Entities.ForbiddenZone", b =>
                 {
-                    b.HasOne("SmartMarketBot.Domain.Entities.Supermarket", "Supermarket")
-                        .WithMany("Floors")
-                        .HasForeignKey("SupermarketID")
+                    b.HasOne("SmartMarketBot.Domain.Entities.Map", "Map")
+                        .WithMany()
+                        .HasForeignKey("MapID")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.Navigation("Supermarket");
+                    b.Navigation("Map");
                 });
 
             modelBuilder.Entity("SmartMarketBot.Domain.Entities.HistoryItem", b =>
@@ -1376,24 +1458,47 @@ namespace SmartMarketBot.Infrastructure.Migrations
 
             modelBuilder.Entity("SmartMarketBot.Domain.Entities.Member", b =>
                 {
-                    b.HasOne("SmartMarketBot.Domain.Entities.User", "User")
+                    b.HasOne("SmartMarketBot.Domain.Entities.Account", "Account")
                         .WithOne("Member")
-                        .HasForeignKey("SmartMarketBot.Domain.Entities.Member", "UserID");
+                        .HasForeignKey("SmartMarketBot.Domain.Entities.Member", "AccountID")
+                        .OnDelete(DeleteBehavior.SetNull);
 
-                    b.Navigation("User");
+                    b.Navigation("Account");
+                });
+
+            modelBuilder.Entity("SmartMarketBot.Domain.Entities.MemberAlert", b =>
+                {
+                    b.HasOne("SmartMarketBot.Domain.Entities.Member", "Member")
+                        .WithMany("MemberAlerts")
+                        .HasForeignKey("MemberID")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Member");
+                });
+
+            modelBuilder.Entity("SmartMarketBot.Domain.Entities.MemberEvent", b =>
+                {
+                    b.HasOne("SmartMarketBot.Domain.Entities.Member", "Member")
+                        .WithMany("MemberEvents")
+                        .HasForeignKey("MemberID")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Member");
                 });
 
             modelBuilder.Entity("SmartMarketBot.Domain.Entities.MemberHealthPreference", b =>
                 {
-                    b.HasOne("SmartMarketBot.Domain.Entities.HealthTag", "HealthTag")
-                        .WithMany("MemberHealthPreferences")
-                        .HasForeignKey("HealthTagTagID")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
                     b.HasOne("SmartMarketBot.Domain.Entities.Member", "Member")
                         .WithMany("MemberHealthPreferences")
                         .HasForeignKey("MemberID")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("SmartMarketBot.Domain.Entities.HealthTag", "HealthTag")
+                        .WithMany("MemberHealthPreferences")
+                        .HasForeignKey("TagID")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
@@ -1438,17 +1543,6 @@ namespace SmartMarketBot.Infrastructure.Migrations
                     b.Navigation("Map");
                 });
 
-            modelBuilder.Entity("SmartMarketBot.Domain.Entities.Payment", b =>
-                {
-                    b.HasOne("SmartMarketBot.Domain.Entities.User", "User")
-                        .WithMany("Payments")
-                        .HasForeignKey("UserId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("User");
-                });
-
             modelBuilder.Entity("SmartMarketBot.Domain.Entities.Product", b =>
                 {
                     b.HasOne("SmartMarketBot.Domain.Entities.ProductType", "ProductType")
@@ -1469,15 +1563,15 @@ namespace SmartMarketBot.Infrastructure.Migrations
 
             modelBuilder.Entity("SmartMarketBot.Domain.Entities.ProductHealthTag", b =>
                 {
-                    b.HasOne("SmartMarketBot.Domain.Entities.HealthTag", "HealthTag")
-                        .WithMany("ProductHealthTags")
-                        .HasForeignKey("HealthTagTagID")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
                     b.HasOne("SmartMarketBot.Domain.Entities.Product", "Product")
                         .WithMany("ProductHealthTags")
                         .HasForeignKey("ProductID")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("SmartMarketBot.Domain.Entities.HealthTag", "HealthTag")
+                        .WithMany("ProductHealthTags")
+                        .HasForeignKey("TagID")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
@@ -1646,24 +1740,40 @@ namespace SmartMarketBot.Infrastructure.Migrations
 
             modelBuilder.Entity("SmartMarketBot.Domain.Entities.SponsoredProduct", b =>
                 {
+                    b.HasOne("SmartMarketBot.Domain.Entities.Brand", "Brand")
+                        .WithMany("SponsoredProducts")
+                        .HasForeignKey("BrandID")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("SmartMarketBot.Domain.Entities.AdPackage", "AdPackage")
+                        .WithMany("SponsoredProducts")
+                        .HasForeignKey("PackageID")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
                     b.HasOne("SmartMarketBot.Domain.Entities.Product", "Product")
                         .WithMany("SponsoredProducts")
                         .HasForeignKey("ProductID")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
+                    b.Navigation("AdPackage");
+
+                    b.Navigation("Brand");
+
                     b.Navigation("Product");
                 });
 
             modelBuilder.Entity("SmartMarketBot.Domain.Entities.Staff", b =>
                 {
-                    b.HasOne("SmartMarketBot.Domain.Entities.User", "User")
+                    b.HasOne("SmartMarketBot.Domain.Entities.Account", "Account")
                         .WithOne("Staff")
-                        .HasForeignKey("SmartMarketBot.Domain.Entities.Staff", "UserID")
+                        .HasForeignKey("SmartMarketBot.Domain.Entities.Staff", "AccountID")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.Navigation("User");
+                    b.Navigation("Account");
                 });
 
             modelBuilder.Entity("SmartMarketBot.Domain.Entities.Subcategory", b =>
@@ -1677,34 +1787,15 @@ namespace SmartMarketBot.Infrastructure.Migrations
                     b.Navigation("Category");
                 });
 
-            modelBuilder.Entity("SmartMarketBot.Domain.Entities.UserRole", b =>
-                {
-                    b.HasOne("SmartMarketBot.Domain.Entities.Role", "Role")
-                        .WithMany("UserRoles")
-                        .HasForeignKey("RoleID")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("SmartMarketBot.Domain.Entities.User", "User")
-                        .WithMany("UserRoles")
-                        .HasForeignKey("UserID")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Role");
-
-                    b.Navigation("User");
-                });
-
             modelBuilder.Entity("SmartMarketBot.Domain.Entities.UserToken", b =>
                 {
-                    b.HasOne("SmartMarketBot.Domain.Entities.User", "User")
+                    b.HasOne("SmartMarketBot.Domain.Entities.Account", "Account")
                         .WithMany("UserTokens")
-                        .HasForeignKey("UserId")
+                        .HasForeignKey("AccountId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.Navigation("User");
+                    b.Navigation("Account");
                 });
 
             modelBuilder.Entity("SmartMarketBot.Domain.Entities.Workstation", b =>
@@ -1718,7 +1809,7 @@ namespace SmartMarketBot.Infrastructure.Migrations
                     b.HasOne("SmartMarketBot.Domain.Entities.Zone", "Zone")
                         .WithMany("Workstations")
                         .HasForeignKey("ZoneID")
-                        .OnDelete(DeleteBehavior.Cascade)
+                        .OnDelete(DeleteBehavior.NoAction)
                         .IsRequired();
 
                     b.Navigation("Node");
@@ -1737,6 +1828,22 @@ namespace SmartMarketBot.Infrastructure.Migrations
                     b.Navigation("Floor");
                 });
 
+            modelBuilder.Entity("SmartMarketBot.Domain.Entities.Account", b =>
+                {
+                    b.Navigation("Admin");
+
+                    b.Navigation("Member");
+
+                    b.Navigation("Staff");
+
+                    b.Navigation("UserTokens");
+                });
+
+            modelBuilder.Entity("SmartMarketBot.Domain.Entities.AdPackage", b =>
+                {
+                    b.Navigation("SponsoredProducts");
+                });
+
             modelBuilder.Entity("SmartMarketBot.Domain.Entities.Aisle", b =>
                 {
                     b.Navigation("NavigationNodes");
@@ -1744,6 +1851,11 @@ namespace SmartMarketBot.Infrastructure.Migrations
                     b.Navigation("ShelfLevels");
 
                     b.Navigation("ShelfScans");
+                });
+
+            modelBuilder.Entity("SmartMarketBot.Domain.Entities.Brand", b =>
+                {
+                    b.Navigation("SponsoredProducts");
                 });
 
             modelBuilder.Entity("SmartMarketBot.Domain.Entities.Category", b =>
@@ -1774,6 +1886,10 @@ namespace SmartMarketBot.Infrastructure.Migrations
 
             modelBuilder.Entity("SmartMarketBot.Domain.Entities.Member", b =>
                 {
+                    b.Navigation("MemberAlerts");
+
+                    b.Navigation("MemberEvents");
+
                     b.Navigation("MemberHealthPreferences");
 
                     b.Navigation("ShoppingHistories");
@@ -1829,11 +1945,6 @@ namespace SmartMarketBot.Infrastructure.Migrations
                     b.Navigation("ShelfScans");
                 });
 
-            modelBuilder.Entity("SmartMarketBot.Domain.Entities.Role", b =>
-                {
-                    b.Navigation("UserRoles");
-                });
-
             modelBuilder.Entity("SmartMarketBot.Domain.Entities.ShelfLevel", b =>
                 {
                     b.Navigation("ShelfScans");
@@ -1849,26 +1960,6 @@ namespace SmartMarketBot.Infrastructure.Migrations
             modelBuilder.Entity("SmartMarketBot.Domain.Entities.Subcategory", b =>
                 {
                     b.Navigation("ProductTypes");
-                });
-
-            modelBuilder.Entity("SmartMarketBot.Domain.Entities.Supermarket", b =>
-                {
-                    b.Navigation("Floors");
-                });
-
-            modelBuilder.Entity("SmartMarketBot.Domain.Entities.User", b =>
-                {
-                    b.Navigation("Admin");
-
-                    b.Navigation("Member");
-
-                    b.Navigation("Payments");
-
-                    b.Navigation("Staff");
-
-                    b.Navigation("UserRoles");
-
-                    b.Navigation("UserTokens");
                 });
 
             modelBuilder.Entity("SmartMarketBot.Domain.Entities.Zone", b =>

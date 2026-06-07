@@ -6,11 +6,66 @@ using Microsoft.EntityFrameworkCore.Migrations;
 namespace SmartMarketBot.Infrastructure.Migrations
 {
     /// <inheritdoc />
-    public partial class AddAuthAndPayment : Migration
+    public partial class InitialCreate : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
+            migrationBuilder.CreateTable(
+                name: "Accounts",
+                columns: table => new
+                {
+                    AccountID = table.Column<int>(type: "int", nullable: false)
+                        .Annotation("SqlServer:Identity", "1, 1"),
+                    Username = table.Column<string>(type: "nvarchar(450)", nullable: false),
+                    PasswordHash = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    Email = table.Column<string>(type: "nvarchar(256)", maxLength: 256, nullable: true),
+                    EmailConfirmed = table.Column<bool>(type: "bit", nullable: false),
+                    FullName = table.Column<string>(type: "nvarchar(100)", maxLength: 100, nullable: true),
+                    Phone = table.Column<string>(type: "nvarchar(20)", maxLength: 20, nullable: true),
+                    AvatarUrl = table.Column<string>(type: "nvarchar(max)", nullable: true),
+                    IsActive = table.Column<bool>(type: "bit", nullable: false),
+                    CreatedAt = table.Column<DateTime>(type: "datetime2", nullable: false),
+                    UpdatedAt = table.Column<DateTime>(type: "datetime2", nullable: true),
+                    Role = table.Column<int>(type: "int", nullable: false, defaultValue: 3)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_Accounts", x => x.AccountID);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "AdPackages",
+                columns: table => new
+                {
+                    PackageID = table.Column<int>(type: "int", nullable: false)
+                        .Annotation("SqlServer:Identity", "1, 1"),
+                    PackageName = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    Price = table.Column<decimal>(type: "decimal(18,2)", nullable: false),
+                    AdScore = table.Column<int>(type: "int", nullable: false, defaultValue: 0),
+                    TimeSlotStart = table.Column<TimeOnly>(type: "time", nullable: true),
+                    TimeSlotEnd = table.Column<TimeOnly>(type: "time", nullable: true),
+                    IsWeekendOnly = table.Column<bool>(type: "bit", nullable: false, defaultValue: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_AdPackages", x => x.PackageID);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "Brands",
+                columns: table => new
+                {
+                    BrandID = table.Column<int>(type: "int", nullable: false)
+                        .Annotation("SqlServer:Identity", "1, 1"),
+                    BrandName = table.Column<string>(type: "nvarchar(100)", maxLength: 100, nullable: false),
+                    Description = table.Column<string>(type: "nvarchar(500)", maxLength: 500, nullable: true)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_Brands", x => x.BrandID);
+                });
+
             migrationBuilder.CreateTable(
                 name: "Categories",
                 columns: table => new
@@ -46,6 +101,19 @@ namespace SmartMarketBot.Infrastructure.Migrations
                 });
 
             migrationBuilder.CreateTable(
+                name: "Floors",
+                columns: table => new
+                {
+                    FloorID = table.Column<int>(type: "int", nullable: false)
+                        .Annotation("SqlServer:Identity", "1, 1"),
+                    FloorNumber = table.Column<int>(type: "int", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_Floors", x => x.FloorID);
+                });
+
+            migrationBuilder.CreateTable(
                 name: "HealthTags",
                 columns: table => new
                 {
@@ -67,7 +135,7 @@ namespace SmartMarketBot.Infrastructure.Migrations
                         .Annotation("SqlServer:Identity", "1, 1"),
                     PromotionName = table.Column<string>(type: "nvarchar(max)", nullable: false),
                     PromotionType = table.Column<string>(type: "nvarchar(max)", nullable: false),
-                    DiscountValue = table.Column<decimal>(type: "decimal(18,2)", nullable: false),
+                    DiscountValue = table.Column<decimal>(type: "decimal(18,2)", precision: 18, scale: 2, nullable: false),
                     StartDate = table.Column<DateOnly>(type: "date", nullable: false),
                     EndDate = table.Column<DateOnly>(type: "date", nullable: false),
                     IsActive = table.Column<bool>(type: "bit", nullable: false)
@@ -86,7 +154,10 @@ namespace SmartMarketBot.Infrastructure.Migrations
                     RecipeName = table.Column<string>(type: "nvarchar(max)", nullable: false),
                     Description = table.Column<string>(type: "nvarchar(max)", nullable: true),
                     YieldPortions = table.Column<int>(type: "int", nullable: false),
-                    ImageUrl = table.Column<string>(type: "nvarchar(max)", nullable: true)
+                    ImageUrl = table.Column<string>(type: "nvarchar(max)", nullable: true),
+                    Calories = table.Column<int>(type: "int", nullable: true),
+                    HealthyScore = table.Column<int>(type: "int", nullable: true),
+                    AlternativeSuggestion = table.Column<string>(type: "nvarchar(max)", nullable: true)
                 },
                 constraints: table =>
                 {
@@ -114,54 +185,99 @@ namespace SmartMarketBot.Infrastructure.Migrations
                 });
 
             migrationBuilder.CreateTable(
-                name: "Roles",
+                name: "Admins",
                 columns: table => new
                 {
-                    RoleID = table.Column<int>(type: "int", nullable: false)
+                    AdminID = table.Column<int>(type: "int", nullable: false)
                         .Annotation("SqlServer:Identity", "1, 1"),
-                    RoleName = table.Column<string>(type: "nvarchar(max)", nullable: false),
-                    Description = table.Column<string>(type: "nvarchar(max)", nullable: true)
+                    AccountID = table.Column<int>(type: "int", nullable: false)
                 },
                 constraints: table =>
                 {
-                    table.PrimaryKey("PK_Roles", x => x.RoleID);
+                    table.PrimaryKey("PK_Admins", x => x.AdminID);
+                    table.ForeignKey(
+                        name: "FK_Admins_Accounts_AccountID",
+                        column: x => x.AccountID,
+                        principalTable: "Accounts",
+                        principalColumn: "AccountID",
+                        onDelete: ReferentialAction.Cascade);
                 });
 
             migrationBuilder.CreateTable(
-                name: "Supermarkets",
+                name: "Members",
                 columns: table => new
                 {
-                    SupermarketID = table.Column<int>(type: "int", nullable: false)
+                    MemberID = table.Column<int>(type: "int", nullable: false)
                         .Annotation("SqlServer:Identity", "1, 1"),
-                    SupermarketName = table.Column<string>(type: "nvarchar(max)", nullable: false),
-                    Address = table.Column<string>(type: "nvarchar(max)", nullable: true),
-                    Status = table.Column<string>(type: "nvarchar(max)", nullable: false)
+                    AccountID = table.Column<int>(type: "int", nullable: true),
+                    FullName = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    PhoneNumber = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    FacePath = table.Column<string>(type: "nvarchar(max)", nullable: true),
+                    FaceVector = table.Column<string>(type: "nvarchar(max)", nullable: true),
+                    MemberName = table.Column<string>(type: "nvarchar(max)", nullable: false, computedColumnSql: "[FullName]", stored: false),
+                    Tier = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    TotalPoints = table.Column<int>(type: "int", nullable: false),
+                    Avatar = table.Column<string>(type: "nvarchar(max)", nullable: true),
+                    TierUpdatedAt = table.Column<DateTime>(type: "datetime2", nullable: true),
+                    SearchMode = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    ShoppingBudget = table.Column<decimal>(type: "decimal(18,2)", precision: 18, scale: 2, nullable: true)
                 },
                 constraints: table =>
                 {
-                    table.PrimaryKey("PK_Supermarkets", x => x.SupermarketID);
+                    table.PrimaryKey("PK_Members", x => x.MemberID);
+                    table.ForeignKey(
+                        name: "FK_Members_Accounts_AccountID",
+                        column: x => x.AccountID,
+                        principalTable: "Accounts",
+                        principalColumn: "AccountID",
+                        onDelete: ReferentialAction.SetNull);
                 });
 
             migrationBuilder.CreateTable(
-                name: "Users",
+                name: "Staff",
                 columns: table => new
                 {
-                    UserID = table.Column<int>(type: "int", nullable: false)
+                    StaffID = table.Column<int>(type: "int", nullable: false)
                         .Annotation("SqlServer:Identity", "1, 1"),
-                    Username = table.Column<string>(type: "nvarchar(450)", nullable: false),
-                    PasswordHash = table.Column<string>(type: "nvarchar(max)", nullable: false),
-                    Email = table.Column<string>(type: "nvarchar(256)", maxLength: 256, nullable: true),
-                    EmailConfirmed = table.Column<bool>(type: "bit", nullable: false),
-                    FullName = table.Column<string>(type: "nvarchar(100)", maxLength: 100, nullable: true),
-                    Phone = table.Column<string>(type: "nvarchar(20)", maxLength: 20, nullable: true),
-                    AvatarUrl = table.Column<string>(type: "nvarchar(max)", nullable: true),
-                    IsActive = table.Column<bool>(type: "bit", nullable: false),
-                    CreatedAt = table.Column<DateTime>(type: "datetime2", nullable: false),
-                    UpdatedAt = table.Column<DateTime>(type: "datetime2", nullable: true)
+                    AccountID = table.Column<int>(type: "int", nullable: false),
+                    FirstName = table.Column<string>(type: "nvarchar(max)", nullable: true),
+                    LastName = table.Column<string>(type: "nvarchar(max)", nullable: true),
+                    Phone = table.Column<string>(type: "nvarchar(max)", nullable: true),
+                    Email = table.Column<string>(type: "nvarchar(max)", nullable: true)
                 },
                 constraints: table =>
                 {
-                    table.PrimaryKey("PK_Users", x => x.UserID);
+                    table.PrimaryKey("PK_Staff", x => x.StaffID);
+                    table.ForeignKey(
+                        name: "FK_Staff_Accounts_AccountID",
+                        column: x => x.AccountID,
+                        principalTable: "Accounts",
+                        principalColumn: "AccountID",
+                        onDelete: ReferentialAction.Cascade);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "UserTokens",
+                columns: table => new
+                {
+                    TokenId = table.Column<Guid>(type: "uniqueidentifier", nullable: false, defaultValueSql: "(newid())"),
+                    AccountId = table.Column<int>(type: "int", nullable: false),
+                    RefreshToken = table.Column<string>(type: "nvarchar(512)", maxLength: 512, nullable: false),
+                    ExpiryDate = table.Column<DateTime>(type: "datetime2", nullable: false),
+                    IsRevoked = table.Column<bool>(type: "bit", nullable: false, defaultValue: false),
+                    CreatedAt = table.Column<DateTime>(type: "datetime2", nullable: false, defaultValueSql: "(getutcdate())"),
+                    DeviceInfo = table.Column<string>(type: "nvarchar(256)", maxLength: 256, nullable: true),
+                    IpAddress = table.Column<string>(type: "nvarchar(64)", maxLength: 64, nullable: true)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_UserTokens", x => x.TokenId);
+                    table.ForeignKey(
+                        name: "FK_UserTokens_Accounts_AccountId",
+                        column: x => x.AccountId,
+                        principalTable: "Accounts",
+                        principalColumn: "AccountID",
+                        onDelete: ReferentialAction.Cascade);
                 });
 
             migrationBuilder.CreateTable(
@@ -181,191 +297,6 @@ namespace SmartMarketBot.Infrastructure.Migrations
                         column: x => x.CategoryID,
                         principalTable: "Categories",
                         principalColumn: "CategoryID",
-                        onDelete: ReferentialAction.Cascade);
-                });
-
-            migrationBuilder.CreateTable(
-                name: "Floors",
-                columns: table => new
-                {
-                    FloorID = table.Column<int>(type: "int", nullable: false)
-                        .Annotation("SqlServer:Identity", "1, 1"),
-                    SupermarketID = table.Column<int>(type: "int", nullable: false),
-                    FloorNumber = table.Column<int>(type: "int", nullable: false)
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_Floors", x => x.FloorID);
-                    table.ForeignKey(
-                        name: "FK_Floors_Supermarkets_SupermarketID",
-                        column: x => x.SupermarketID,
-                        principalTable: "Supermarkets",
-                        principalColumn: "SupermarketID",
-                        onDelete: ReferentialAction.Cascade);
-                });
-
-            migrationBuilder.CreateTable(
-                name: "Admins",
-                columns: table => new
-                {
-                    AdminID = table.Column<int>(type: "int", nullable: false)
-                        .Annotation("SqlServer:Identity", "1, 1"),
-                    UserID = table.Column<int>(type: "int", nullable: false)
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_Admins", x => x.AdminID);
-                    table.ForeignKey(
-                        name: "FK_Admins_Users_UserID",
-                        column: x => x.UserID,
-                        principalTable: "Users",
-                        principalColumn: "UserID",
-                        onDelete: ReferentialAction.Cascade);
-                });
-
-            migrationBuilder.CreateTable(
-                name: "Members",
-                columns: table => new
-                {
-                    MemberID = table.Column<int>(type: "int", nullable: false)
-                        .Annotation("SqlServer:Identity", "1, 1"),
-                    UserID = table.Column<int>(type: "int", nullable: true),
-                    FullName = table.Column<string>(type: "nvarchar(max)", nullable: false),
-                    PhoneNumber = table.Column<string>(type: "nvarchar(max)", nullable: false),
-                    FacePath = table.Column<string>(type: "nvarchar(max)", nullable: true),
-                    FaceVector = table.Column<string>(type: "nvarchar(max)", nullable: true),
-                    MemberName = table.Column<string>(type: "nvarchar(max)", nullable: false, computedColumnSql: "[FullName]", stored: false),
-                    Tier = table.Column<string>(type: "nvarchar(max)", nullable: false),
-                    TotalPoints = table.Column<int>(type: "int", nullable: false),
-                    Avatar = table.Column<string>(type: "nvarchar(max)", nullable: true),
-                    TierUpdatedAt = table.Column<DateTime>(type: "datetime2", nullable: true)
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_Members", x => x.MemberID);
-                    table.ForeignKey(
-                        name: "FK_Members_Users_UserID",
-                        column: x => x.UserID,
-                        principalTable: "Users",
-                        principalColumn: "UserID");
-                });
-
-            migrationBuilder.CreateTable(
-                name: "Payments",
-                columns: table => new
-                {
-                    PaymentId = table.Column<Guid>(type: "uniqueidentifier", nullable: false, defaultValueSql: "(newid())"),
-                    UserId = table.Column<int>(type: "int", nullable: false),
-                    OrderCode = table.Column<string>(type: "nvarchar(100)", maxLength: 100, nullable: false),
-                    Amount = table.Column<decimal>(type: "decimal(18,2)", nullable: false),
-                    Currency = table.Column<string>(type: "nvarchar(10)", maxLength: 10, nullable: false, defaultValue: "VND"),
-                    Status = table.Column<string>(type: "nvarchar(20)", maxLength: 20, nullable: false, defaultValue: "Pending"),
-                    Description = table.Column<string>(type: "nvarchar(500)", maxLength: 500, nullable: true),
-                    QrCodeUrl = table.Column<string>(type: "nvarchar(1000)", maxLength: 1000, nullable: true),
-                    SepayTransactionId = table.Column<string>(type: "nvarchar(100)", maxLength: 100, nullable: true),
-                    WebhookPayload = table.Column<string>(type: "nvarchar(max)", nullable: true),
-                    CreatedAt = table.Column<DateTime>(type: "datetime2", nullable: false, defaultValueSql: "(getutcdate())"),
-                    PaidAt = table.Column<DateTime>(type: "datetime2", nullable: true)
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_Payments", x => x.PaymentId);
-                    table.ForeignKey(
-                        name: "FK_Payments_Users_UserId",
-                        column: x => x.UserId,
-                        principalTable: "Users",
-                        principalColumn: "UserID",
-                        onDelete: ReferentialAction.Cascade);
-                });
-
-            migrationBuilder.CreateTable(
-                name: "Staffs",
-                columns: table => new
-                {
-                    StaffID = table.Column<int>(type: "int", nullable: false)
-                        .Annotation("SqlServer:Identity", "1, 1"),
-                    UserID = table.Column<int>(type: "int", nullable: false),
-                    FirstName = table.Column<string>(type: "nvarchar(max)", nullable: true),
-                    LastName = table.Column<string>(type: "nvarchar(max)", nullable: true),
-                    Phone = table.Column<string>(type: "nvarchar(max)", nullable: true),
-                    Email = table.Column<string>(type: "nvarchar(max)", nullable: true)
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_Staffs", x => x.StaffID);
-                    table.ForeignKey(
-                        name: "FK_Staffs_Users_UserID",
-                        column: x => x.UserID,
-                        principalTable: "Users",
-                        principalColumn: "UserID",
-                        onDelete: ReferentialAction.Cascade);
-                });
-
-            migrationBuilder.CreateTable(
-                name: "UserRoles",
-                columns: table => new
-                {
-                    UserID = table.Column<int>(type: "int", nullable: false),
-                    RoleID = table.Column<int>(type: "int", nullable: false)
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_UserRoles", x => new { x.UserID, x.RoleID });
-                    table.ForeignKey(
-                        name: "FK_UserRoles_Roles_RoleID",
-                        column: x => x.RoleID,
-                        principalTable: "Roles",
-                        principalColumn: "RoleID",
-                        onDelete: ReferentialAction.Cascade);
-                    table.ForeignKey(
-                        name: "FK_UserRoles_Users_UserID",
-                        column: x => x.UserID,
-                        principalTable: "Users",
-                        principalColumn: "UserID",
-                        onDelete: ReferentialAction.Cascade);
-                });
-
-            migrationBuilder.CreateTable(
-                name: "UserTokens",
-                columns: table => new
-                {
-                    TokenId = table.Column<Guid>(type: "uniqueidentifier", nullable: false, defaultValueSql: "(newid())"),
-                    UserId = table.Column<int>(type: "int", nullable: false),
-                    RefreshToken = table.Column<string>(type: "nvarchar(512)", maxLength: 512, nullable: false),
-                    ExpiryDate = table.Column<DateTime>(type: "datetime2", nullable: false),
-                    IsRevoked = table.Column<bool>(type: "bit", nullable: false, defaultValue: false),
-                    CreatedAt = table.Column<DateTime>(type: "datetime2", nullable: false, defaultValueSql: "(getutcdate())"),
-                    DeviceInfo = table.Column<string>(type: "nvarchar(256)", maxLength: 256, nullable: true),
-                    IpAddress = table.Column<string>(type: "nvarchar(64)", maxLength: 64, nullable: true)
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_UserTokens", x => x.TokenId);
-                    table.ForeignKey(
-                        name: "FK_UserTokens_Users_UserId",
-                        column: x => x.UserId,
-                        principalTable: "Users",
-                        principalColumn: "UserID",
-                        onDelete: ReferentialAction.Cascade);
-                });
-
-            migrationBuilder.CreateTable(
-                name: "ProductTypes",
-                columns: table => new
-                {
-                    ProductTypeID = table.Column<int>(type: "int", nullable: false)
-                        .Annotation("SqlServer:Identity", "1, 1"),
-                    SubcategoryID = table.Column<int>(type: "int", nullable: false),
-                    ProductTypeName = table.Column<string>(type: "nvarchar(max)", nullable: false)
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_ProductTypes", x => x.ProductTypeID);
-                    table.ForeignKey(
-                        name: "FK_ProductTypes_Subcategories_SubcategoryID",
-                        column: x => x.SubcategoryID,
-                        principalTable: "Subcategories",
-                        principalColumn: "SubcategoryID",
                         onDelete: ReferentialAction.Cascade);
                 });
 
@@ -415,20 +346,65 @@ namespace SmartMarketBot.Infrastructure.Migrations
                 });
 
             migrationBuilder.CreateTable(
+                name: "MemberAlerts",
+                columns: table => new
+                {
+                    AlertID = table.Column<int>(type: "int", nullable: false)
+                        .Annotation("SqlServer:Identity", "1, 1"),
+                    MemberID = table.Column<int>(type: "int", nullable: false),
+                    AlertType = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    AlertMessage = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    CreatedAt = table.Column<DateTime>(type: "datetime2", nullable: false, defaultValueSql: "(getutcdate())"),
+                    IsRead = table.Column<bool>(type: "bit", nullable: false, defaultValue: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_MemberAlerts", x => x.AlertID);
+                    table.ForeignKey(
+                        name: "FK_MemberAlerts_Members_MemberID",
+                        column: x => x.MemberID,
+                        principalTable: "Members",
+                        principalColumn: "MemberID",
+                        onDelete: ReferentialAction.Cascade);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "MemberEvents",
+                columns: table => new
+                {
+                    EventID = table.Column<int>(type: "int", nullable: false)
+                        .Annotation("SqlServer:Identity", "1, 1"),
+                    MemberID = table.Column<int>(type: "int", nullable: false),
+                    EventName = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    EventDate = table.Column<DateOnly>(type: "date", nullable: false),
+                    DiscountPct = table.Column<decimal>(type: "decimal(18,2)", precision: 18, scale: 2, nullable: true),
+                    IsProcessed = table.Column<bool>(type: "bit", nullable: false, defaultValue: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_MemberEvents", x => x.EventID);
+                    table.ForeignKey(
+                        name: "FK_MemberEvents_Members_MemberID",
+                        column: x => x.MemberID,
+                        principalTable: "Members",
+                        principalColumn: "MemberID",
+                        onDelete: ReferentialAction.Cascade);
+                });
+
+            migrationBuilder.CreateTable(
                 name: "MemberHealthPreferences",
                 columns: table => new
                 {
                     MemberID = table.Column<int>(type: "int", nullable: false),
                     TagID = table.Column<int>(type: "int", nullable: false),
-                    IsAllergy = table.Column<bool>(type: "bit", nullable: false),
-                    HealthTagTagID = table.Column<int>(type: "int", nullable: false)
+                    IsAllergy = table.Column<bool>(type: "bit", nullable: false)
                 },
                 constraints: table =>
                 {
                     table.PrimaryKey("PK_MemberHealthPreferences", x => new { x.MemberID, x.TagID });
                     table.ForeignKey(
-                        name: "FK_MemberHealthPreferences_HealthTags_HealthTagTagID",
-                        column: x => x.HealthTagTagID,
+                        name: "FK_MemberHealthPreferences_HealthTags_TagID",
+                        column: x => x.TagID,
                         principalTable: "HealthTags",
                         principalColumn: "TagID",
                         onDelete: ReferentialAction.Cascade);
@@ -448,7 +424,7 @@ namespace SmartMarketBot.Infrastructure.Migrations
                         .Annotation("SqlServer:Identity", "1, 1"),
                     MemberID = table.Column<int>(type: "int", nullable: false),
                     ShoppingDate = table.Column<DateTime>(type: "datetime2", nullable: false),
-                    TotalAmount = table.Column<decimal>(type: "decimal(18,2)", nullable: false),
+                    TotalAmount = table.Column<decimal>(type: "decimal(18,2)", precision: 18, scale: 2, nullable: false),
                     PaymentMethod = table.Column<string>(type: "nvarchar(max)", nullable: true)
                 },
                 constraints: table =>
@@ -463,36 +439,49 @@ namespace SmartMarketBot.Infrastructure.Migrations
                 });
 
             migrationBuilder.CreateTable(
-                name: "Products",
+                name: "ProductTypes",
                 columns: table => new
                 {
-                    ProductID = table.Column<int>(type: "int", nullable: false)
+                    ProductTypeID = table.Column<int>(type: "int", nullable: false)
                         .Annotation("SqlServer:Identity", "1, 1"),
-                    ProductTypeID = table.Column<int>(type: "int", nullable: false),
-                    ProductName = table.Column<string>(type: "nvarchar(max)", nullable: false),
-                    UnitPrice = table.Column<decimal>(type: "decimal(18,2)", nullable: false),
-                    Barcode = table.Column<string>(type: "nvarchar(max)", nullable: true),
-                    ImageUrl = table.Column<string>(type: "nvarchar(max)", nullable: true),
-                    WeightOrVolume = table.Column<decimal>(type: "decimal(18,2)", nullable: true),
-                    Unit = table.Column<string>(type: "nvarchar(max)", nullable: true),
-                    Description = table.Column<string>(type: "nvarchar(max)", nullable: true),
-                    IsActive = table.Column<bool>(type: "bit", nullable: false),
-                    SubstituteProductID = table.Column<int>(type: "int", nullable: true)
+                    SubcategoryID = table.Column<int>(type: "int", nullable: false),
+                    ProductTypeName = table.Column<string>(type: "nvarchar(max)", nullable: false)
                 },
                 constraints: table =>
                 {
-                    table.PrimaryKey("PK_Products", x => x.ProductID);
+                    table.PrimaryKey("PK_ProductTypes", x => x.ProductTypeID);
                     table.ForeignKey(
-                        name: "FK_Products_ProductTypes_ProductTypeID",
-                        column: x => x.ProductTypeID,
-                        principalTable: "ProductTypes",
-                        principalColumn: "ProductTypeID",
+                        name: "FK_ProductTypes_Subcategories_SubcategoryID",
+                        column: x => x.SubcategoryID,
+                        principalTable: "Subcategories",
+                        principalColumn: "SubcategoryID",
                         onDelete: ReferentialAction.Cascade);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "ForbiddenZones",
+                columns: table => new
+                {
+                    ForbiddenZoneID = table.Column<int>(type: "int", nullable: false)
+                        .Annotation("SqlServer:Identity", "1, 1"),
+                    MapID = table.Column<int>(type: "int", nullable: false),
+                    ZoneName = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    XMin = table.Column<double>(type: "float", nullable: false),
+                    YMin = table.Column<double>(type: "float", nullable: false),
+                    XMax = table.Column<double>(type: "float", nullable: false),
+                    YMax = table.Column<double>(type: "float", nullable: false),
+                    IsActive = table.Column<bool>(type: "bit", nullable: false),
+                    Reason = table.Column<string>(type: "nvarchar(max)", nullable: true)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_ForbiddenZones", x => x.ForbiddenZoneID);
                     table.ForeignKey(
-                        name: "FK_Products_Products_SubstituteProductID",
-                        column: x => x.SubstituteProductID,
-                        principalTable: "Products",
-                        principalColumn: "ProductID");
+                        name: "FK_ForbiddenZones_Maps_MapID",
+                        column: x => x.MapID,
+                        principalTable: "Maps",
+                        principalColumn: "MapID",
+                        onDelete: ReferentialAction.Cascade);
                 });
 
             migrationBuilder.CreateTable(
@@ -567,131 +556,36 @@ namespace SmartMarketBot.Infrastructure.Migrations
                 });
 
             migrationBuilder.CreateTable(
-                name: "HistoryItems",
+                name: "Products",
                 columns: table => new
                 {
-                    HistoryItemID = table.Column<int>(type: "int", nullable: false)
+                    ProductID = table.Column<int>(type: "int", nullable: false)
                         .Annotation("SqlServer:Identity", "1, 1"),
-                    ShoppingHistoryID = table.Column<int>(type: "int", nullable: false),
-                    ProductID = table.Column<int>(type: "int", nullable: false),
-                    Quantity = table.Column<int>(type: "int", nullable: false),
-                    UnitPrice = table.Column<decimal>(type: "decimal(18,2)", nullable: false)
+                    ProductTypeID = table.Column<int>(type: "int", nullable: false),
+                    ProductName = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    UnitPrice = table.Column<decimal>(type: "decimal(18,2)", precision: 18, scale: 2, nullable: false),
+                    Barcode = table.Column<string>(type: "nvarchar(max)", nullable: true),
+                    ImageUrl = table.Column<string>(type: "nvarchar(max)", nullable: true),
+                    WeightOrVolume = table.Column<decimal>(type: "decimal(18,3)", precision: 18, scale: 3, nullable: true),
+                    Unit = table.Column<string>(type: "nvarchar(max)", nullable: true),
+                    Description = table.Column<string>(type: "nvarchar(max)", nullable: true),
+                    IsActive = table.Column<bool>(type: "bit", nullable: false),
+                    SubstituteProductID = table.Column<int>(type: "int", nullable: true)
                 },
                 constraints: table =>
                 {
-                    table.PrimaryKey("PK_HistoryItems", x => x.HistoryItemID);
+                    table.PrimaryKey("PK_Products", x => x.ProductID);
                     table.ForeignKey(
-                        name: "FK_HistoryItems_Products_ProductID",
-                        column: x => x.ProductID,
+                        name: "FK_Products_ProductTypes_ProductTypeID",
+                        column: x => x.ProductTypeID,
+                        principalTable: "ProductTypes",
+                        principalColumn: "ProductTypeID",
+                        onDelete: ReferentialAction.Cascade);
+                    table.ForeignKey(
+                        name: "FK_Products_Products_SubstituteProductID",
+                        column: x => x.SubstituteProductID,
                         principalTable: "Products",
-                        principalColumn: "ProductID",
-                        onDelete: ReferentialAction.Cascade);
-                    table.ForeignKey(
-                        name: "FK_HistoryItems_ShoppingHistories_ShoppingHistoryID",
-                        column: x => x.ShoppingHistoryID,
-                        principalTable: "ShoppingHistories",
-                        principalColumn: "ShoppingHistoryID",
-                        onDelete: ReferentialAction.Cascade);
-                });
-
-            migrationBuilder.CreateTable(
-                name: "ProductHealthTags",
-                columns: table => new
-                {
-                    ProductID = table.Column<int>(type: "int", nullable: false),
-                    TagID = table.Column<int>(type: "int", nullable: false),
-                    HealthTagTagID = table.Column<int>(type: "int", nullable: false)
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_ProductHealthTags", x => new { x.ProductID, x.TagID });
-                    table.ForeignKey(
-                        name: "FK_ProductHealthTags_HealthTags_HealthTagTagID",
-                        column: x => x.HealthTagTagID,
-                        principalTable: "HealthTags",
-                        principalColumn: "TagID",
-                        onDelete: ReferentialAction.Cascade);
-                    table.ForeignKey(
-                        name: "FK_ProductHealthTags_Products_ProductID",
-                        column: x => x.ProductID,
-                        principalTable: "Products",
-                        principalColumn: "ProductID",
-                        onDelete: ReferentialAction.Cascade);
-                });
-
-            migrationBuilder.CreateTable(
-                name: "PromotionProducts",
-                columns: table => new
-                {
-                    PromotionID = table.Column<int>(type: "int", nullable: false),
-                    ProductID = table.Column<int>(type: "int", nullable: false),
-                    Priority = table.Column<int>(type: "int", nullable: false)
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_PromotionProducts", x => new { x.PromotionID, x.ProductID });
-                    table.ForeignKey(
-                        name: "FK_PromotionProducts_Products_ProductID",
-                        column: x => x.ProductID,
-                        principalTable: "Products",
-                        principalColumn: "ProductID",
-                        onDelete: ReferentialAction.Cascade);
-                    table.ForeignKey(
-                        name: "FK_PromotionProducts_Promotions_PromotionID",
-                        column: x => x.PromotionID,
-                        principalTable: "Promotions",
-                        principalColumn: "PromotionID",
-                        onDelete: ReferentialAction.Cascade);
-                });
-
-            migrationBuilder.CreateTable(
-                name: "RecipeItems",
-                columns: table => new
-                {
-                    RecipeID = table.Column<int>(type: "int", nullable: false),
-                    ProductID = table.Column<int>(type: "int", nullable: false),
-                    QuantityRequired = table.Column<decimal>(type: "decimal(18,2)", nullable: false),
-                    UnitOfMeasure = table.Column<string>(type: "nvarchar(max)", nullable: false)
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_RecipeItems", x => new { x.RecipeID, x.ProductID });
-                    table.ForeignKey(
-                        name: "FK_RecipeItems_Products_ProductID",
-                        column: x => x.ProductID,
-                        principalTable: "Products",
-                        principalColumn: "ProductID",
-                        onDelete: ReferentialAction.Cascade);
-                    table.ForeignKey(
-                        name: "FK_RecipeItems_Recipes_RecipeID",
-                        column: x => x.RecipeID,
-                        principalTable: "Recipes",
-                        principalColumn: "RecipeID",
-                        onDelete: ReferentialAction.Cascade);
-                });
-
-            migrationBuilder.CreateTable(
-                name: "SponsoredProducts",
-                columns: table => new
-                {
-                    SponsoredID = table.Column<int>(type: "int", nullable: false)
-                        .Annotation("SqlServer:Identity", "1, 1"),
-                    ProductID = table.Column<int>(type: "int", nullable: false),
-                    SponsorBrand = table.Column<string>(type: "nvarchar(max)", nullable: false),
-                    StartDate = table.Column<DateOnly>(type: "date", nullable: false),
-                    EndDate = table.Column<DateOnly>(type: "date", nullable: false),
-                    Priority = table.Column<int>(type: "int", nullable: false),
-                    IsActive = table.Column<bool>(type: "bit", nullable: false)
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_SponsoredProducts", x => x.SponsoredID);
-                    table.ForeignKey(
-                        name: "FK_SponsoredProducts_Products_ProductID",
-                        column: x => x.ProductID,
-                        principalTable: "Products",
-                        principalColumn: "ProductID",
-                        onDelete: ReferentialAction.Cascade);
+                        principalColumn: "ProductID");
                 });
 
             migrationBuilder.CreateTable(
@@ -741,6 +635,146 @@ namespace SmartMarketBot.Infrastructure.Migrations
                         column: x => x.AisleID,
                         principalTable: "Aisles",
                         principalColumn: "AisleID",
+                        onDelete: ReferentialAction.Cascade);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "HistoryItems",
+                columns: table => new
+                {
+                    HistoryItemID = table.Column<int>(type: "int", nullable: false)
+                        .Annotation("SqlServer:Identity", "1, 1"),
+                    ShoppingHistoryID = table.Column<int>(type: "int", nullable: false),
+                    ProductID = table.Column<int>(type: "int", nullable: false),
+                    Quantity = table.Column<int>(type: "int", nullable: false),
+                    UnitPrice = table.Column<decimal>(type: "decimal(18,2)", precision: 18, scale: 2, nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_HistoryItems", x => x.HistoryItemID);
+                    table.ForeignKey(
+                        name: "FK_HistoryItems_Products_ProductID",
+                        column: x => x.ProductID,
+                        principalTable: "Products",
+                        principalColumn: "ProductID",
+                        onDelete: ReferentialAction.Cascade);
+                    table.ForeignKey(
+                        name: "FK_HistoryItems_ShoppingHistories_ShoppingHistoryID",
+                        column: x => x.ShoppingHistoryID,
+                        principalTable: "ShoppingHistories",
+                        principalColumn: "ShoppingHistoryID",
+                        onDelete: ReferentialAction.Cascade);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "ProductHealthTags",
+                columns: table => new
+                {
+                    ProductID = table.Column<int>(type: "int", nullable: false),
+                    TagID = table.Column<int>(type: "int", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_ProductHealthTags", x => new { x.ProductID, x.TagID });
+                    table.ForeignKey(
+                        name: "FK_ProductHealthTags_HealthTags_TagID",
+                        column: x => x.TagID,
+                        principalTable: "HealthTags",
+                        principalColumn: "TagID",
+                        onDelete: ReferentialAction.Cascade);
+                    table.ForeignKey(
+                        name: "FK_ProductHealthTags_Products_ProductID",
+                        column: x => x.ProductID,
+                        principalTable: "Products",
+                        principalColumn: "ProductID",
+                        onDelete: ReferentialAction.Cascade);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "PromotionProducts",
+                columns: table => new
+                {
+                    PromotionID = table.Column<int>(type: "int", nullable: false),
+                    ProductID = table.Column<int>(type: "int", nullable: false),
+                    Priority = table.Column<int>(type: "int", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_PromotionProducts", x => new { x.PromotionID, x.ProductID });
+                    table.ForeignKey(
+                        name: "FK_PromotionProducts_Products_ProductID",
+                        column: x => x.ProductID,
+                        principalTable: "Products",
+                        principalColumn: "ProductID",
+                        onDelete: ReferentialAction.Cascade);
+                    table.ForeignKey(
+                        name: "FK_PromotionProducts_Promotions_PromotionID",
+                        column: x => x.PromotionID,
+                        principalTable: "Promotions",
+                        principalColumn: "PromotionID",
+                        onDelete: ReferentialAction.Cascade);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "RecipeItems",
+                columns: table => new
+                {
+                    RecipeID = table.Column<int>(type: "int", nullable: false),
+                    ProductID = table.Column<int>(type: "int", nullable: false),
+                    QuantityRequired = table.Column<decimal>(type: "decimal(18,3)", precision: 18, scale: 3, nullable: false),
+                    UnitOfMeasure = table.Column<string>(type: "nvarchar(max)", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_RecipeItems", x => new { x.RecipeID, x.ProductID });
+                    table.ForeignKey(
+                        name: "FK_RecipeItems_Products_ProductID",
+                        column: x => x.ProductID,
+                        principalTable: "Products",
+                        principalColumn: "ProductID",
+                        onDelete: ReferentialAction.Cascade);
+                    table.ForeignKey(
+                        name: "FK_RecipeItems_Recipes_RecipeID",
+                        column: x => x.RecipeID,
+                        principalTable: "Recipes",
+                        principalColumn: "RecipeID",
+                        onDelete: ReferentialAction.Cascade);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "SponsoredProducts",
+                columns: table => new
+                {
+                    SponsoredID = table.Column<int>(type: "int", nullable: false)
+                        .Annotation("SqlServer:Identity", "1, 1"),
+                    ProductID = table.Column<int>(type: "int", nullable: false),
+                    BrandID = table.Column<int>(type: "int", nullable: false),
+                    PackageID = table.Column<int>(type: "int", nullable: false),
+                    StartDate = table.Column<DateOnly>(type: "date", nullable: false),
+                    EndDate = table.Column<DateOnly>(type: "date", nullable: false),
+                    Priority = table.Column<int>(type: "int", nullable: false),
+                    IsActive = table.Column<bool>(type: "bit", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_SponsoredProducts", x => x.SponsoredID);
+                    table.ForeignKey(
+                        name: "FK_SponsoredProducts_AdPackages_PackageID",
+                        column: x => x.PackageID,
+                        principalTable: "AdPackages",
+                        principalColumn: "PackageID",
+                        onDelete: ReferentialAction.Restrict);
+                    table.ForeignKey(
+                        name: "FK_SponsoredProducts_Brands_BrandID",
+                        column: x => x.BrandID,
+                        principalTable: "Brands",
+                        principalColumn: "BrandID",
+                        onDelete: ReferentialAction.Restrict);
+                    table.ForeignKey(
+                        name: "FK_SponsoredProducts_Products_ProductID",
+                        column: x => x.ProductID,
+                        principalTable: "Products",
+                        principalColumn: "ProductID",
                         onDelete: ReferentialAction.Cascade);
                 });
 
@@ -826,8 +860,7 @@ namespace SmartMarketBot.Infrastructure.Migrations
                         name: "FK_Workstations_Zones_ZoneID",
                         column: x => x.ZoneID,
                         principalTable: "Zones",
-                        principalColumn: "ZoneID",
-                        onDelete: ReferentialAction.Cascade);
+                        principalColumn: "ZoneID");
                 });
 
             migrationBuilder.CreateTable(
@@ -841,9 +874,11 @@ namespace SmartMarketBot.Infrastructure.Migrations
                     RobotID = table.Column<int>(type: "int", nullable: false),
                     ScannedAt = table.Column<DateTime>(type: "datetime2", nullable: false),
                     ImageUrl = table.Column<string>(type: "nvarchar(max)", nullable: true),
-                    EmptyPercentage = table.Column<decimal>(type: "decimal(18,2)", nullable: false),
+                    EmptyPercentage = table.Column<decimal>(type: "decimal(5,2)", precision: 5, scale: 2, nullable: false),
                     NeedsRestock = table.Column<bool>(type: "bit", nullable: false, computedColumnSql: "CASE WHEN [EmptyPercentage] > 30 THEN CAST(1 AS bit) ELSE CAST(0 AS bit) END", stored: false),
-                    AiResponseRaw = table.Column<string>(type: "nvarchar(max)", nullable: true)
+                    AiResponseRaw = table.Column<string>(type: "nvarchar(max)", nullable: true),
+                    IsOccluded = table.Column<bool>(type: "bit", nullable: false),
+                    OcclusionReason = table.Column<string>(type: "nvarchar(max)", nullable: true)
                 },
                 constraints: table =>
                 {
@@ -877,7 +912,9 @@ namespace SmartMarketBot.Infrastructure.Migrations
                     SlotCode = table.Column<string>(type: "nvarchar(max)", nullable: false),
                     ProductID = table.Column<int>(type: "int", nullable: true),
                     Quantity = table.Column<int>(type: "int", nullable: false),
-                    LastScannedAt = table.Column<DateTime>(type: "datetime2", nullable: true)
+                    LastScannedAt = table.Column<DateTime>(type: "datetime2", nullable: true),
+                    ExpiryDate = table.Column<DateOnly>(type: "date", nullable: true),
+                    Supplier = table.Column<string>(type: "nvarchar(max)", nullable: true)
                 },
                 constraints: table =>
                 {
@@ -896,9 +933,22 @@ namespace SmartMarketBot.Infrastructure.Migrations
                 });
 
             migrationBuilder.CreateIndex(
-                name: "IX_Admins_UserID",
+                name: "IX_Accounts_Email",
+                table: "Accounts",
+                column: "Email",
+                unique: true,
+                filter: "[Email] IS NOT NULL");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_Accounts_Username",
+                table: "Accounts",
+                column: "Username",
+                unique: true);
+
+            migrationBuilder.CreateIndex(
+                name: "IX_Admins_AccountID",
                 table: "Admins",
-                column: "UserID",
+                column: "AccountID",
                 unique: true);
 
             migrationBuilder.CreateIndex(
@@ -919,9 +969,9 @@ namespace SmartMarketBot.Infrastructure.Migrations
                 filter: "[IsUsed] = 0");
 
             migrationBuilder.CreateIndex(
-                name: "IX_Floors_SupermarketID",
-                table: "Floors",
-                column: "SupermarketID");
+                name: "IX_ForbiddenZones_MapID",
+                table: "ForbiddenZones",
+                column: "MapID");
 
             migrationBuilder.CreateIndex(
                 name: "IX_HistoryItems_ProductID",
@@ -939,16 +989,31 @@ namespace SmartMarketBot.Infrastructure.Migrations
                 column: "FloorID");
 
             migrationBuilder.CreateIndex(
-                name: "IX_MemberHealthPreferences_HealthTagTagID",
-                table: "MemberHealthPreferences",
-                column: "HealthTagTagID");
+                name: "IX_MemberAlerts_MemberID_IsRead",
+                table: "MemberAlerts",
+                columns: new[] { "MemberID", "IsRead" });
 
             migrationBuilder.CreateIndex(
-                name: "IX_Members_UserID",
+                name: "IX_MemberEvents_EventDate_IsProcessed",
+                table: "MemberEvents",
+                columns: new[] { "EventDate", "IsProcessed" });
+
+            migrationBuilder.CreateIndex(
+                name: "IX_MemberEvents_MemberID",
+                table: "MemberEvents",
+                column: "MemberID");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_MemberHealthPreferences_TagID",
+                table: "MemberHealthPreferences",
+                column: "TagID");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_Members_AccountID",
                 table: "Members",
-                column: "UserID",
+                column: "AccountID",
                 unique: true,
-                filter: "[UserID] IS NOT NULL");
+                filter: "[AccountID] IS NOT NULL");
 
             migrationBuilder.CreateIndex(
                 name: "IX_NavigationEdges_FromNodeID",
@@ -971,20 +1036,9 @@ namespace SmartMarketBot.Infrastructure.Migrations
                 column: "MapID");
 
             migrationBuilder.CreateIndex(
-                name: "IX_Payments_OrderCode",
-                table: "Payments",
-                column: "OrderCode",
-                unique: true);
-
-            migrationBuilder.CreateIndex(
-                name: "IX_Payments_UserId_Status",
-                table: "Payments",
-                columns: new[] { "UserId", "Status" });
-
-            migrationBuilder.CreateIndex(
-                name: "IX_ProductHealthTags_HealthTagTagID",
+                name: "IX_ProductHealthTags_TagID",
                 table: "ProductHealthTags",
-                column: "HealthTagTagID");
+                column: "TagID");
 
             migrationBuilder.CreateIndex(
                 name: "IX_Products_ProductTypeID",
@@ -1073,14 +1127,24 @@ namespace SmartMarketBot.Infrastructure.Migrations
                 column: "ShelfLevelID");
 
             migrationBuilder.CreateIndex(
+                name: "IX_SponsoredProducts_BrandID",
+                table: "SponsoredProducts",
+                column: "BrandID");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_SponsoredProducts_PackageID",
+                table: "SponsoredProducts",
+                column: "PackageID");
+
+            migrationBuilder.CreateIndex(
                 name: "IX_SponsoredProducts_ProductID",
                 table: "SponsoredProducts",
                 column: "ProductID");
 
             migrationBuilder.CreateIndex(
-                name: "IX_Staffs_UserID",
-                table: "Staffs",
-                column: "UserID",
+                name: "IX_Staff_AccountID",
+                table: "Staff",
+                column: "AccountID",
                 unique: true);
 
             migrationBuilder.CreateIndex(
@@ -1089,32 +1153,14 @@ namespace SmartMarketBot.Infrastructure.Migrations
                 column: "CategoryID");
 
             migrationBuilder.CreateIndex(
-                name: "IX_UserRoles_RoleID",
-                table: "UserRoles",
-                column: "RoleID");
-
-            migrationBuilder.CreateIndex(
-                name: "IX_Users_Email",
-                table: "Users",
-                column: "Email",
-                unique: true,
-                filter: "[Email] IS NOT NULL");
-
-            migrationBuilder.CreateIndex(
-                name: "IX_Users_Username",
-                table: "Users",
-                column: "Username",
-                unique: true);
+                name: "IX_UserTokens_AccountId_IsRevoked",
+                table: "UserTokens",
+                columns: new[] { "AccountId", "IsRevoked" });
 
             migrationBuilder.CreateIndex(
                 name: "IX_UserTokens_RefreshToken",
                 table: "UserTokens",
                 column: "RefreshToken");
-
-            migrationBuilder.CreateIndex(
-                name: "IX_UserTokens_UserId_IsRevoked",
-                table: "UserTokens",
-                columns: new[] { "UserId", "IsRevoked" });
 
             migrationBuilder.CreateIndex(
                 name: "IX_Workstations_NodeID",
@@ -1142,16 +1188,22 @@ namespace SmartMarketBot.Infrastructure.Migrations
                 name: "EmailOtps");
 
             migrationBuilder.DropTable(
+                name: "ForbiddenZones");
+
+            migrationBuilder.DropTable(
                 name: "HistoryItems");
+
+            migrationBuilder.DropTable(
+                name: "MemberAlerts");
+
+            migrationBuilder.DropTable(
+                name: "MemberEvents");
 
             migrationBuilder.DropTable(
                 name: "MemberHealthPreferences");
 
             migrationBuilder.DropTable(
                 name: "NavigationEdges");
-
-            migrationBuilder.DropTable(
-                name: "Payments");
 
             migrationBuilder.DropTable(
                 name: "ProductHealthTags");
@@ -1181,10 +1233,7 @@ namespace SmartMarketBot.Infrastructure.Migrations
                 name: "SponsoredProducts");
 
             migrationBuilder.DropTable(
-                name: "Staffs");
-
-            migrationBuilder.DropTable(
-                name: "UserRoles");
+                name: "Staff");
 
             migrationBuilder.DropTable(
                 name: "UserTokens");
@@ -1211,10 +1260,13 @@ namespace SmartMarketBot.Infrastructure.Migrations
                 name: "ShelfLevels");
 
             migrationBuilder.DropTable(
-                name: "Products");
+                name: "AdPackages");
 
             migrationBuilder.DropTable(
-                name: "Roles");
+                name: "Brands");
+
+            migrationBuilder.DropTable(
+                name: "Products");
 
             migrationBuilder.DropTable(
                 name: "NavigationNodes");
@@ -1232,7 +1284,7 @@ namespace SmartMarketBot.Infrastructure.Migrations
                 name: "Maps");
 
             migrationBuilder.DropTable(
-                name: "Users");
+                name: "Accounts");
 
             migrationBuilder.DropTable(
                 name: "Subcategories");
@@ -1245,9 +1297,6 @@ namespace SmartMarketBot.Infrastructure.Migrations
 
             migrationBuilder.DropTable(
                 name: "Floors");
-
-            migrationBuilder.DropTable(
-                name: "Supermarkets");
         }
     }
 }

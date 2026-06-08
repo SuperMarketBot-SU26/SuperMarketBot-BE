@@ -32,6 +32,21 @@ services:
     volumes:
       - ./mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
 
+  face_service:
+    build:
+      context: ./face_service
+      dockerfile: Dockerfile
+    container_name: smartmarketbot-face-ai
+    ports:
+      - "8000:8000"
+    environment:
+      - DB_CONNECTION_STRING=DRIVER={ODBC Driver 18 for SQL Server};SERVER=sqlserver,1433;DATABASE=SuperMarketBot;UID=sa;PWD=YourStrong!Passw0rd;Encrypt=yes;TrustServerCertificate=yes;
+    depends_on:
+      sqlserver:
+        condition: service_healthy
+    volumes:
+      - ./storage:/storage
+
   api:
     build:
       context: .
@@ -46,6 +61,8 @@ services:
       sqlserver:
         condition: service_healthy
       mosquitto:
+        condition: service_started
+      face_service:
         condition: service_started
     restart: unless-stopped
 

@@ -17,6 +17,8 @@ public interface IAuthService
 
     Task<FaceLoginResponseDto> FaceLoginAsync(FaceLoginRequestDto request, CancellationToken ct = default);
 
+    Task<bool> RegisterFaceAsync(int userId, FaceLoginRequestDto request, CancellationToken ct = default);
+
     Task<AuthResponseDto> RefreshTokenAsync(RefreshTokenRequestDto request, CancellationToken ct = default);
 
     Task LogoutAsync(int userId, string refreshToken, CancellationToken ct = default);

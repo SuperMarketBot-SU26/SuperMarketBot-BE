@@ -83,6 +83,27 @@ public sealed class AuthController(IAuthService authService) : ControllerBase
         return Ok(result);
     }
 
+    /// <summary>Đăng ký khuôn mặt cho tài khoản đang đăng nhập</summary>
+    [Authorize]
+    [HttpPost("register-face")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    public async Task<IActionResult> RegisterFace(
+        [FromBody] FaceLoginRequestDto request, CancellationToken ct)
+    {
+        var userId = GetCurrentUserId();
+        if (userId is null) return Unauthorized();
+
+        var success = await authService.RegisterFaceAsync(userId.Value, request, ct);
+        if (!success)
+        {
+            return BadRequest(new { message = "Đăng ký khuôn mặt thất bại. Vui lòng chụp ảnh rõ nét hơn." });
+        }
+
+        return Ok(new { message = "Đăng ký khuôn mặt thành công." });
+    }
+
     /// <summary>Đăng xuất — revoke refresh token hiện tại</summary>
     [Authorize]
     [HttpPost("logout")]

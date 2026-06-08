@@ -1,0 +1,10 @@
+fastapi
+uvicorn[standard]
+deepface
+pyodbc
+opencv-python-headless
+numpy
+pydantic
+python-dotenv
+python-multipart
+tf-keras

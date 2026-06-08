@@ -1,4 +1,6 @@
 using System.Security.Cryptography;
+using System.Text.Json;
+using System.IO;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -207,6 +209,61 @@ public sealed class AuthService(
         );
 
         return new FaceLoginResponseDto(true, "Đăng nhập bằng khuôn mặt thành công", greeting, tokenDto, memberDto);
+    }
+
+    public async Task<bool> RegisterFaceAsync(int userId, FaceLoginRequestDto request, CancellationToken ct = default)
+    {
+        // 1. Tìm Member gắn với AccountID này
+        var member = await db.Members
+            .FirstOrDefaultAsync(m => m.AccountID == userId, ct);
+
+        if (member == null)
+        {
+            logger.LogWarning("[AuthService] Không tìm thấy Member cho AccountID: {UserId}", userId);
+            return false;
+        }
+
+        // 2. Gọi Python AI trích xuất vector khuôn mặt
+        var vector = await faceAiService.ExtractFaceVectorAsync(request.ImageBase64, ct);
+        if (vector == null || vector.Count == 0)
+        {
+            logger.LogWarning("[AuthService] Không trích xuất được vector khuôn mặt cho MemberID: {MemberId}", member.MemberID);
+            return false;
+        }
+
+        // 3. Giải mã ảnh Base64 và lưu vào storage
+        try
+        {
+            var apiDir = Directory.GetCurrentDirectory(); // src/SmartMarketBot.API
+            var storagePath = Path.GetFullPath(Path.Combine(apiDir, "..", "..", "storage", "member_faces"));
+            Directory.CreateDirectory(storagePath);
+
+            var fileName = $"{Guid.NewGuid():N}.jpg";
+            var filePath = Path.Combine(storagePath, fileName);
+
+            var base64Data = request.ImageBase64;
+            if (base64Data.Contains(","))
+            {
+                base64Data = base64Data.Split(',')[1];
+            }
+            var imageBytes = Convert.FromBase64String(base64Data);
+            await File.WriteAllBytesAsync(filePath, imageBytes, ct);
+
+            // 4. Cập nhật thông tin FacePath và FaceVector trong Database
+            member.FacePath = filePath;
+            member.FaceVector = JsonSerializer.Serialize(vector);
+            
+            db.Members.Update(member);
+            await db.SaveChangesAsync(ct);
+
+            logger.LogInformation("[AuthService] Đăng ký khuôn mặt thành công cho MemberID: {MemberId}. File: {File}", member.MemberID, filePath);
+            return true;
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "[AuthService] Lỗi khi lưu ảnh hoặc cập nhật Database đăng ký khuôn mặt");
+            return false;
+        }
     }
 
     public async Task<AuthResponseDto> RefreshTokenAsync(RefreshTokenRequestDto request, CancellationToken ct = default)

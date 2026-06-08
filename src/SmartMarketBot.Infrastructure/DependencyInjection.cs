@@ -45,6 +45,8 @@ public static class DependencyInjection
         services.AddScoped<IStaffService, StaffService>();
 
         services.AddHttpClient<IAiVisionProxy, AiVisionProxy>();
+        services.AddHttpClient<IFaceAiService, FaceAiService>();
+        services.AddHttpClient<IGeminiService, GeminiService>();
 
         // MQTT (Singleton + HostedService)
         services.AddSingleton<MqttClientService>();

@@ -57,6 +57,21 @@ public sealed class AuthController(IAuthService authService) : ControllerBase
         return Ok(result);
     }
 
+    /// <summary>Đăng nhập bằng nhận diện khuôn mặt</summary>
+    [HttpPost("face-login")]
+    [ProducesResponseType(typeof(FaceLoginResponseDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    public async Task<ActionResult<FaceLoginResponseDto>> FaceLogin(
+        [FromBody] FaceLoginRequestDto request, CancellationToken ct)
+    {
+        var result = await authService.FaceLoginAsync(request, ct);
+        if (!result.Success)
+        {
+            return Unauthorized(result);
+        }
+        return Ok(result);
+    }
+
     /// <summary>Làm mới Access Token bằng Refresh Token</summary>
     [HttpPost("refresh")]
     [ProducesResponseType(typeof(AuthResponseDto), StatusCodes.Status200OK)]

@@ -17,6 +17,8 @@ public sealed class AuthService(
     IEmailService emailService,
     IOptions<EmailOptions> emailOptions,
     IOptions<JwtOptions> jwtOptions,
+    IFaceAiService faceAiService,
+    IGeminiService geminiService,
     ILogger<AuthService> logger,
     ILocalizationService localizer) : IAuthService
 {
@@ -152,6 +154,59 @@ public sealed class AuthService(
             throw new UnauthorizedAccessException(localizer.Get("EmailNotConfirmed"));
 
         return await BuildAuthResponseAsync(account, ct);
+    }
+
+    public async Task<FaceLoginResponseDto> FaceLoginAsync(FaceLoginRequestDto request, CancellationToken ct = default)
+    {
+        // 1. Gọi Python service để xác thực khuôn mặt từ Base64
+        var verifyResult = await faceAiService.VerifyFaceAsync(request.ImageBase64, ct);
+        if (verifyResult == null || verifyResult.Status != "success")
+        {
+            return new FaceLoginResponseDto(false, "Không nhận diện được khuôn mặt", null, null, null);
+        }
+
+        // 2. Tìm thông tin Member trong DB
+        var member = await db.Members
+            .Include(m => m.Account)
+            .FirstOrDefaultAsync(m => m.MemberID == verifyResult.MemberId, ct);
+
+        if (member == null)
+        {
+            return new FaceLoginResponseDto(false, "Không tìm thấy thông tin hội viên", null, null, null);
+        }
+
+        // 3. Truy vấn các sản phẩm mua nhiều nhất từ lịch sử mua hàng
+        var topProductsList = await db.HistoryItems
+            .Where(i => i.ShoppingHistory.MemberID == member.MemberID)
+            .GroupBy(i => i.Product.ProductName)
+            .OrderByDescending(g => g.Count())
+            .Select(g => g.Key)
+            .Take(3)
+            .ToListAsync(ct);
+
+        var topProductsStr = topProductsList.Any()
+            ? string.Join(", ", topProductsList)
+            : "chưa có lịch sử mua hàng";
+
+        // 4. Gọi Gemini API để sinh câu chào cá nhân hóa
+        var greeting = await geminiService.GeneratePersonalizedGreetingAsync(member.FullName, topProductsStr, ct);
+
+        // 5. Nếu thành viên có tài khoản liên kết, tự động sinh JWT Token đăng nhập
+        AuthResponseDto? tokenDto = null;
+        if (member.Account != null)
+        {
+            tokenDto = await BuildAuthResponseAsync(member.Account, ct);
+        }
+
+        var memberDto = new FaceLoginMemberDto(
+            member.MemberID,
+            member.FullName,
+            member.PhoneNumber,
+            member.Tier,
+            member.TotalPoints
+        );
+
+        return new FaceLoginResponseDto(true, "Đăng nhập bằng khuôn mặt thành công", greeting, tokenDto, memberDto);
     }
 
     public async Task<AuthResponseDto> RefreshTokenAsync(RefreshTokenRequestDto request, CancellationToken ct = default)

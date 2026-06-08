@@ -35,3 +35,20 @@ public sealed record AuthResponseDto(
 
 // Legacy — giữ tương thích AuthService cũ nếu có code dùng
 public sealed record RegisterRequestDto(string Username, string Password, string? Email);
+
+// ── Face Login DTOs ──────────────────────────────────────────────────
+public sealed record FaceLoginRequestDto(string ImageBase64);
+
+public sealed record FaceLoginResponseDto(
+    bool Success,
+    string? Message,
+    string? Greeting,
+    AuthResponseDto? Token,
+    FaceLoginMemberDto? Member);
+
+public sealed record FaceLoginMemberDto(
+    int MemberId,
+    string FullName,
+    string PhoneNumber,
+    string Tier,
+    int TotalPoints);

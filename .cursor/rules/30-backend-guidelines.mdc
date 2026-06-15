@@ -1,0 +1,93 @@
+---
+description: Comprehensive backend rules for Clean Architecture, EF Core mapping, localization, dynamic navigation, and API constraints
+globs: "src/SmartMarketBot.*/**/*.cs"
+alwaysApply: true
+---
+
+# 🚀 SMARTMARKETBOT - BACKEND SYSTEM GUIDELINES (.NET 10)
+
+Tài liệu hướng dẫn (Cursor Rule) này giúp AI và lập trình viên luôn tuân thủ đúng kiến trúc, sửa lỗi đồng bộ, và sẵn sàng phát triển mở rộng hệ thống trong tương lai.
+
+---
+
+## 🏗️ 1. KIẾN TRÚC 4 LỚP (CLEAN ARCHITECTURE)
+
+Đảm bảo nguyên tắc **nghịch đảo phụ thuộc (Dependency Inversion)**. Các lớp bên ngoài phụ thuộc vào bên trong, không đi ngược lại:
+
+1.  **Domain (Core):**
+    *   Chứa Entities, Enums, Exceptions riêng.
+    *   **Bắt buộc:** Tuyệt đối không tham chiếu đến EF Core (`Microsoft.EntityFrameworkCore`) hoặc HTTP/Controller.
+2.  **Application (Mục tiêu nghiệp vụ):**
+    *   Chứa Interfaces, DTOs, Services (thuật toán Dijkstra, TSP, Logic nghiệp vụ).
+    *   Chỉ phụ thuộc vào lớp **Domain**.
+3.  **Infrastructure (Kết nối ngoại vi):**
+    *   Chứa EF Core `AppDbContext`, Migrations, MQTT client (MQTTnet), JWT Token, Email Service.
+    *   Phụ thuộc vào **Application** và **Domain**.
+4.  **API (Cổng giao tiếp):**
+    *   Chứa Controllers, Hubs (SignalR), Middlewares, `Program.cs`.
+    *   Phụ thuộc vào **Application** để gọi MediatR/Services.
+
+---
+
+## 🗄️ 2. QUY TẮC EF CORE & DATABASE MAPPING (RẤT QUAN TRỌNG)
+
+Để tránh lỗi tạo ra các cột ảo "Shadow Foreign Key" (ví dụ: `AccountID1`, `HealthTagTagID`) do EF Core tự suy luận sai quan hệ:
+
+*   **Quy tắc 1: Khai báo Foreign Key tường minh (Explicit FK):**
+    Mọi quan hệ 1-1 hoặc 1-N có thuộc tính điều hướng (Navigation Property) thì **bắt buộc** phải cấu hình tường minh khóa ngoại trong `AppDbContext.cs`.
+    *   *Ví dụ (1-1):*
+        ```csharp
+        modelBuilder.Entity<Member>(entity => {
+            entity.HasOne(m => m.Account)
+                  .WithOne(a => a.Member)
+                  .HasForeignKey<Member>(m => m.AccountID); // Explicit FK
+        });
+        ```
+    *   *Ví dụ (N-N hoặc Composite Key):* `ProductHealthTag` và `MemberHealthPreference` cần chỉ rõ `TagID` là khóa ngoại trỏ tới `HealthTags`.
+        ```csharp
+        modelBuilder.Entity<ProductHealthTag>(entity => {
+            entity.HasKey(x => new { x.ProductID, x.TagID });
+            entity.HasOne(x => x.HealthTag)
+                  .WithMany(t => t.ProductHealthTags)
+                  .HasForeignKey(x => x.TagID); // Tránh sinh ra cột HealthTagTagID
+        });
+        ```
+
+*   **Quy tắc 2: Giữ đồng bộ dữ liệu mẫu (Seed Data):**
+    *   Khi viết SQL Seed data trong [seed_azure.sql](file:///e:/FPT%20UNIVERSITY/CN9/Sep401/SuperMarketBot-BE/db/seed_azure.sql), các cột kiểu `bool` (`IsBlocked`, `IsActive`) hoặc `DateTime` (`CreatedAt`) không có thiết lập `HasDefaultValueSql` trong EF Core thì **bắt buộc phải điền giá trị cụ thể** (`0`/`1`, `GETUTCDATE()`) trong câu lệnh `INSERT INTO`.
+
+---
+
+## 🌐 3. HỆ THỐNG ĐA NGÔN NGỮ (LOCALIZATION SYSTEM)
+
+Hệ thống hỗ trợ song ngữ tự động nhận diện ngôn ngữ qua `ILocalizationService`.
+
+*   **Cách sử dụng:** Inject `ILocalizationService` vào Service để dịch các thông báo phản hồi cho Client.
+*   **Cơ chế nhận diện:** Đọc query param `?lang=en|vi` hoặc HTTP Header `Accept-Language`.
+*   **Quy tắc viết Code:** Không hardcode chuỗi thông báo tiếng Việt trực tiếp. Hãy đưa vào file từ điển dịch thuật và gọi:
+    ```csharp
+    _localization.Get("Error_AllergyAlert", productName);
+    ```
+
+---
+
+## 🤖 4. ĐIỀU HƯỚNG DIJKSTRA & TRÁNH VÙNG CẤM (FORBIDDEN ZONES)
+
+*   **Thuật toán đường đi ngắn nhất:** Nằm trong `NavigationService.cs`.
+*   **Ràng buộc tránh vùng cấm động (Dynamic Obstacle Avoidance):**
+    *   Mỗi khi tính toán đường đi (`PlanRouteAsync`), hệ thống phải tải danh sách các `ForbiddenZones` đang hoạt động từ DB.
+    *   Kiểm tra tọa độ $(x, y)$ của các `NavigationNodes`. Nếu node nằm trong vùng tọa độ cấm (chữ nhật $X_{min} \rightarrow X_{max}, Y_{min} \rightarrow Y_{max}$), đánh dấu `IsBlocked = true` trong bộ nhớ chạy thuật toán Dijkstra để ép robot tìm lộ trình vòng khác.
+
+---
+
+## 📈 5. XỬ LÝ QUẢNG CÁO & THỜI GIAN THỰC (STALE TIME AVOIDANCE)
+
+*   **Quy tắc:** Tuyệt đối không khai báo thời gian dạng tĩnh (`static readonly DateTime Now = DateTime.UtcNow`) trên toàn cục trong các Promotion/Sponsored Services.
+*   **Giải pháp:** Luôn tính toán `CurrentTime` và `IsWeekend` động **bên trong thân hàm xử lý Request** để đảm bảo thời gian chạy đúng thời điểm thực tế khách hàng gửi yêu cầu.
+
+---
+
+## 🧪 6. RÀNG BUỘC ĐẦU VÀO (VALIDATION) & XỬ LÝ LỖI (EXCEPTION)
+
+*   **Validation:** Tất cả DTO nhận dữ liệu từ Client (như `SetBudgetRequestDto`, `ScanItemRequestDto`) bắt buộc dùng Data Annotations (`[Required]`, `[Range(1, int.MaxValue)]`) để chặn dữ liệu rác (số âm, chuỗi trống) ngay từ tầng API.
+*   **Exception Handling:** Khi không tìm thấy bản ghi (như không tìm thấy kệ hàng hoặc sản phẩm), ném ra `KeyNotFoundException` kèm chuỗi dịch thuật. Lớp `GlobalExceptionMiddleware` sẽ tự bắt lỗi này và chuyển thành HTTP Status Code tương ứng (404/400) trả về client sạch sẽ.

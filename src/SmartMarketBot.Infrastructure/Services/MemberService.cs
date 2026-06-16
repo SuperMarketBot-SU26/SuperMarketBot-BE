@@ -36,7 +36,7 @@ public sealed class MemberService(AppDbContext db, ILocalizationService localize
     {
         var member = await db.Members
             .AsNoTracking()
-            .FirstOrDefaultAsync(m => m.MemberID == memberId, ct)
+            .FirstOrDefaultAsync(m => m.MemberId == memberId, ct)
             ?? throw new KeyNotFoundException(localizer.Get("MemberNotFound", memberId));
 
         var product = await db.Products
@@ -50,13 +50,13 @@ public sealed class MemberService(AppDbContext db, ILocalizationService localize
         // 1. Kiểm tra dị ứng
         var allergyTagIds = await db.MemberHealthPreferences
             .AsNoTracking()
-            .Where(mhp => mhp.MemberID == memberId && mhp.IsAllergy)
-            .Select(mhp => mhp.TagID)
+            .Where(mhp => mhp.MemberId == memberId && mhp.IsAllergy)
+            .Select(mhp => mhp.HealthTagId)
             .ToListAsync(ct);
 
         bool hasAllergy = allergyTagIds.Count > 0 && await db.ProductHealthTags
             .AsNoTracking()
-            .AnyAsync(pht => pht.ProductID == product.ProductID && allergyTagIds.Contains(pht.TagID), ct);
+            .AnyAsync(pht => pht.ProductId == product.ProductId && allergyTagIds.Contains(pht.HealthTagId), ct);
 
         // 2. Kiểm tra vượt ngân sách
         var newTotal = request.CurrentCartTotal + product.UnitPrice * request.Quantity;
@@ -64,11 +64,11 @@ public sealed class MemberService(AppDbContext db, ILocalizationService localize
 
         // 3. Kiểm tra mua trùng trong 7 ngày gần nhất
         var sevenDaysAgo = VnDateTime.Now.AddDays(-7);
-        bool isDuplicate = await db.HistoryItems
+        bool isDuplicate = await db.InvoiceHistoryItems
             .AsNoTracking()
-            .AnyAsync(hi => hi.ProductID == product.ProductID
-                && hi.ShoppingHistory.MemberID == memberId
-                && hi.ShoppingHistory.ShoppingDate >= sevenDaysAgo, ct);
+            .AnyAsync(hi => hi.ProductId == product.ProductId
+                && hi.InvoiceHistory.MemberId == memberId
+                && hi.InvoiceHistory.PurchaseDate >= sevenDaysAgo, ct);
 
         // Xác định cảnh báo (ưu tiên dị ứng > ngân sách > trùng)
         string? alertType = null;
@@ -95,7 +95,7 @@ public sealed class MemberService(AppDbContext db, ILocalizationService localize
         {
             db.MemberAlerts.Add(new MemberAlert
             {
-                MemberID = memberId,
+                MemberId = memberId,
                 AlertType = alertType,
                 AlertMessage = alertMessage!
             });
@@ -110,14 +110,14 @@ public sealed class MemberService(AppDbContext db, ILocalizationService localize
         {
             var altProducts = await db.Products
                 .AsNoTracking()
-                .Where(p => p.ProductTypeID == product.ProductTypeID
-                    && p.ProductID != product.ProductID
+                .Where(p => p.ProductTypeId == product.ProductTypeId
+                    && p.ProductId != product.ProductId
                     && p.IsActive)
                 .Take(3)
                 .ToListAsync(ct);
 
             alternatives = altProducts.Select(p => new AlternativeProductDto(
-                p.ProductID, p.ProductName, p.UnitPrice, p.ImageUrl,
+                p.ProductId, p.ProductName, p.UnitPrice, p.ImageUrl,
                 alertType == "Allergy" ? localizer.Get("AltReasonAllergy") : localizer.Get("AltReasonBudget"))).ToList();
         }
 
@@ -125,7 +125,7 @@ public sealed class MemberService(AppDbContext db, ILocalizationService localize
             isAllowed,
             alertType,
             alertMessage,
-            product.ProductID,
+            product.ProductId,
             product.ProductName,
             product.UnitPrice,
             isAllowed ? newTotal : request.CurrentCartTotal,
@@ -138,27 +138,27 @@ public sealed class MemberService(AppDbContext db, ILocalizationService localize
     public async Task<MemberDealsResponseDto> GetPersonalizedDealsAsync(
         int memberId, CancellationToken ct = default)
     {
-        var member = await db.Members.AsNoTracking().FirstOrDefaultAsync(m => m.MemberID == memberId, ct);
+        var member = await db.Members.AsNoTracking().FirstOrDefaultAsync(m => m.MemberId == memberId, ct);
         if (member is null) return new MemberDealsResponseDto(memberId, [], 0);
 
-        var today = VnDateTime.DateToday;
+        var today = DateOnly.FromDateTime(VnDateTime.Now);
         var deals = new List<MemberDealDto>();
 
         // 1. Khuyến mãi đang active
         var promos = await db.PromotionProducts
             .AsNoTracking()
-            .Join(db.Promotions.Where(pr => pr.IsActive && pr.StartDate <= today && pr.EndDate >= today),
-                pp => pp.PromotionID, pr => pr.PromotionID,
-                (pp, pr) => new { pp.ProductID, pr.DiscountValue, pr.PromotionName })
-            .Join(db.Products, x => x.ProductID, p => p.ProductID,
-                (x, p) => new { p.ProductID, p.ProductName, p.UnitPrice, p.ImageUrl, x.DiscountValue, x.PromotionName })
+            .Join(db.Promotions.Where(pr => pr.IsActive && DateOnly.FromDateTime(pr.StartDate) <= today && DateOnly.FromDateTime(pr.EndDate) >= today),
+                pp => pp.PromotionId, pr => pr.PromotionId,
+                (pp, pr) => new { pp.ProductId, pr.DiscountValue, pr.PromotionName })
+            .Join(db.Products, x => x.ProductId, p => p.ProductId,
+                (x, p) => new { p.ProductId, p.ProductName, p.UnitPrice, p.ImageUrl, x.DiscountValue, x.PromotionName })
             .Take(5)
             .ToListAsync(ct);
 
         foreach (var p in promos)
         {
             deals.Add(new MemberDealDto(
-                p.ProductID, p.ProductName, p.UnitPrice,
+                p.ProductId, p.ProductName, p.UnitPrice,
                 p.UnitPrice * (1 - p.DiscountValue / 100m),
                 p.DiscountValue, "Promotion", p.PromotionName, p.ImageUrl));
         }
@@ -166,8 +166,8 @@ public sealed class MemberService(AppDbContext db, ILocalizationService localize
         // 2. Birthday/Anniversary deal
         var events = await db.MemberEvents
             .AsNoTracking()
-            .Where(me => me.MemberID == memberId && !me.IsProcessed && me.DiscountPct.HasValue
-                && me.EventDate >= today && me.EventDate <= today.AddDays(7))
+            .Where(me => me.MemberId == memberId && !me.IsProcessed && me.DiscountPct.HasValue
+                && DateOnly.FromDateTime(me.EventDate) >= today && DateOnly.FromDateTime(me.EventDate) <= today.AddDays(7))
             .ToListAsync(ct);
 
         foreach (var ev in events)
@@ -186,10 +186,10 @@ public sealed class MemberService(AppDbContext db, ILocalizationService localize
     {
         var alerts = await db.MemberAlerts
             .AsNoTracking()
-            .Where(a => a.MemberID == memberId)
+            .Where(a => a.MemberId == memberId)
             .OrderByDescending(a => a.CreatedAt)
             .Take(50)
-            .Select(a => new MemberAlertDto(a.AlertID, a.AlertType, a.AlertMessage, a.CreatedAt, a.IsRead))
+            .Select(a => new MemberAlertDto(a.AlertId, a.AlertType, a.AlertMessage, a.CreatedAt, a.IsRead))
             .ToListAsync(ct);
 
         return new MemberAlertsResponseDto(memberId, alerts.Count(a => !a.IsRead), alerts);
@@ -198,7 +198,7 @@ public sealed class MemberService(AppDbContext db, ILocalizationService localize
     public async Task MarkAlertsReadAsync(int memberId, MarkAlertsReadRequestDto request, CancellationToken ct = default)
     {
         await db.MemberAlerts
-            .Where(a => a.MemberID == memberId && request.AlertIds.Contains(a.AlertID))
+            .Where(a => a.MemberId == memberId && request.AlertIds.Contains(a.AlertId))
             .ExecuteUpdateAsync(s => s.SetProperty(a => a.IsRead, true), ct);
     }
 }

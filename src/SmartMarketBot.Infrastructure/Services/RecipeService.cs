@@ -1,6 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using SmartMarketBot.Application.Interfaces;
-using SmartMarketBot.Application.Models.Recipes;
+using SmartMarketBot.Application.Models.MealSuggestions;
 using SmartMarketBot.Infrastructure.Persistence;
 
 namespace SmartMarketBot.Infrastructure.Services;
@@ -10,12 +10,12 @@ public sealed class RecipeService(AppDbContext db) : IRecipeService
 {
     public async Task<IReadOnlyList<RecipeDto>> GetAllAsync(CancellationToken ct = default)
     {
-        return await db.Recipes
+        return await db.MealSuggestions
             .AsNoTracking()
-            .OrderBy(r => r.RecipeName)
+            .OrderBy(r => r.MealName)
             .Select(r => new RecipeDto(
-                r.RecipeID,
-                r.RecipeName,
+                r.MealSuggestionId,
+                r.MealName,
                 r.Description,
                 r.YieldPortions,
                 r.ImageUrl,
@@ -27,12 +27,12 @@ public sealed class RecipeService(AppDbContext db) : IRecipeService
 
     public async Task<RecipeDto?> GetByIdAsync(int recipeId, CancellationToken ct = default)
     {
-        return await db.Recipes
+        return await db.MealSuggestions
             .AsNoTracking()
-            .Where(r => r.RecipeID == recipeId)
+            .Where(r => r.MealSuggestionId == recipeId)
             .Select(r => new RecipeDto(
-                r.RecipeID,
-                r.RecipeName,
+                r.MealSuggestionId,
+                r.MealName,
                 r.Description,
                 r.YieldPortions,
                 r.ImageUrl,
@@ -45,31 +45,35 @@ public sealed class RecipeService(AppDbContext db) : IRecipeService
     public async Task<MenuAssistantResponseDto?> GetMenuAssistantAsync(
         int recipeId, int portions, CancellationToken ct = default)
     {
-        var recipe = await db.Recipes
+        var mealSuggestion = await db.MealSuggestions
             .AsNoTracking()
-            .FirstOrDefaultAsync(r => r.RecipeID == recipeId, ct);
+            .FirstOrDefaultAsync(r => r.MealSuggestionId == recipeId, ct);
 
-        if (recipe is null) return null;
+        if (mealSuggestion is null) return null;
 
         // Lấy nguyên liệu và tính định lượng theo số phần ăn
-        var items = await db.RecipeItems
+        var items = await db.MealItems
             .AsNoTracking()
-            .Where(ri => ri.RecipeID == recipeId)
-            .Join(db.Products, ri => ri.ProductID, p => p.ProductID,
+            .Where(ri => ri.MealSuggestionId == recipeId)
+            .Join(db.Products, ri => ri.ProductId, p => p.ProductId,
                 (ri, p) => new { ri, p })
             .ToListAsync(ct);
 
-        // Tìm NodeID cho từng sản phẩm qua Slots → ShelfLevels → Aisles → NavigationNodes
-        var productIds = items.Select(x => x.p.ProductID).ToList();
+        // Tìm NodeID cho từng sản phẩm qua Slots → Shelves → Aisles → NavigationNodes
+        var productIds = items.Select(x => x.p.ProductId).ToList();
         var productNodeMap = await db.Slots
             .AsNoTracking()
-            .Where(s => productIds.Contains(s.ProductID ?? 0) && s.ProductID != null)
-            .Join(db.ShelfLevels, s => s.ShelfLevelID, sl => sl.ShelfLevelID, (s, sl) => new { s, sl })
-            .Join(db.NavigationNodes, x => x.sl.AisleID, n => n.LinkedAisleID,
-                  (x, n) => new { x.s.ProductID, n.NodeID, x.s.Quantity, AisleCode = n.NodeName })
-            .GroupBy(x => x.ProductID)
-            .Select(g => g.First())
-            .ToDictionaryAsync(x => x.ProductID!.Value, ct);
+            .Where(s => s.ProductSlots.Any(ps => productIds.Contains(ps.ProductId)))
+            .Include(s => s.ProductSlots)
+            .Join(db.Shelves, s => s.ShelfId, sl => sl.ShelfId, (s, sl) => new { s, sl })
+            .Join(db.NavigationNodes, x => x.sl.AisleId, n => n.NodeId,
+                  (x, n) => new { x.s, n.NodeId, n.XCoord, n.YCoord, x.sl.AisleId })
+            .ToListAsync(ct);
+
+        var productNodeDict = productNodeMap
+            .GroupBy(x => x.s.ProductSlots.FirstOrDefault(ps => productIds.Contains(ps.ProductId))?.ProductId ?? 0)
+            .Where(g => g.Key != 0)
+            .ToDictionary(g => g.Key, g => g.First());
 
         decimal portionMultiplier = portions;
         decimal totalCost = 0;
@@ -79,19 +83,22 @@ public sealed class RecipeService(AppDbContext db) : IRecipeService
         {
             var adjustedQty = item.ri.QuantityRequired * portionMultiplier;
             totalCost += item.p.UnitPrice * (decimal)adjustedQty;
-            productNodeMap.TryGetValue(item.p.ProductID, out var pn);
+            productNodeDict.TryGetValue(item.p.ProductId, out var pn);
+
+            var nodeId = pn?.NodeId;
+            var nodeName = pn != null ? $"Node {pn.NodeId}" : null;
 
             ingredients.Add(new RecipeIngredientDto(
-                item.p.ProductID,
+                item.p.ProductId,
                 item.p.ProductName,
                 item.p.UnitPrice,
                 item.p.ImageUrl,
                 adjustedQty,
                 item.ri.UnitOfMeasure,
-                pn?.Quantity > 0,
-                pn?.Quantity ?? 0,
-                pn?.NodeID,
-                pn is null ? null : $"Node {pn.NodeID} — {pn.AisleCode}"));
+                pn != null,
+                pn?.s.Quantity ?? 0,
+                nodeId,
+                nodeName));
         }
 
         // Lộ trình tối ưu gom hàng (NodeId theo thứ tự xuất hiện trong Nearest Neighbour đơn giản)
@@ -102,12 +109,12 @@ public sealed class RecipeService(AppDbContext db) : IRecipeService
             .ToList();
 
         return new MenuAssistantResponseDto(
-            recipe.RecipeID,
-            recipe.RecipeName,
+            mealSuggestion.MealSuggestionId,
+            mealSuggestion.MealName,
             portions,
-            recipe.Calories.HasValue ? recipe.Calories * portions : null,
-            recipe.HealthyScore,
-            recipe.AlternativeSuggestion,
+            mealSuggestion.Calories.HasValue ? mealSuggestion.Calories * portions : null,
+            mealSuggestion.HealthyScore,
+            mealSuggestion.AlternativeSuggestion,
             Math.Round(totalCost, 0),
             ingredients,
             routeNodeIds);

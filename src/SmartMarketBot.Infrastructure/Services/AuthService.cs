@@ -89,7 +89,7 @@ public sealed class AuthService(
             EmailConfirmed = true,
             IsActive = true,
             CreatedAt = VnDateTime.Now,
-            Role = AccountRole.Member
+            Role = AccountRole.Member.ToString()
         };
 
         otp.IsUsed = true;
@@ -170,7 +170,7 @@ public sealed class AuthService(
         // 2. Tìm thông tin Member trong DB
         var member = await db.Members
             .Include(m => m.Account)
-            .FirstOrDefaultAsync(m => m.MemberID == verifyResult.MemberId, ct);
+            .FirstOrDefaultAsync(m => m.MemberId == verifyResult.MemberId, ct);
 
         if (member == null)
         {
@@ -178,8 +178,8 @@ public sealed class AuthService(
         }
 
         // 3. Truy vấn các sản phẩm mua nhiều nhất từ lịch sử mua hàng
-        var topProductsList = await db.HistoryItems
-            .Where(i => i.ShoppingHistory.MemberID == member.MemberID)
+        var topProductsList = await db.InvoiceHistoryItems
+            .Where(i => i.InvoiceHistory.MemberId == member.MemberId)
             .GroupBy(i => i.Product.ProductName)
             .OrderByDescending(g => g.Count())
             .Select(g => g.Key)
@@ -201,9 +201,9 @@ public sealed class AuthService(
         }
 
         var memberDto = new FaceLoginMemberDto(
-            member.MemberID,
+            member.MemberId,
             member.FullName,
-            member.PhoneNumber,
+            member.Account?.Phone ?? "",
             member.Tier,
             member.TotalPoints
         );
@@ -213,13 +213,13 @@ public sealed class AuthService(
 
     public async Task<bool> RegisterFaceAsync(int userId, FaceLoginRequestDto request, CancellationToken ct = default)
     {
-        // 1. Tìm Member gắn với AccountID này
+        // 1. Tìm Member gắn với AccountId này
         var member = await db.Members
-            .FirstOrDefaultAsync(m => m.AccountID == userId, ct);
+            .FirstOrDefaultAsync(m => m.AccountId == userId, ct);
 
         if (member == null)
         {
-            logger.LogWarning("[AuthService] Không tìm thấy Member cho AccountID: {UserId}", userId);
+            logger.LogWarning("[AuthService] Không tìm thấy Member cho AccountId: {UserId}", userId);
             return false;
         }
 
@@ -227,7 +227,7 @@ public sealed class AuthService(
         var vector = await faceAiService.ExtractFaceVectorAsync(request.ImageBase64, ct);
         if (vector == null || vector.Count == 0)
         {
-            logger.LogWarning("[AuthService] Không trích xuất được vector khuôn mặt cho MemberID: {MemberId}", member.MemberID);
+            logger.LogWarning("[AuthService] Không trích xuất được vector khuôn mặt cho MemberId: {MemberId}", member.MemberId);
             return false;
         }
 
@@ -256,7 +256,7 @@ public sealed class AuthService(
             db.Members.Update(member);
             await db.SaveChangesAsync(ct);
 
-            logger.LogInformation("[AuthService] Đăng ký khuôn mặt thành công cho MemberID: {MemberId}. File: {File}", member.MemberID, filePath);
+            logger.LogInformation("[AuthService] Đăng ký khuôn mặt thành công cho MemberId: {MemberId}. File: {File}", member.MemberId, filePath);
             return true;
         }
         catch (Exception ex)
@@ -344,7 +344,7 @@ public sealed class AuthService(
         otp!.IsUsed = true;
 
         // Revoke tất cả refresh token của account này
-        var tokens = db.UserTokens.Where(t => t.AccountId == account.AccountID && !t.IsRevoked);
+        var tokens = db.UserTokens.Where(t => t.AccountId == account.AccountId && !t.IsRevoked);
         await tokens.ForEachAsync(t => t.IsRevoked = true, ct);
 
         await db.SaveChangesAsync(ct);
@@ -360,7 +360,7 @@ public sealed class AuthService(
 
         db.UserTokens.Add(new UserToken
         {
-            AccountId = account.AccountID,
+            AccountId = account.AccountId,
             RefreshToken = refreshToken,
             ExpiryDate = VnDateTime.Now.AddDays(_jwtOpts.RefreshTokenExpiryDays)
         });
@@ -370,7 +370,7 @@ public sealed class AuthService(
             accessToken,
             refreshToken,
             expiresAt,
-            account.AccountID,
+            account.AccountId,
             account.Email ?? string.Empty,
             account.FullName,
             roles);

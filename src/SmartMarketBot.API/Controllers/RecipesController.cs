@@ -1,7 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using SmartMarketBot.Application.Interfaces;
-using SmartMarketBot.Application.Models.Recipes;
+using SmartMarketBot.Application.Models.MealSuggestions;
 
 namespace SmartMarketBot.API.Controllers;
 
@@ -24,8 +24,8 @@ public sealed class RecipesController(IRecipeService recipeService) : Controller
     [AllowAnonymous]
     public async Task<ActionResult<RecipeDto>> GetById(int id, CancellationToken cancellationToken)
     {
-        var recipe = await recipeService.GetByIdAsync(id, cancellationToken);
-        return recipe is null ? NotFound() : Ok(recipe);
+        var MealSuggestion = await recipeService.GetByIdAsync(id, cancellationToken);
+        return MealSuggestion is null ? NotFound() : Ok(MealSuggestion);
     }
 
     /// <summary>
@@ -40,6 +40,6 @@ public sealed class RecipesController(IRecipeService recipeService) : Controller
         CancellationToken cancellationToken = default)
     {
         var result = await recipeService.GetMenuAssistantAsync(recipeId, portions, cancellationToken);
-        return result is null ? NotFound($"Recipe {recipeId} not found.") : Ok(result);
+        return result is null ? NotFound($"MealSuggestion {recipeId} not found.") : Ok(result);
     }
 }

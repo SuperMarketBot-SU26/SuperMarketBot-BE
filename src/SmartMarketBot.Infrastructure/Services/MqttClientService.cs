@@ -169,14 +169,11 @@ public sealed class MqttClientService(
             var robot = await dbContext.Robots.FirstOrDefaultAsync(x => x.RobotCode == robotCode);
             var log = new RobotLog
             {
-                RobotID = robot?.RobotID,
-                battery = payload.Battery,
-                location = payload.Location,
-                status = payload.Status,
-                timestamp = timestamp,
-                CurrentNodeID = payload.CurrentNodeId,
-                Mode = payload.Mode,
-                IsOnline = payload.IsOnline,
+                RobotId = robot?.RobotId,
+                Battery = payload.Battery,
+                Location = payload.Location,
+                Status = payload.Status,
+                Timestamp = timestamp,
                 XCoord = payload.XCoord,
                 YCoord = payload.YCoord,
                 HeadingRad = payload.HeadingRad
@@ -199,11 +196,6 @@ public sealed class MqttClientService(
                 if (payload.IsOnline.HasValue)
                 {
                     robot.IsOnline = payload.IsOnline.Value;
-                }
-
-                if (payload.CurrentNodeId.HasValue)
-                {
-                    robot.CurrentNodeID = payload.CurrentNodeId.Value;
                 }
 
                 robot.LastSeenAt = timestamp;
@@ -256,7 +248,7 @@ public sealed class MqttClientService(
 
                 /* ── Phase 3.5: Reroute khi robot bị kẹt ────────────── */
                 if ("reroute_needed".Equals(payload.Status, StringComparison.OrdinalIgnoreCase)
-                    && robot is not null && robot.CurrentNodeID.HasValue)
+                    && robot is not null)
                 {
                     await HandleRerouteAsync(scope, robotCode, robot);
                 }
@@ -274,7 +266,18 @@ public sealed class MqttClientService(
         try
         {
             var navService = scope.ServiceProvider.GetRequiredService<INavigationService>();
-            var startNode  = robot?.CurrentNodeID ?? 1;
+            var dbCtx = scope.ServiceProvider.GetRequiredService<Infrastructure.Persistence.AppDbContext>();
+
+            // Lấy current node từ log gần nhất
+            var startNode = robot != null
+                ? await dbCtx.RobotLogs
+                    .AsNoTracking()
+                    .Where(l => l.RobotId == robot.RobotId)
+                    .OrderByDescending(l => l.Timestamp)
+                    .Select(l => (int?)l.RobotId)
+                    .FirstOrDefaultAsync() ?? 1
+                : 1;
+
             const int dockNodeId = 2; // Trạm sạc — khớp seed data + Config.h DOCK_NODE_ID
 
             logger.LogWarning("Robot {RobotCode} battery low — auto-navigating to dock node {DockNode}.",
@@ -323,19 +326,25 @@ public sealed class MqttClientService(
         try
         {
             var navCommandService = scope.ServiceProvider.GetRequiredService<Application.Services.NavigationCommandService>();
+            var dbCtx = scope.ServiceProvider.GetRequiredService<Infrastructure.Persistence.AppDbContext>();
 
             /* Lấy destination từ log gần nhất — tạm dùng waypoint cuối cùng trong route */
-            var dbCtx = scope.ServiceProvider.GetRequiredService<Infrastructure.Persistence.AppDbContext>();
             var destNode = await dbCtx.RobotLogs
                 .AsNoTracking()
-                .Where(l => l.RobotID == robot.RobotID && l.CurrentNodeID.HasValue)
-                .OrderByDescending(l => l.timestamp)
-                .Select(l => l.CurrentNodeID)
+                .Where(l => l.RobotId == robot.RobotId)
+                .OrderByDescending(l => l.Timestamp)
+                .Select(l => (int?)l.RobotId)
                 .FirstOrDefaultAsync();
 
             /* Fallback: tính lại từ node hiện tại về node tiếp theo đã biết */
-            int startNode = robot.CurrentNodeID ?? 1;
-            int endNode   = destNode ?? 5; // Default fallback — cần improve Phase 4
+            var startNode = await dbCtx.RobotLogs
+                .AsNoTracking()
+                .Where(l => l.RobotId == robot.RobotId)
+                .OrderByDescending(l => l.Timestamp)
+                .Select(l => (int?)l.RobotId)
+                .FirstOrDefaultAsync() ?? 1;
+
+            int endNode = destNode ?? 5; // Default fallback — cần improve Phase 4
 
             logger.LogWarning("Rerouting robot {RobotCode} from node {Start} to {End}.",
                               robotCode, startNode, endNode);

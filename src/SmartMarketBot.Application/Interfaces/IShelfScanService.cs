@@ -1,4 +1,4 @@
-using SmartMarketBot.Application.Models.ShelfScans;
+using SmartMarketBot.Application.Models.AisleScans;
 
 namespace SmartMarketBot.Application.Interfaces;
 

@@ -86,11 +86,14 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
             entity.Property(x => x.Username).HasColumnName("username").HasMaxLength(100).IsRequired();
             entity.Property(x => x.PasswordHash).HasColumnName("password_hash").HasMaxLength(500).IsRequired();
             entity.Property(x => x.Email).HasColumnName("email").HasMaxLength(256);
+            entity.Property(x => x.EmailConfirmed).HasColumnName("email_confirmed").HasDefaultValue(false);
             entity.Property(x => x.Phone).HasColumnName("phone").HasMaxLength(20);
             entity.Property(x => x.FullName).HasColumnName("full_name").HasMaxLength(100);
+            entity.Property(x => x.AvatarUrl).HasColumnName("avatar_url").HasMaxLength(500);
             entity.Property(x => x.IsActive).HasColumnName("is_active").HasDefaultValue(true);
             entity.Property(x => x.Role).HasColumnName("role").HasMaxLength(20).HasDefaultValue("Member");
             entity.Property(x => x.CreatedAt).HasColumnName("created_at").HasDefaultValueSql("GETUTCDATE()");
+            entity.Property(x => x.UpdatedAt).HasColumnName("updated_at");
             entity.HasIndex(x => x.Username).IsUnique().HasDatabaseName("IX_ACCOUNT_username");
             entity.HasIndex(x => x.Email)
                 .IsUnique()
@@ -110,6 +113,10 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
             entity.Property(x => x.SpendingLimit).HasColumnName("spending_limit").HasPrecision(12, 2);
             entity.Property(x => x.WarningThreshold).HasColumnName("warning_threshold").HasPrecision(12, 2);
             entity.Property(x => x.TotalPoints).HasColumnName("total_points").HasDefaultValue(0);
+            // Backward-compat columns (không thuộc ERD V4.0 - chỉ dùng cho code cũ)
+            entity.Ignore(x => x.ShoppingBudget);
+            entity.Ignore(x => x.SearchMode);
+            entity.Ignore(x => x.Tier);
             // 1-1 nullable: Account.Member back-navigation prevents shadow FK
             entity.HasOne(x => x.Account)
                 .WithOne(a => a.Member)
@@ -173,6 +180,80 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
             entity.Property(x => x.ExpiredAt).HasColumnName("expired_at");
             entity.Property(x => x.TemporaryFullName).HasColumnName("temporary_full_name").HasMaxLength(100);
             entity.Property(x => x.TemporaryPhone).HasColumnName("temporary_phone").HasMaxLength(20);
+            entity.Property(x => x.TemporaryPasswordHash).HasColumnName("temporary_password_hash").HasMaxLength(500);
+        });
+
+        // UserToken - refresh token
+        modelBuilder.Entity<UserToken>(entity =>
+        {
+            entity.ToTable("USER_TOKEN");
+            entity.HasKey(x => x.TokenId);
+            entity.Property(x => x.TokenId).HasColumnName("token_id").HasDefaultValueSql("NEWID()");
+            entity.Property(x => x.AccountId).HasColumnName("account_id");
+            entity.Property(x => x.RefreshToken).HasColumnName("refresh_token").HasMaxLength(512).IsRequired();
+            entity.Property(x => x.ExpiryDate).HasColumnName("expiry_date");
+            entity.Property(x => x.IsRevoked).HasColumnName("is_revoked").HasDefaultValue(false);
+            entity.Property(x => x.DeviceInfo).HasColumnName("device_info").HasMaxLength(256);
+            entity.Property(x => x.IpAddress).HasColumnName("ip_address").HasMaxLength(64);
+            entity.Property(x => x.CreatedAt).HasColumnName("created_at").HasDefaultValueSql("GETUTCDATE()");
+            entity.HasOne(x => x.Account)
+                .WithMany()
+                .HasForeignKey(x => x.AccountId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        // MemberAlert
+        modelBuilder.Entity<MemberAlert>(entity =>
+        {
+            entity.ToTable("MEMBER_ALERT");
+            entity.HasKey(x => x.AlertId);
+            entity.Property(x => x.AlertId).HasColumnName("alert_id");
+            entity.Property(x => x.MemberId).HasColumnName("member_id");
+            entity.Property(x => x.AlertType).HasColumnName("alert_type").HasMaxLength(50);
+            entity.Property(x => x.AlertMessage).HasColumnName("alert_message").HasMaxLength(1000);
+            entity.Property(x => x.CreatedAt).HasColumnName("created_at").HasDefaultValueSql("GETUTCDATE()");
+            entity.Property(x => x.IsRead).HasColumnName("is_read").HasDefaultValue(false);
+            entity.HasOne(x => x.Member)
+                .WithMany()
+                .HasForeignKey(x => x.MemberId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        // MemberEvent
+        modelBuilder.Entity<MemberEvent>(entity =>
+        {
+            entity.ToTable("MEMBER_EVENT");
+            entity.HasKey(x => x.EventId);
+            entity.Property(x => x.EventId).HasColumnName("event_id");
+            entity.Property(x => x.MemberId).HasColumnName("member_id");
+            entity.Property(x => x.EventName).HasColumnName("event_name").HasMaxLength(50);
+            entity.Property(x => x.EventDate).HasColumnName("event_date");
+            entity.Property(x => x.DiscountPct).HasColumnName("discount_pct").HasPrecision(18, 2);
+            entity.Property(x => x.IsProcessed).HasColumnName("is_processed").HasDefaultValue(false);
+        });
+
+        // Promotion (legacy - không thuộc ERD V4.0)
+        modelBuilder.Entity<Promotion>(entity =>
+        {
+            entity.ToTable("PROMOTION");
+            entity.HasKey(x => x.PromotionId);
+            entity.Property(x => x.PromotionId).HasColumnName("promotion_id");
+            entity.Property(x => x.PromotionName).HasColumnName("promotion_name").HasMaxLength(200);
+            entity.Property(x => x.Description).HasColumnName("description");
+            entity.Property(x => x.DiscountValue).HasColumnName("discount_value").HasPrecision(18, 2);
+            entity.Property(x => x.StartDate).HasColumnName("start_date");
+            entity.Property(x => x.EndDate).HasColumnName("end_date");
+            entity.Property(x => x.IsActive).HasColumnName("is_active").HasDefaultValue(true);
+        });
+
+        // PromotionProduct (legacy)
+        modelBuilder.Entity<PromotionProduct>(entity =>
+        {
+            entity.ToTable("PROMOTION_PRODUCT");
+            entity.HasKey(x => new { x.PromotionId, x.ProductId });
+            entity.Property(x => x.PromotionId).HasColumnName("promotion_id");
+            entity.Property(x => x.ProductId).HasColumnName("product_id");
+            entity.Property(x => x.Priority).HasColumnName("priority").HasDefaultValue(0);
         });
 
         // ─────────────────────────────────────────────

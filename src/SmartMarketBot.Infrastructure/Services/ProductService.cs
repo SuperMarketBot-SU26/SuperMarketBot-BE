@@ -13,13 +13,13 @@ public sealed class ProductService(AppDbContext dbContext) : IProductService
             .AsNoTracking()
             .OrderBy(x => x.ProductName)
             .Select(x => new ProductDto(
-                x.ProductID,
+                x.ProductId,
                 x.ProductName,
                 x.UnitPrice,
                 x.IsActive,
                 x.Barcode,
                 x.ImageUrl,
-                x.ProductTypeID))
+                x.ProductTypeId))
             .ToListAsync(cancellationToken);
     }
 
@@ -27,26 +27,26 @@ public sealed class ProductService(AppDbContext dbContext) : IProductService
     {
         return await dbContext.Products
             .AsNoTracking()
-            .Where(x => x.ProductID == productId)
+            .Where(x => x.ProductId == productId)
             .Select(x => new ProductDto(
-                x.ProductID,
+                x.ProductId,
                 x.ProductName,
                 x.UnitPrice,
                 x.IsActive,
                 x.Barcode,
                 x.ImageUrl,
-                x.ProductTypeID))
+                x.ProductTypeId))
             .FirstOrDefaultAsync(cancellationToken);
     }
 
     public async Task<IReadOnlyList<ProductDto>> GetAlternativeProductsAsync(
         int productId, int? memberId, CancellationToken cancellationToken = default)
     {
-        // Lấy ProductTypeID của sản phẩm gốc
+        // Lấy ProductTypeId của sản phẩm gốc
         var source = await dbContext.Products
             .AsNoTracking()
-            .Where(x => x.ProductID == productId)
-            .Select(x => new { x.ProductTypeID, x.UnitPrice })
+            .Where(x => x.ProductId == productId)
+            .Select(x => new { x.ProductTypeId, x.UnitPrice })
             .FirstOrDefaultAsync(cancellationToken);
 
         if (source is null) return [];
@@ -57,8 +57,8 @@ public sealed class ProductService(AppDbContext dbContext) : IProductService
         {
             allergyTagIds = (await dbContext.MemberHealthPreferences
                 .AsNoTracking()
-                .Where(mhp => mhp.MemberID == memberId.Value && mhp.IsAllergy)
-                .Select(mhp => mhp.TagID)
+                .Where(mhp => mhp.MemberId == memberId.Value && mhp.IsAllergy)
+                .Select(mhp => mhp.HealthTagId)
                 .ToListAsync(cancellationToken))
                 .ToHashSet();
         }
@@ -69,8 +69,8 @@ public sealed class ProductService(AppDbContext dbContext) : IProductService
         {
             allergenProductIds = (await dbContext.ProductHealthTags
                 .AsNoTracking()
-                .Where(pht => allergyTagIds.Contains(pht.TagID))
-                .Select(pht => pht.ProductID)
+                .Where(pht => allergyTagIds.Contains(pht.HealthTagId))
+                .Select(pht => pht.ProductId)
                 .ToListAsync(cancellationToken))
                 .ToHashSet();
         }
@@ -81,22 +81,22 @@ public sealed class ProductService(AppDbContext dbContext) : IProductService
 
         return await dbContext.Products
             .AsNoTracking()
-            .Where(x => x.ProductTypeID == source.ProductTypeID
-                && x.ProductID != productId
+            .Where(x => x.ProductTypeId == source.ProductTypeId
+                && x.ProductId != productId
                 && x.IsActive
-                && !allergenProductIds.Contains(x.ProductID)
+                && !allergenProductIds.Contains(x.ProductId)
                 && x.UnitPrice >= minPrice
                 && x.UnitPrice <= maxPrice)
             .OrderBy(x => x.UnitPrice)
             .Take(5)
             .Select(x => new ProductDto(
-                x.ProductID,
+                x.ProductId,
                 x.ProductName,
                 x.UnitPrice,
                 x.IsActive,
                 x.Barcode,
                 x.ImageUrl,
-                x.ProductTypeID))
+                x.ProductTypeId))
             .ToListAsync(cancellationToken);
     }
 }

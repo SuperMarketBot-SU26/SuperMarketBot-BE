@@ -15,4 +15,7 @@ public class EmailOtp
     public DateTime ExpiredAt { get; set; } = DateTime.UtcNow.AddMinutes(10);
     public string? TemporaryFullName { get; set; }
     public string? TemporaryPhone { get; set; }
+
+    /// <summary>Hash mật khẩu tạm thời (giữ cho tương thích AuthService cũ).</summary>
+    public string? TemporaryPasswordHash { get; set; }
 }

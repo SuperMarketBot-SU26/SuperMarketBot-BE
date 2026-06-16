@@ -17,9 +17,9 @@ public sealed class RobotService(
     {
         return await dbContext.Robots
             .AsNoTracking()
-            .OrderBy(x => x.RobotID)
+            .OrderBy(x => x.RobotId)
             .Select(x => new RobotDto(
-                x.RobotID,
+                x.RobotId,
                 x.RobotName,
                 x.RobotCode,
                 x.BatteryPct,
@@ -43,8 +43,8 @@ public sealed class RobotService(
 
         var latestLog = await dbContext.RobotLogs
             .AsNoTracking()
-            .Where(l => l.RobotID == robot.RobotID && l.XCoord.HasValue && l.YCoord.HasValue)
-            .OrderByDescending(l => l.timestamp)
+            .Where(l => l.RobotId == robot.RobotId && l.XCoord.HasValue && l.YCoord.HasValue)
+            .OrderByDescending(l => l.Timestamp)
             .FirstOrDefaultAsync(cancellationToken);
 
         double x = latestLog?.XCoord ?? 0;
@@ -52,7 +52,7 @@ public sealed class RobotService(
         double headingRad = latestLog?.HeadingRad ?? 0;
         double headingDeg = headingRad * 180.0 / Math.PI;
 
-        return new RobotPoseDto(robotCode, x, y, headingRad, headingDeg, latestLog?.timestamp);
+        return new RobotPoseDto(robotCode, x, y, headingRad, headingDeg, latestLog?.Timestamp);
     }
 
     public async Task NavigateRobotAsync(NavigateRobotRequestDto request, CancellationToken cancellationToken = default)
@@ -78,10 +78,15 @@ public sealed class RobotService(
                 throw new ArgumentException(localizer.Get("DestNodeInvalid"));
             }
 
-            var startNodeId = robot.CurrentNodeID ?? 1;
+            var currentNodeId = await dbContext.RobotLogs
+                .AsNoTracking()
+                .Where(l => l.RobotId == robot.RobotId)
+                .OrderByDescending(l => l.Timestamp)
+                .Select(l => (int?)l.RobotId)
+                .FirstOrDefaultAsync(cancellationToken) ?? 1;
 
             var routeResult = await navigationService.PlanRouteAsync(
-                new RoutePlanRequestDto(startNodeId, destId),
+                new RoutePlanRequestDto(currentNodeId, destId),
                 cancellationToken);
 
             var waypoints = routeResult.Nodes

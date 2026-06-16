@@ -1,6 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using SmartMarketBot.Application.Interfaces;
-using SmartMarketBot.Application.Models.ShelfScans;
+using SmartMarketBot.Application.Models.AisleScans;
 using SmartMarketBot.Domain.Common;
 using SmartMarketBot.Domain.Entities;
 using SmartMarketBot.Infrastructure.Persistence;
@@ -16,15 +16,15 @@ public sealed class ShelfScanService(AppDbContext dbContext) : IShelfScanService
             take = 20;
         }
 
-        return await dbContext.ShelfScans
+        return await dbContext.AisleScans
             .AsNoTracking()
             .OrderByDescending(x => x.ScannedAt)
             .Take(take)
             .Select(x => new ShelfScanDto(
-                x.ScanID,
-                x.AisleID,
-                x.ShelfLevelID,
-                x.RobotID,
+                x.ScanId,
+                x.AisleId,
+                0, // ShelfId - not in AisleScan
+                x.RobotId,
                 x.ScannedAt,
                 x.EmptyPercentage,
                 x.NeedsRestock,
@@ -35,25 +35,24 @@ public sealed class ShelfScanService(AppDbContext dbContext) : IShelfScanService
 
     public async Task<ShelfScanDto> CreateScanAsync(CreateShelfScanRequestDto request, CancellationToken cancellationToken = default)
     {
-        var entity = new ShelfScan
+        var entity = new AisleScan
         {
-            AisleID = request.AisleId,
-            ShelfLevelID = request.ShelfLevelId,
-            RobotID = request.RobotId,
+            AisleId = request.AisleId,
+            RobotId = request.RobotId,
             EmptyPercentage = request.EmptyPercentage,
             ImageUrl = request.ImageUrl,
             AiResponseRaw = request.AiResponseRaw,
             ScannedAt = VnDateTime.Now
         };
 
-        dbContext.ShelfScans.Add(entity);
+        dbContext.AisleScans.Add(entity);
         await dbContext.SaveChangesAsync(cancellationToken);
 
         return new ShelfScanDto(
-            entity.ScanID,
-            entity.AisleID,
-            entity.ShelfLevelID,
-            entity.RobotID,
+            entity.ScanId,
+            entity.AisleId,
+            0, // ShelfId - not in AisleScan
+            entity.RobotId,
             entity.ScannedAt,
             entity.EmptyPercentage,
             entity.NeedsRestock,

@@ -1,4 +1,4 @@
-namespace SmartMarketBot.Application.Models.ShelfScans;
+namespace SmartMarketBot.Application.Models.AisleScans;
 
 public sealed record ShelfScanDto(
     int ScanId,

@@ -1,4 +1,4 @@
-using SmartMarketBot.Application.Models.Recipes;
+using SmartMarketBot.Application.Models.MealSuggestions;
 
 namespace SmartMarketBot.Application.Interfaces;
 

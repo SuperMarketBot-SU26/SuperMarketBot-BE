@@ -21,10 +21,10 @@ public sealed class TokenService(IOptions<JwtOptions> jwtOptions) : ITokenServic
 
         var claims = new List<Claim>
         {
-            new(JwtRegisteredClaimNames.Sub, account.AccountID.ToString()),
+            new(JwtRegisteredClaimNames.Sub, account.AccountId.ToString()),
             new(JwtRegisteredClaimNames.Email, account.Email ?? string.Empty),
             new(JwtRegisteredClaimNames.UniqueName, account.Username),
-            new(ClaimTypes.NameIdentifier, account.AccountID.ToString()),
+            new(ClaimTypes.NameIdentifier, account.AccountId.ToString()),
             new(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString())
         };
 

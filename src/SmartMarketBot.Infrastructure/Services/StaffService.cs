@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using SmartMarketBot.Application.Interfaces;
 using SmartMarketBot.Application.Models.Staff;
 using SmartMarketBot.Domain.Common;
+using SmartMarketBot.Domain.Entities;
 using SmartMarketBot.Infrastructure.Persistence;
 
 namespace SmartMarketBot.Infrastructure.Services;
@@ -15,55 +16,63 @@ public sealed class StaffService(AppDbContext db, ILocalizationService localizer
         // Tìm Slot và Aisle liên kết
         var slot = await db.Slots
             .AsNoTracking()
-            .Include(s => s.ShelfLevel)
+            .Include(s => s.Shelf)
                 .ThenInclude(sl => sl.Aisle)
-            .FirstOrDefaultAsync(s => s.SlotID == request.SlotId, ct)
+            .FirstOrDefaultAsync(s => s.SlotId == request.SlotId, ct)
             ?? throw new KeyNotFoundException(localizer.Get("SlotNotFound", request.SlotId));
 
-        int aisleId = slot.ShelfLevel.Aisle.AisleID;
+        int aisleId = slot.Shelf.Aisle.AisleId;
 
         // Tính tổng tồn kho còn lại của sản phẩm này trên toàn bộ kệ
-        int totalWarehouseStock = slot.ProductID.HasValue
-            ? await db.Slots
+        // Lấy ProductId qua ProductSlot (N-N)
+        var productId = await db.ProductSlots
+            .AsNoTracking()
+            .Where(ps => ps.SlotId == request.SlotId)
+            .Select(ps => (int?)ps.ProductId)
+            .FirstOrDefaultAsync(ct);
+
+        int totalWarehouseStock = 0;
+        if (productId.HasValue)
+        {
+            totalWarehouseStock = await db.ProductSlots
                 .AsNoTracking()
-                .Where(s => s.ProductID == slot.ProductID && s.SlotID != request.SlotId)
-                .SumAsync(s => s.Quantity, ct)
-            : 0;
+                .Where(ps => ps.ProductId == productId.Value && ps.SlotId != request.SlotId)
+                .Join(db.Slots, ps => ps.SlotId, s => s.SlotId, (ps, s) => s)
+                .SumAsync(s => s.Quantity, ct);
+        }
 
         bool hasWarehouseStock = totalWarehouseStock > 0;
 
         // Ghi nhận bản quét kệ
-        var scan = new Domain.Entities.ShelfScan
+        var scan = new Domain.Entities.AisleScan
         {
-            AisleID = aisleId,
-            ShelfLevelID = slot.ShelfLevelID,
-            RobotID = request.RobotId,
+            AisleId = aisleId,
+            RobotId = request.RobotId,
             ImageUrl = request.ImageUrl,
             EmptyPercentage = request.EmptyPercentage,
-            IsOccluded = request.IsOccluded,
-            OcclusionReason = request.OcclusionReason
+            ScannedAt = VnDateTime.Now
         };
-        db.ShelfScans.Add(scan);
+        db.AisleScans.Add(scan);
         await db.SaveChangesAsync(ct);
 
         string message = hasWarehouseStock
-            ? localizer.Get("OosEventWithStock", scan.ScanID)
-            : localizer.Get("OosEventNoStock", scan.ScanID);
+            ? localizer.Get("OosEventWithStock", scan.ScanId)
+            : localizer.Get("OosEventNoStock", scan.ScanId);
 
-        return new ReportOosResponseDto(scan.ScanID, scan.EmptyPercentage > 30, hasWarehouseStock, message);
+        return new ReportOosResponseDto(scan.ScanId, scan.EmptyPercentage > 30, hasWarehouseStock, message);
     }
 
     public async Task<RestockTaskListResponseDto> GetRestockTasksAsync(CancellationToken ct = default)
     {
-        var tasks = await db.ShelfScans
+        var tasks = await db.AisleScans
             .AsNoTracking()
-            .Where(ss => ss.EmptyPercentage > 30 && !ss.IsOccluded)
+            .Where(ss => ss.EmptyPercentage > 30)
             .OrderByDescending(ss => ss.EmptyPercentage)
             .Take(30)
-            .Join(db.Aisles, ss => ss.AisleID, a => a.AisleID, (ss, a) => new { ss, a })
-            .Join(db.Zones, x => x.a.ZoneID, z => z.ZoneID, (x, z) => new { x.ss, x.a, z })
+            .Join(db.Aisles, ss => ss.AisleId, a => a.AisleId, (ss, a) => new { ss, a })
+            .Join(db.Zones, x => x.a.ZoneId, z => z.ZoneId, (x, z) => new { x.ss, x.a, z })
             .Select(x => new RestockTaskDto(
-                x.ss.ScanID,
+                x.ss.ScanId,
                 0,  // SlotId — enriched lazily if needed
                 "-",
                 $"Khu {x.z.ZoneCode} - Dãy {x.a.AisleCode}",

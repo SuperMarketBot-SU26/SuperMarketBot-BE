@@ -1,4 +1,4 @@
-namespace SmartMarketBot.Application.Models.Recipes;
+namespace SmartMarketBot.Application.Models.MealSuggestions;
 
 // ─── Flow 2: Smart Menu Assistant ────────────────────────────────────────────
 

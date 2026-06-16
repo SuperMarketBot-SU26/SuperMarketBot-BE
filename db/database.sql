@@ -669,6 +669,120 @@ PRINT N'   - 1 computed column: AISLE_SCAN.needs_restock';
 GO
 
 -- ============================================================================
+-- PHẦN 3B: TẠO CÁC BẢNG PHỤ TRỢ (LEGACY) - BỔ SUNG CHO CODE CŨ
+-- ============================================================================
+-- Các bảng này KHÔNG thuộc ERD V4.0 cốt lõi - chỉ tạo để tương thích với
+-- code Service cũ (AuthService, MemberService, PromotionService) mà chưa
+-- refactor sang dùng bảng V4.0 mới. Tương lai sẽ migrate sang AD_CAMPAIGN,
+-- AISLE_SCAN, etc.
+-- ============================================================================
+PRINT N'🔧 PHẦN 3B: Tạo 6 bảng phụ trợ (legacy)...';
+GO
+
+-- 38. EMAIL_OTP
+CREATE TABLE dbo.EMAIL_OTP (
+    otp_id                  UNIQUEIDENTIFIER NOT NULL CONSTRAINT DF_EMAIL_OTP_otp_id        DEFAULT NEWID(),
+    email                   NVARCHAR(256) NOT NULL,
+    otp_code                NVARCHAR(6)   NOT NULL,
+    otp_type                NVARCHAR(50)  NOT NULL CONSTRAINT DF_EMAIL_OTP_otp_type        DEFAULT 'Registration',
+    is_used                 BIT           NOT NULL CONSTRAINT DF_EMAIL_OTP_is_used         DEFAULT 0,
+    created_at              DATETIME2     NOT NULL CONSTRAINT DF_EMAIL_OTP_created_at      DEFAULT GETUTCDATE(),
+    expired_at              DATETIME2     NOT NULL,
+    temporary_full_name     NVARCHAR(100) NULL,
+    temporary_phone         NVARCHAR(20)  NULL,
+    temporary_password_hash NVARCHAR(500) NULL,
+    CONSTRAINT PK_EMAIL_OTP PRIMARY KEY CLUSTERED (otp_id)
+);
+GO
+
+CREATE NONCLUSTERED INDEX IX_EMAIL_OTP_email_type_active
+    ON dbo.EMAIL_OTP(email, otp_type, is_used)
+    WHERE is_used = 0;
+GO
+
+-- 39. USER_TOKEN
+CREATE TABLE dbo.USER_TOKEN (
+    token_id      UNIQUEIDENTIFIER NOT NULL CONSTRAINT DF_USER_TOKEN_token_id DEFAULT NEWID(),
+    account_id    INT NOT NULL,
+    refresh_token NVARCHAR(512) NOT NULL,
+    expiry_date   DATETIME2 NOT NULL,
+    is_revoked    BIT        NOT NULL CONSTRAINT DF_USER_TOKEN_is_revoked DEFAULT 0,
+    device_info   NVARCHAR(256) NULL,
+    ip_address    NVARCHAR(64)  NULL,
+    created_at    DATETIME2 NOT NULL CONSTRAINT DF_USER_TOKEN_created_at DEFAULT GETUTCDATE(),
+    CONSTRAINT PK_USER_TOKEN PRIMARY KEY CLUSTERED (token_id),
+    CONSTRAINT FK_USER_TOKEN_ACCOUNT FOREIGN KEY (account_id)
+        REFERENCES dbo.ACCOUNT(account_id) ON DELETE CASCADE
+);
+GO
+
+-- 40. MEMBER_ALERT
+CREATE TABLE dbo.MEMBER_ALERT (
+    alert_id       INT IDENTITY(1,1) NOT NULL,
+    member_id      INT NOT NULL,
+    alert_type     NVARCHAR(50)  NOT NULL,
+    alert_message  NVARCHAR(1000) NOT NULL,
+    created_at     DATETIME2 NOT NULL CONSTRAINT DF_MEMBER_ALERT_created_at DEFAULT GETUTCDATE(),
+    is_read        BIT        NOT NULL CONSTRAINT DF_MEMBER_ALERT_is_read   DEFAULT 0,
+    CONSTRAINT PK_MEMBER_ALERT PRIMARY KEY CLUSTERED (alert_id),
+    CONSTRAINT FK_MEMBER_ALERT_MEMBER FOREIGN KEY (member_id)
+        REFERENCES dbo.MEMBER(member_id) ON DELETE CASCADE
+);
+GO
+
+CREATE NONCLUSTERED INDEX IX_MEMBER_ALERT_member_unread
+    ON dbo.MEMBER_ALERT(member_id, is_read);
+GO
+
+-- 41. MEMBER_EVENT
+CREATE TABLE dbo.MEMBER_EVENT (
+    event_id      INT IDENTITY(1,1) NOT NULL,
+    member_id     INT NOT NULL,
+    event_name    NVARCHAR(50) NOT NULL,
+    event_date    DATE NOT NULL,
+    discount_pct  DECIMAL(18,2) NULL,
+    is_processed  BIT NOT NULL CONSTRAINT DF_MEMBER_EVENT_is_processed DEFAULT 0,
+    CONSTRAINT PK_MEMBER_EVENT PRIMARY KEY CLUSTERED (event_id),
+    CONSTRAINT FK_MEMBER_EVENT_MEMBER FOREIGN KEY (member_id)
+        REFERENCES dbo.MEMBER(member_id) ON DELETE CASCADE
+);
+GO
+
+CREATE NONCLUSTERED INDEX IX_MEMBER_EVENT_date_unprocessed
+    ON dbo.MEMBER_EVENT(event_date, is_processed);
+GO
+
+-- 42. PROMOTION (legacy - không thuộc ERD V4.0)
+CREATE TABLE dbo.PROMOTION (
+    promotion_id    INT IDENTITY(1,1) NOT NULL,
+    promotion_name  NVARCHAR(200) NOT NULL,
+    description     NVARCHAR(MAX) NULL,
+    discount_value  DECIMAL(18,2) NOT NULL CONSTRAINT DF_PROMOTION_discount_value DEFAULT 0.00,
+    start_date      DATETIME2 NOT NULL,
+    end_date        DATETIME2 NOT NULL,
+    is_active       BIT NOT NULL CONSTRAINT DF_PROMOTION_is_active DEFAULT 1,
+    CONSTRAINT PK_PROMOTION PRIMARY KEY CLUSTERED (promotion_id)
+);
+GO
+
+-- 43. PROMOTION_PRODUCT (legacy)
+CREATE TABLE dbo.PROMOTION_PRODUCT (
+    promotion_id INT NOT NULL,
+    product_id   INT NOT NULL,
+    priority     INT NOT NULL CONSTRAINT DF_PROMOTION_PRODUCT_priority DEFAULT 0,
+    CONSTRAINT PK_PROMOTION_PRODUCT PRIMARY KEY CLUSTERED (promotion_id, product_id),
+    CONSTRAINT FK_PROMOTION_PRODUCT_PROMOTION FOREIGN KEY (promotion_id)
+        REFERENCES dbo.PROMOTION(promotion_id) ON DELETE CASCADE,
+    CONSTRAINT FK_PROMOTION_PRODUCT_PRODUCT FOREIGN KEY (product_id)
+        REFERENCES dbo.PRODUCT(product_id) ON DELETE CASCADE
+);
+GO
+
+PRINT N'   - Đã tạo 6 bảng legacy (EMAIL_OTP, USER_TOKEN, MEMBER_ALERT, MEMBER_EVENT, PROMOTION, PROMOTION_PRODUCT)';
+PRINT N'   - Tổng cộng: 37 bảng ERD V4.0 + 6 bảng legacy = 43 bảng';
+GO
+
+-- ============================================================================
 -- PHẦN 4: TẠO 4 VIEW TƯƠNG THÍCH NGƯỤC 100% CHO AI / n8n
 -- ============================================================================
 -- Lưu ý: View giữ nguyên contract tên cột cũ (PascalCase) để AI FastAPI & n8n

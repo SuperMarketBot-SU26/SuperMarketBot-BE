@@ -1,6 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 using SmartMarketBot.Application.Interfaces;
-using SmartMarketBot.Application.Models.ShelfScans;
+using SmartMarketBot.Application.Models.AisleScans;
 using SmartMarketBot.Application.Models.Staff;
 
 namespace SmartMarketBot.API.Controllers;

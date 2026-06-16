@@ -9,50 +9,60 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
 {
     // ── Region 1: Customer & Identity ────────────────────────────────────────
     public DbSet<Account> Accounts => Set<Account>();
-    public DbSet<Admin> Admins => Set<Admin>();
     public DbSet<Member> Members => Set<Member>();
+    public DbSet<Membership> Memberships => Set<Membership>();
+    public DbSet<HealthTag> HealthTags => Set<HealthTag>();
     public DbSet<MemberHealthPreference> MemberHealthPreferences => Set<MemberHealthPreference>();
+    public DbSet<EmailOtp> EmailOtps => Set<EmailOtp>();
+    public DbSet<UserToken> UserTokens => Set<UserToken>();
     public DbSet<MemberAlert> MemberAlerts => Set<MemberAlert>();
     public DbSet<MemberEvent> MemberEvents => Set<MemberEvent>();
-    public DbSet<Staff> Staffs => Set<Staff>();
-    public DbSet<UserToken> UserTokens => Set<UserToken>();
-    public DbSet<EmailOtp> EmailOtps => Set<EmailOtp>();
 
-    // ── Region 2: Space & Goods ───────────────────────────────────────────────
-    public DbSet<Aisle> Aisles => Set<Aisle>();
+    // ── Region 2: Product Catalog ────────────────────────────────────────────
     public DbSet<Category> Categories => Set<Category>();
-    public DbSet<Floor> Floors => Set<Floor>();
-    public DbSet<HealthTag> HealthTags => Set<HealthTag>();
-    public DbSet<HistoryItem> HistoryItems => Set<HistoryItem>();
+    public DbSet<Subcategory> Subcategories => Set<Subcategory>();
+    public DbSet<ProductType> ProductTypes => Set<ProductType>();
     public DbSet<Product> Products => Set<Product>();
     public DbSet<ProductHealthTag> ProductHealthTags => Set<ProductHealthTag>();
-    public DbSet<ProductType> ProductTypes => Set<ProductType>();
-    public DbSet<ShelfLevel> ShelfLevels => Set<ShelfLevel>();
-    public DbSet<ShelfScan> ShelfScans => Set<ShelfScan>();
-    public DbSet<ShoppingHistory> ShoppingHistories => Set<ShoppingHistory>();
-    public DbSet<Slot> Slots => Set<Slot>();
-    public DbSet<Subcategory> Subcategories => Set<Subcategory>();
-    public DbSet<Zone> Zones => Set<Zone>();
 
-    // ── Region 3: Ads & Revenue ───────────────────────────────────────────────
-    public DbSet<AdPackage> AdPackages => Set<AdPackage>();
-    public DbSet<Brand> Brands => Set<Brand>();
-    public DbSet<SponsoredProduct> SponsoredProducts => Set<SponsoredProduct>();
+    // Legacy (không thuộc ERD V4.0 cốt lõi - dùng cho service cũ)
     public DbSet<Promotion> Promotions => Set<Promotion>();
     public DbSet<PromotionProduct> PromotionProducts => Set<PromotionProduct>();
-    public DbSet<Recipe> Recipes => Set<Recipe>();
-    public DbSet<RecipeItem> RecipeItems => Set<RecipeItem>();
 
-    // ── Region 4: Robot & Navigation ─────────────────────────────────────────
-    public DbSet<ForbiddenZone> ForbiddenZones => Set<ForbiddenZone>();
-    public DbSet<Map> Maps => Set<Map>();
-    public DbSet<NavigationEdge> NavigationEdges => Set<NavigationEdge>();
-    public DbSet<NavigationNode> NavigationNodes => Set<NavigationNode>();
+    // ── Region 3: Shopping & Meal ────────────────────────────────────────────
+    public DbSet<InvoiceHistory> InvoiceHistories => Set<InvoiceHistory>();
+    public DbSet<InvoiceHistoryItem> InvoiceHistoryItems => Set<InvoiceHistoryItem>();
+    public DbSet<MealSuggestion> MealSuggestions => Set<MealSuggestion>();
+    public DbSet<MealItem> MealItems => Set<MealItem>();
+
+    // ── Region 4: Store Layout ───────────────────────────────────────────────
+    public DbSet<Floor> Floors => Set<Floor>();
+    public DbSet<Zone> Zones => Set<Zone>();
+    public DbSet<Aisle> Aisles => Set<Aisle>();
+    public DbSet<Shelf> Shelves => Set<Shelf>();
+    public DbSet<Slot> Slots => Set<Slot>();
+    public DbSet<ProductSlot> ProductSlots => Set<ProductSlot>();
+
+    // ── Region 5: Ad & Sponsorship ───────────────────────────────────────────
+    public DbSet<Brand> Brands => Set<Brand>();
+    public DbSet<AdPackage> AdPackages => Set<AdPackage>();
+    public DbSet<AdCampaign> AdCampaigns => Set<AdCampaign>();
+    public DbSet<SponsoredProduct> SponsoredProducts => Set<SponsoredProduct>();
+    public DbSet<AdCampaignLog> AdCampaignLogs => Set<AdCampaignLog>();
+
+    // ── Region 6: Robot & Navigation ─────────────────────────────────────────
     public DbSet<Robot> Robots => Set<Robot>();
     public DbSet<RobotLog> RobotLogs => Set<RobotLog>();
     public DbSet<RobotZone> RobotZones => Set<RobotZone>();
+    public DbSet<Map> Maps => Set<Map>();
+    public DbSet<NavigationNode> NavigationNodes => Set<NavigationNode>();
+    public DbSet<NavigationEdge> NavigationEdges => Set<NavigationEdge>();
+    public DbSet<AisleNode> AisleNodes => Set<AisleNode>();
+    public DbSet<RobotRoute> RobotRoutes => Set<RobotRoute>();
+    public DbSet<RouteNodeMapping> RouteNodeMappings => Set<RouteNodeMapping>();
+    public DbSet<RouteAssignment> RouteAssignments => Set<RouteAssignment>();
+    public DbSet<AisleScan> AisleScans => Set<AisleScan>();
     public DbSet<SemanticObject> SemanticObjects => Set<SemanticObject>();
-    public DbSet<Workstation> Workstations => Set<Workstation>();
 
     // ── Views (keyless) ───────────────────────────────────────────────────────
     public DbSet<BlockedAisleView> BlockedAisleViews => Set<BlockedAisleView>();
@@ -64,377 +74,652 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
     {
         base.OnModelCreating(modelBuilder);
 
-        // ── Region 1: Customer & Identity ────────────────────────────────────
+        // ─────────────────────────────────────────────
+        // REGION 1: Customer & Identity
+        // ─────────────────────────────────────────────
 
         modelBuilder.Entity<Account>(entity =>
         {
-            entity.ToTable("Accounts");
-            entity.HasKey(x => x.AccountID);
-            entity.HasIndex(x => x.Username).IsUnique();
-            entity.HasIndex(x => x.Email).IsUnique();
-            entity.Property(x => x.Email).HasMaxLength(256);
-            entity.Property(x => x.FullName).HasMaxLength(100);
-            entity.Property(x => x.Phone).HasMaxLength(20);
-            entity.Property(x => x.Role)
-                .HasConversion<int>()
-                .HasDefaultValue(AccountRole.Member);
-        });
-
-        modelBuilder.Entity<Admin>(entity =>
-        {
-            entity.ToTable("Admins");
-            entity.HasKey(x => x.AdminID);
-            // 1-to-1: Account.Admin back-navigation — use WithOne to prevent shadow FK
-            entity.HasOne(x => x.Account)
-                .WithOne(a => a.Admin)
-                .HasForeignKey<Admin>(x => x.AccountID)
-                .OnDelete(DeleteBehavior.Cascade);
+            entity.ToTable("ACCOUNT");
+            entity.HasKey(x => x.AccountId);
+            entity.Property(x => x.AccountId).HasColumnName("account_id");
+            entity.Property(x => x.Username).HasColumnName("username").HasMaxLength(100).IsRequired();
+            entity.Property(x => x.PasswordHash).HasColumnName("password_hash").HasMaxLength(500).IsRequired();
+            entity.Property(x => x.Email).HasColumnName("email").HasMaxLength(256);
+            entity.Property(x => x.Phone).HasColumnName("phone").HasMaxLength(20);
+            entity.Property(x => x.FullName).HasColumnName("full_name").HasMaxLength(100);
+            entity.Property(x => x.IsActive).HasColumnName("is_active").HasDefaultValue(true);
+            entity.Property(x => x.Role).HasColumnName("role").HasMaxLength(20).HasDefaultValue("Member");
+            entity.Property(x => x.CreatedAt).HasColumnName("created_at").HasDefaultValueSql("GETUTCDATE()");
+            entity.HasIndex(x => x.Username).IsUnique().HasDatabaseName("IX_ACCOUNT_username");
+            entity.HasIndex(x => x.Email)
+                .IsUnique()
+                .HasFilter("[email] IS NOT NULL")
+                .HasDatabaseName("IX_ACCOUNT_email");
         });
 
         modelBuilder.Entity<Member>(entity =>
         {
-            entity.ToTable("Members");
-            entity.HasKey(x => x.MemberID);
-            entity.Property(x => x.MemberName)
-                .HasComputedColumnSql("[FullName]", stored: false);
-            entity.Property(x => x.ShoppingBudget).HasPrecision(18, 2);
-            // 1-to-1 nullable: Account.Member back-navigation
+            entity.ToTable("MEMBER");
+            entity.HasKey(x => x.MemberId);
+            entity.Property(x => x.MemberId).HasColumnName("member_id");
+            entity.Property(x => x.AccountId).HasColumnName("account_id");
+            entity.Property(x => x.FullName).HasColumnName("full_name").HasMaxLength(255).IsRequired();
+            entity.Property(x => x.FacePath).HasColumnName("face_path").HasMaxLength(500);
+            entity.Property(x => x.FaceVector).HasColumnName("face_vector").HasColumnType("nvarchar(max)");
+            entity.Property(x => x.SpendingLimit).HasColumnName("spending_limit").HasPrecision(12, 2);
+            entity.Property(x => x.WarningThreshold).HasColumnName("warning_threshold").HasPrecision(12, 2);
+            entity.Property(x => x.TotalPoints).HasColumnName("total_points").HasDefaultValue(0);
+            // 1-1 nullable: Account.Member back-navigation prevents shadow FK
             entity.HasOne(x => x.Account)
                 .WithOne(a => a.Member)
-                .HasForeignKey<Member>(x => x.AccountID)
+                .HasForeignKey<Member>(x => x.AccountId)
                 .IsRequired(false)
                 .OnDelete(DeleteBehavior.SetNull);
         });
 
-        modelBuilder.Entity<MemberHealthPreference>(entity =>
+        modelBuilder.Entity<Membership>(entity =>
         {
-            entity.ToTable("MemberHealthPreferences");
-            entity.HasKey(x => new { x.MemberID, x.TagID });
-            // Explicit FK: TagID IS the FK to HealthTags — prevents shadow 'HealthTagTagID'
-            entity.HasOne(x => x.HealthTag)
-                .WithMany(h => h.MemberHealthPreferences)
-                .HasForeignKey(x => x.TagID)
+            entity.ToTable("MEMBERSHIP");
+            entity.HasKey(x => x.MembershipId);
+            entity.Property(x => x.MembershipId).HasColumnName("membership_id");
+            entity.Property(x => x.MemberId).HasColumnName("member_id");
+            entity.Property(x => x.TierName).HasColumnName("tier_name").HasMaxLength(20).IsRequired();
+            entity.Property(x => x.PointsThreshold).HasColumnName("points_threshold");
+            entity.HasOne(x => x.Member)
+                .WithMany(m => m.Memberships)
+                .HasForeignKey(x => x.MemberId)
                 .OnDelete(DeleteBehavior.Cascade);
-        });
-
-        modelBuilder.Entity<MemberAlert>(entity =>
-        {
-            entity.ToTable("MemberAlerts");
-            entity.HasKey(x => x.AlertID);
-            entity.Property(x => x.CreatedAt).HasDefaultValueSql("(getutcdate())");
-            entity.Property(x => x.IsRead).HasDefaultValue(false);
-            entity.HasIndex(x => new { x.MemberID, x.IsRead });
-            entity.HasOne(x => x.Member).WithMany(m => m.MemberAlerts)
-                .HasForeignKey(x => x.MemberID).OnDelete(DeleteBehavior.Cascade);
-        });
-
-        modelBuilder.Entity<MemberEvent>(entity =>
-        {
-            entity.ToTable("MemberEvents");
-            entity.HasKey(x => x.EventID);
-            entity.Property(x => x.IsProcessed).HasDefaultValue(false);
-            entity.Property(x => x.DiscountPct).HasPrecision(18, 2);
-            entity.HasIndex(x => new { x.EventDate, x.IsProcessed });
-            entity.HasOne(x => x.Member).WithMany(m => m.MemberEvents)
-                .HasForeignKey(x => x.MemberID).OnDelete(DeleteBehavior.Cascade);
-        });
-
-        modelBuilder.Entity<Staff>(entity =>
-        {
-            entity.ToTable("Staff");
-            entity.HasKey(x => x.StaffID);
-            // 1-to-1: Account.Staff back-navigation — use WithOne to prevent shadow FK
-            entity.HasOne(x => x.Account)
-                .WithOne(a => a.Staff)
-                .HasForeignKey<Staff>(x => x.AccountID)
-                .OnDelete(DeleteBehavior.Cascade);
-        });
-
-        modelBuilder.Entity<UserToken>(entity =>
-        {
-            entity.ToTable("UserTokens");
-            entity.HasKey(x => x.TokenId);
-            entity.Property(x => x.TokenId).HasDefaultValueSql("(newid())");
-            entity.Property(x => x.RefreshToken).IsRequired().HasMaxLength(512);
-            entity.Property(x => x.DeviceInfo).HasMaxLength(256);
-            entity.Property(x => x.IpAddress).HasMaxLength(64);
-            entity.Property(x => x.IsRevoked).HasDefaultValue(false);
-            entity.Property(x => x.CreatedAt).HasDefaultValueSql("(getutcdate())");
-            entity.HasIndex(x => x.RefreshToken);
-            entity.HasIndex(x => new { x.AccountId, x.IsRevoked });
-            entity.HasOne(x => x.Account).WithMany(a => a.UserTokens)
-                .HasForeignKey(x => x.AccountId).OnDelete(DeleteBehavior.Cascade);
-        });
-
-        modelBuilder.Entity<EmailOtp>(entity =>
-        {
-            entity.ToTable("EmailOtps");
-            entity.HasKey(x => x.OtpId);
-            entity.Property(x => x.OtpId).HasDefaultValueSql("(newid())");
-            entity.Property(x => x.Email).IsRequired().HasMaxLength(256);
-            entity.Property(x => x.OtpCode).IsRequired().HasMaxLength(6);
-            entity.Property(x => x.OtpType).IsRequired().HasMaxLength(50).HasDefaultValue("Registration");
-            entity.Property(x => x.IsUsed).HasDefaultValue(false);
-            entity.Property(x => x.CreatedAt).HasDefaultValueSql("(getutcdate())");
-            entity.Property(x => x.TemporaryFullName).HasMaxLength(100);
-            entity.Property(x => x.TemporaryPhone).HasMaxLength(20);
-            entity.HasIndex(x => new { x.Email, x.OtpType, x.IsUsed })
-                .HasFilter("[IsUsed] = 0");
-            entity.HasIndex(x => x.ExpiredAt).HasFilter("[IsUsed] = 0");
-        });
-
-        // ── Region 2: Space & Goods ─────────────────────────────────────────
-
-        modelBuilder.Entity<Aisle>(entity =>
-        {
-            entity.ToTable("Aisles");
-            entity.HasKey(x => x.AisleID);
-        });
-
-        modelBuilder.Entity<Category>(entity =>
-        {
-            entity.ToTable("Categories");
-            entity.HasKey(x => x.CategoryID);
-        });
-
-        modelBuilder.Entity<Floor>(entity =>
-        {
-            entity.ToTable("Floors");
-            entity.HasKey(x => x.FloorID);
+            entity.HasIndex(x => new { x.MemberId, x.TierName }).IsUnique();
         });
 
         modelBuilder.Entity<HealthTag>(entity =>
         {
-            entity.ToTable("HealthTags");
-            entity.HasKey(x => x.TagID);
+            entity.ToTable("HEALTH_TAG");
+            entity.HasKey(x => x.HealthTagId);
+            entity.Property(x => x.HealthTagId).HasColumnName("health_tag_id");
+            entity.Property(x => x.TagName).HasColumnName("tag_name").HasMaxLength(50).IsRequired();
+            entity.Property(x => x.TagType).HasColumnName("tag_type").HasMaxLength(20).IsRequired();
         });
 
-        modelBuilder.Entity<HistoryItem>(entity =>
+        modelBuilder.Entity<MemberHealthPreference>(entity =>
         {
-            entity.ToTable("HistoryItems");
-            entity.HasKey(x => x.HistoryItemID);
-            entity.Property(x => x.UnitPrice).HasPrecision(18, 2);
-        });
-
-        modelBuilder.Entity<Product>(entity =>
-        {
-            entity.ToTable("Products");
-            entity.HasKey(x => x.ProductID);
-            entity.Property(x => x.UnitPrice).HasPrecision(18, 2);
-            entity.Property(x => x.WeightOrVolume).HasPrecision(18, 3);
-            entity.HasOne(x => x.SubstituteProduct)
-                .WithMany()
-                .HasForeignKey(x => x.SubstituteProductID)
-                .OnDelete(DeleteBehavior.NoAction);
-        });
-
-        modelBuilder.Entity<ProductHealthTag>(entity =>
-        {
-            entity.ToTable("ProductHealthTags");
-            entity.HasKey(x => new { x.ProductID, x.TagID });
-            // Explicit FK: TagID IS the FK to HealthTags — prevents shadow 'HealthTagTagID'
+            entity.ToTable("MEMBERHEALTH_PREFERENCE");
+            entity.HasKey(x => new { x.MemberId, x.HealthTagId });
+            entity.Property(x => x.MemberId).HasColumnName("member_id");
+            entity.Property(x => x.HealthTagId).HasColumnName("health_tag_id");
+            entity.Property(x => x.IsAllergy).HasColumnName("is_allergy").HasDefaultValue(false);
+            entity.HasOne(x => x.Member)
+                .WithMany(m => m.MemberHealthPreferences)
+                .HasForeignKey(x => x.MemberId)
+                .OnDelete(DeleteBehavior.Cascade);
             entity.HasOne(x => x.HealthTag)
-                .WithMany(h => h.ProductHealthTags)
-                .HasForeignKey(x => x.TagID)
-                .OnDelete(DeleteBehavior.Cascade);
-            entity.HasOne(x => x.Product)
-                .WithMany(p => p.ProductHealthTags)
-                .HasForeignKey(x => x.ProductID)
+                .WithMany(h => h.MemberHealthPreferences)
+                .HasForeignKey(x => x.HealthTagId)
                 .OnDelete(DeleteBehavior.Cascade);
         });
 
-        modelBuilder.Entity<ProductType>(entity =>
+        // EmailOtp - bảng phụ trợ cho AuthService (không thuộc ERD V4.0 cốt lõi)
+        modelBuilder.Entity<EmailOtp>(entity =>
         {
-            entity.ToTable("ProductTypes");
-            entity.HasKey(x => x.ProductTypeID);
+            entity.ToTable("EMAIL_OTP");
+            entity.HasKey(x => x.OtpId);
+            entity.Property(x => x.OtpId).HasColumnName("otp_id").HasDefaultValueSql("NEWID()");
+            entity.Property(x => x.Email).HasColumnName("email").HasMaxLength(256).IsRequired();
+            entity.Property(x => x.OtpCode).HasColumnName("otp_code").HasMaxLength(6).IsRequired();
+            entity.Property(x => x.OtpType).HasColumnName("otp_type").HasMaxLength(50).HasDefaultValue("Registration");
+            entity.Property(x => x.IsUsed).HasColumnName("is_used").HasDefaultValue(false);
+            entity.Property(x => x.CreatedAt).HasColumnName("created_at").HasDefaultValueSql("GETUTCDATE()");
+            entity.Property(x => x.ExpiredAt).HasColumnName("expired_at");
+            entity.Property(x => x.TemporaryFullName).HasColumnName("temporary_full_name").HasMaxLength(100);
+            entity.Property(x => x.TemporaryPhone).HasColumnName("temporary_phone").HasMaxLength(20);
         });
 
-        modelBuilder.Entity<ShelfLevel>(entity =>
-        {
-            entity.ToTable("ShelfLevels");
-            entity.HasKey(x => x.ShelfLevelID);
-        });
+        // ─────────────────────────────────────────────
+        // REGION 2: Product Catalog
+        // ─────────────────────────────────────────────
 
-        modelBuilder.Entity<ShelfScan>(entity =>
+        modelBuilder.Entity<Category>(entity =>
         {
-            entity.ToTable("ShelfScans");
-            entity.HasKey(x => x.ScanID);
-            entity.Property(x => x.EmptyPercentage).HasPrecision(5, 2);
-            entity.Property(x => x.NeedsRestock)
-                .HasComputedColumnSql("CASE WHEN [EmptyPercentage] > 30 THEN CAST(1 AS bit) ELSE CAST(0 AS bit) END", stored: false);
-        });
-
-        modelBuilder.Entity<ShoppingHistory>(entity =>
-        {
-            entity.ToTable("ShoppingHistories");
-            entity.HasKey(x => x.ShoppingHistoryID);
-            entity.Property(x => x.TotalAmount).HasPrecision(18, 2);
-        });
-
-        modelBuilder.Entity<Slot>(entity =>
-        {
-            entity.ToTable("Slots");
-            entity.HasKey(x => x.SlotID);
+            entity.ToTable("CATEGORY");
+            entity.HasKey(x => x.CategoryId);
+            entity.Property(x => x.CategoryId).HasColumnName("category_id");
+            entity.Property(x => x.CategoryName).HasColumnName("category_name").HasMaxLength(100).IsRequired();
+            entity.Property(x => x.Description).HasColumnName("description").HasMaxLength(500);
         });
 
         modelBuilder.Entity<Subcategory>(entity =>
         {
-            entity.ToTable("Subcategories");
-            entity.HasKey(x => x.SubcategoryID);
+            entity.ToTable("SUBCATEGORY");
+            entity.HasKey(x => x.SubcategoryId);
+            entity.Property(x => x.SubcategoryId).HasColumnName("subcategory_id");
+            entity.Property(x => x.CategoryId).HasColumnName("category_id");
+            entity.Property(x => x.SubcategoryName).HasColumnName("subcategory_name").HasMaxLength(100).IsRequired();
+            entity.HasOne(x => x.Category)
+                .WithMany(c => c.Subcategories)
+                .HasForeignKey(x => x.CategoryId);
+        });
+
+        modelBuilder.Entity<ProductType>(entity =>
+        {
+            entity.ToTable("PRODUCT_TYPE");
+            entity.HasKey(x => x.ProductTypeId);
+            entity.Property(x => x.ProductTypeId).HasColumnName("product_type_id");
+            entity.Property(x => x.SubcategoryId).HasColumnName("subcategory_id");
+            entity.Property(x => x.TypeName).HasColumnName("type_name").HasMaxLength(100).IsRequired();
+            entity.HasOne(x => x.Subcategory)
+                .WithMany(s => s.ProductTypes)
+                .HasForeignKey(x => x.SubcategoryId);
+        });
+
+        modelBuilder.Entity<Product>(entity =>
+        {
+            entity.ToTable("PRODUCT");
+            entity.HasKey(x => x.ProductId);
+            entity.Property(x => x.ProductId).HasColumnName("product_id");
+            entity.Property(x => x.ProductTypeId).HasColumnName("product_type_id");
+            entity.Property(x => x.ProductName).HasColumnName("product_name").HasMaxLength(200).IsRequired();
+            entity.Property(x => x.UnitPrice).HasColumnName("unit_price").HasPrecision(12, 2);
+            entity.Property(x => x.Barcode).HasColumnName("barcode").HasMaxLength(50);
+            entity.Property(x => x.ImageUrl).HasColumnName("image_url").HasMaxLength(500);
+            entity.Property(x => x.WeightOrVolume).HasColumnName("weight_or_volume").HasPrecision(10, 2);
+            entity.Property(x => x.Unit).HasColumnName("unit").HasMaxLength(20);
+            entity.Property(x => x.Description).HasColumnName("description").HasMaxLength(1000);
+            entity.Property(x => x.IsActive).HasColumnName("is_active").HasDefaultValue(true);
+            entity.Property(x => x.SubstituteProductId).HasColumnName("substitute_product_id");
+            entity.HasOne(x => x.ProductType)
+                .WithMany(pt => pt.Products)
+                .HasForeignKey(x => x.ProductTypeId);
+            // Self-ref: substitute product — NoAction to prevent cascade cycle
+            entity.HasOne(x => x.SubstituteProduct)
+                .WithMany()
+                .HasForeignKey(x => x.SubstituteProductId)
+                .OnDelete(DeleteBehavior.NoAction);
+            entity.HasIndex(x => x.Barcode)
+                .IsUnique()
+                .HasFilter("[barcode] IS NOT NULL")
+                .HasDatabaseName("IX_PRODUCT_barcode");
+        });
+
+        modelBuilder.Entity<ProductHealthTag>(entity =>
+        {
+            entity.ToTable("PRODUCT_HEALTHTAG");
+            entity.HasKey(x => new { x.ProductId, x.HealthTagId });
+            entity.Property(x => x.ProductId).HasColumnName("product_id");
+            entity.Property(x => x.HealthTagId).HasColumnName("health_tag_id");
+            entity.HasOne(x => x.Product)
+                .WithMany(p => p.ProductHealthTags)
+                .HasForeignKey(x => x.ProductId)
+                .OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne(x => x.HealthTag)
+                .WithMany(h => h.ProductHealthTags)
+                .HasForeignKey(x => x.HealthTagId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        // ─────────────────────────────────────────────
+        // REGION 3: Shopping & Meal
+        // ─────────────────────────────────────────────
+
+        modelBuilder.Entity<InvoiceHistory>(entity =>
+        {
+            entity.ToTable("INVOICE_HISTORY");
+            entity.HasKey(x => x.InvoiceHistoryId);
+            entity.Property(x => x.InvoiceHistoryId).HasColumnName("invoice_history_id");
+            entity.Property(x => x.MemberId).HasColumnName("member_id");
+            entity.Property(x => x.PurchaseDate).HasColumnName("purchase_date").HasDefaultValueSql("GETUTCDATE()");
+            entity.Property(x => x.TotalAmount).HasColumnName("total_amount").HasPrecision(12, 2);
+            entity.HasOne(x => x.Member)
+                .WithMany(m => m.InvoiceHistories)
+                .HasForeignKey(x => x.MemberId);
+        });
+
+        modelBuilder.Entity<InvoiceHistoryItem>(entity =>
+        {
+            entity.ToTable("INVOICE_HISTORY_ITEM");
+            entity.HasKey(x => x.InvoiceHistoryItemId);
+            entity.Property(x => x.InvoiceHistoryItemId).HasColumnName("invoice_history_item_id");
+            entity.Property(x => x.InvoiceHistoryId).HasColumnName("invoice_history_id");
+            entity.Property(x => x.ProductId).HasColumnName("product_id");
+            entity.Property(x => x.Quantity).HasColumnName("quantity").HasDefaultValue(1);
+            entity.Property(x => x.UnitPrice).HasColumnName("unit_price").HasPrecision(12, 2);
+            entity.HasOne(x => x.InvoiceHistory)
+                .WithMany(ih => ih.InvoiceHistoryItems)
+                .HasForeignKey(x => x.InvoiceHistoryId)
+                .OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne(x => x.Product)
+                .WithMany(p => p.InvoiceHistoryItems)
+                .HasForeignKey(x => x.ProductId);
+        });
+
+        modelBuilder.Entity<MealSuggestion>(entity =>
+        {
+            entity.ToTable("MEAL_SUGGESTION");
+            entity.HasKey(x => x.MealSuggestionId);
+            entity.Property(x => x.MealSuggestionId).HasColumnName("meal_suggestion_id");
+            entity.Property(x => x.MealName).HasColumnName("meal_name").HasMaxLength(200).IsRequired();
+            entity.Property(x => x.Description).HasColumnName("description").HasColumnType("nvarchar(max)");
+            entity.Property(x => x.YieldPortions).HasColumnName("yield_portions").HasDefaultValue(1);
+            entity.Property(x => x.ImageUrl).HasColumnName("image_url").HasMaxLength(500);
+            entity.Property(x => x.Calories).HasColumnName("calories");
+            entity.Property(x => x.HealthyScore).HasColumnName("healthy_score");
+            entity.Property(x => x.AlternativeSuggestion).HasColumnName("alternative_suggestion").HasMaxLength(500);
+        });
+
+        modelBuilder.Entity<MealItem>(entity =>
+        {
+            entity.ToTable("MEAL_ITEM");
+            entity.HasKey(x => new { x.MealSuggestionId, x.ProductId });
+            entity.Property(x => x.MealSuggestionId).HasColumnName("meal_suggestion_id");
+            entity.Property(x => x.ProductId).HasColumnName("product_id");
+            entity.Property(x => x.QuantityRequired).HasColumnName("quantity_required").HasPrecision(10, 2);
+            entity.Property(x => x.UnitOfMeasure).HasColumnName("unit_of_measure").HasMaxLength(20);
+            entity.HasOne(x => x.MealSuggestion)
+                .WithMany(ms => ms.MealItems)
+                .HasForeignKey(x => x.MealSuggestionId)
+                .OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne(x => x.Product)
+                .WithMany(p => p.MealItems)
+                .HasForeignKey(x => x.ProductId);
+        });
+
+        // ─────────────────────────────────────────────
+        // REGION 4: Store Layout
+        // ─────────────────────────────────────────────
+
+        modelBuilder.Entity<Floor>(entity =>
+        {
+            entity.ToTable("FLOOR");
+            entity.HasKey(x => x.FloorId);
+            entity.Property(x => x.FloorId).HasColumnName("floor_id");
+            entity.Property(x => x.FloorNumber).HasColumnName("floor_number");
         });
 
         modelBuilder.Entity<Zone>(entity =>
         {
-            entity.ToTable("Zones");
-            entity.HasKey(x => x.ZoneID);
+            entity.ToTable("ZONE");
+            entity.HasKey(x => x.ZoneId);
+            entity.Property(x => x.ZoneId).HasColumnName("zone_id");
+            entity.Property(x => x.FloorId).HasColumnName("floor_id");
+            entity.Property(x => x.ZoneCode).HasColumnName("zone_code").HasColumnType("char(1)").IsRequired();
+            entity.Property(x => x.ZoneName).HasColumnName("zone_name").HasMaxLength(100).IsRequired();
+            entity.Property(x => x.Description).HasColumnName("description").HasMaxLength(500);
+            entity.Property(x => x.IsBlocked).HasColumnName("is_blocked").HasDefaultValue(false);
+            entity.HasOne(x => x.Floor)
+                .WithMany(f => f.Zones)
+                .HasForeignKey(x => x.FloorId);
         });
 
-        // ── Region 3: Ads & Revenue ─────────────────────────────────────────
-
-        modelBuilder.Entity<AdPackage>(entity =>
+        modelBuilder.Entity<Aisle>(entity =>
         {
-            entity.ToTable("AdPackages");
-            entity.HasKey(x => x.PackageID);
-            entity.Property(x => x.Price).HasColumnType("decimal(18,2)");
-            entity.Property(x => x.AdScore).HasDefaultValue(0);
-            entity.Property(x => x.IsWeekendOnly).HasDefaultValue(false);
+            entity.ToTable("AISLE");
+            entity.HasKey(x => x.AisleId);
+            entity.Property(x => x.AisleId).HasColumnName("aisle_id");
+            entity.Property(x => x.ZoneId).HasColumnName("zone_id");
+            entity.Property(x => x.AisleCode).HasColumnName("aisle_code").HasMaxLength(10).IsRequired();
+            entity.Property(x => x.AisleName).HasColumnName("aisle_name").HasMaxLength(100);
+            entity.Property(x => x.IsBlocked).HasColumnName("is_blocked").HasDefaultValue(false);
+            entity.HasOne(x => x.Zone)
+                .WithMany(z => z.Aisles)
+                .HasForeignKey(x => x.ZoneId);
         });
+
+        modelBuilder.Entity<Shelf>(entity =>
+        {
+            entity.ToTable("SHELF");
+            entity.HasKey(x => x.ShelfId);
+            entity.Property(x => x.ShelfId).HasColumnName("shelf_id");
+            entity.Property(x => x.AisleId).HasColumnName("aisle_id");
+            entity.Property(x => x.LevelNumber).HasColumnName("level_number");
+            entity.HasOne(x => x.Aisle)
+                .WithMany(a => a.Shelves)
+                .HasForeignKey(x => x.AisleId);
+        });
+
+        modelBuilder.Entity<Slot>(entity =>
+        {
+            entity.ToTable("SLOT");
+            entity.HasKey(x => x.SlotId);
+            entity.Property(x => x.SlotId).HasColumnName("slot_id");
+            entity.Property(x => x.ShelfId).HasColumnName("shelf_id");
+            entity.Property(x => x.SlotCode).HasColumnName("slot_code").HasMaxLength(10).IsRequired();
+            entity.Property(x => x.Quantity).HasColumnName("quantity").HasDefaultValue(0);
+            entity.Property(x => x.ExpiryDate).HasColumnName("expiry_date").HasColumnType("date");
+            entity.Property(x => x.Supplier).HasColumnName("supplier").HasMaxLength(200);
+            entity.Property(x => x.LastScannedAt).HasColumnName("last_scanned_at");
+            entity.HasOne(x => x.Shelf)
+                .WithMany(s => s.Slots)
+                .HasForeignKey(x => x.ShelfId);
+        });
+
+        modelBuilder.Entity<ProductSlot>(entity =>
+        {
+            entity.ToTable("PRODUCT_SLOT");
+            entity.HasKey(x => x.ProductSlotId);
+            entity.Property(x => x.ProductSlotId).HasColumnName("product_slot_id");
+            entity.Property(x => x.SlotId).HasColumnName("slot_id");
+            entity.Property(x => x.ProductId).HasColumnName("product_id");
+            entity.HasOne(x => x.Slot)
+                .WithMany(s => s.ProductSlots)
+                .HasForeignKey(x => x.SlotId)
+                .OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne(x => x.Product)
+                .WithMany(p => p.ProductSlots)
+                .HasForeignKey(x => x.ProductId)
+                .OnDelete(DeleteBehavior.Cascade);
+            entity.HasIndex(x => new { x.SlotId, x.ProductId }).HasDatabaseName("IX_PRODUCT_SLOT_slot_product");
+        });
+
+        // ─────────────────────────────────────────────
+        // REGION 5: Ad & Sponsorship
+        // ─────────────────────────────────────────────
 
         modelBuilder.Entity<Brand>(entity =>
         {
-            entity.ToTable("Brands");
-            entity.HasKey(x => x.BrandID);
-            entity.Property(x => x.BrandName).IsRequired().HasMaxLength(100);
-            entity.Property(x => x.Description).HasMaxLength(500);
+            entity.ToTable("BRAND");
+            entity.HasKey(x => x.BrandId);
+            entity.Property(x => x.BrandId).HasColumnName("brand_id");
+            entity.Property(x => x.BrandName).HasColumnName("brand_name").HasMaxLength(100).IsRequired();
+            entity.Property(x => x.Description).HasColumnName("description").HasMaxLength(500);
+        });
+
+        modelBuilder.Entity<AdPackage>(entity =>
+        {
+            entity.ToTable("AD_PACKAGE");
+            entity.HasKey(x => x.PackageId);
+            entity.Property(x => x.PackageId).HasColumnName("package_id");
+            entity.Property(x => x.PackageName).HasColumnName("package_name").HasMaxLength(100).IsRequired();
+            entity.Property(x => x.Price).HasColumnName("price").HasPrecision(18, 2);
+            entity.Property(x => x.AdScore).HasColumnName("ad_score").HasDefaultValue(0);
+            entity.Property(x => x.IsWeekendOnly).HasColumnName("is_weekend_only").HasDefaultValue(false);
+        });
+
+        modelBuilder.Entity<AdCampaign>(entity =>
+        {
+            entity.ToTable("AD_CAMPAIGN");
+            entity.HasKey(x => x.AdCampaignId);
+            entity.Property(x => x.AdCampaignId).HasColumnName("ad_campaign_id");
+            entity.Property(x => x.PackageId).HasColumnName("package_id");
+            entity.Property(x => x.BrandId).HasColumnName("brand_id");
+            entity.Property(x => x.CampaignName).HasColumnName("campaign_name").HasMaxLength(200).IsRequired();
+            entity.Property(x => x.StartDate).HasColumnName("start_date");
+            entity.Property(x => x.EndDate).HasColumnName("end_date");
+            entity.Property(x => x.IsActive).HasColumnName("is_active").HasDefaultValue(true);
+            // NoAction: chống cascade cycle
+            entity.HasOne(x => x.Package)
+                .WithMany(p => p.AdCampaigns)
+                .HasForeignKey(x => x.PackageId)
+                .OnDelete(DeleteBehavior.NoAction);
+            entity.HasOne(x => x.Brand)
+                .WithMany(b => b.AdCampaigns)
+                .HasForeignKey(x => x.BrandId)
+                .OnDelete(DeleteBehavior.NoAction);
         });
 
         modelBuilder.Entity<SponsoredProduct>(entity =>
         {
-            entity.ToTable("SponsoredProducts");
-            entity.HasKey(x => x.SponsoredID);
-            entity.HasOne(x => x.Brand)
-                .WithMany(b => b.SponsoredProducts)
-                .HasForeignKey(x => x.BrandID)
-                .OnDelete(DeleteBehavior.Restrict);
-            entity.HasOne(x => x.AdPackage)
-                .WithMany(ap => ap.SponsoredProducts)
-                .HasForeignKey(x => x.PackageID)
-                .OnDelete(DeleteBehavior.Restrict);
-            // Explicit back-nav: prevents shadow property 'ProductID1'
+            entity.ToTable("SPONSORED_PRODUCT");
+            entity.HasKey(x => x.SponsoredId);
+            entity.Property(x => x.SponsoredId).HasColumnName("sponsored_id");
+            entity.Property(x => x.AdCampaignId).HasColumnName("ad_campaign_id");
+            entity.Property(x => x.ProductId).HasColumnName("product_id");
+            entity.Property(x => x.BrandId).HasColumnName("brand_id");
+            entity.Property(x => x.Priority).HasColumnName("priority").HasDefaultValue(0);
+            entity.Property(x => x.IsActive).HasColumnName("is_active").HasDefaultValue(true);
+            entity.HasOne(x => x.AdCampaign)
+                .WithMany(ac => ac.SponsoredProducts)
+                .HasForeignKey(x => x.AdCampaignId)
+                .OnDelete(DeleteBehavior.Cascade);
             entity.HasOne(x => x.Product)
                 .WithMany(p => p.SponsoredProducts)
-                .HasForeignKey(x => x.ProductID)
+                .HasForeignKey(x => x.ProductId)
+                .OnDelete(DeleteBehavior.Cascade);
+            // Brand: NoAction để bảo vệ brand
+            entity.HasOne(x => x.Brand)
+                .WithMany(b => b.SponsoredProducts)
+                .HasForeignKey(x => x.BrandId)
+                .OnDelete(DeleteBehavior.NoAction);
+        });
+
+        modelBuilder.Entity<AdCampaignLog>(entity =>
+        {
+            entity.ToTable("AD_CAMPAIGN_LOG");
+            entity.HasKey(x => x.LogId);
+            entity.Property(x => x.LogId).HasColumnName("log_id");
+            entity.Property(x => x.AdCampaignId).HasColumnName("ad_campaign_id");
+            entity.Property(x => x.ActionType).HasColumnName("action_type").HasMaxLength(50).IsRequired();
+            entity.Property(x => x.Timestamp).HasColumnName("timestamp").HasDefaultValueSql("GETUTCDATE()");
+            entity.HasOne(x => x.AdCampaign)
+                .WithMany(ac => ac.AdCampaignLogs)
+                .HasForeignKey(x => x.AdCampaignId)
                 .OnDelete(DeleteBehavior.Cascade);
         });
 
-        modelBuilder.Entity<Promotion>(entity =>
-        {
-            entity.ToTable("Promotions");
-            entity.HasKey(x => x.PromotionID);
-            entity.Property(x => x.DiscountValue).HasPrecision(18, 2);
-        });
-
-        modelBuilder.Entity<PromotionProduct>(entity =>
-        {
-            entity.ToTable("PromotionProducts");
-            entity.HasKey(x => new { x.PromotionID, x.ProductID });
-        });
-
-        modelBuilder.Entity<Recipe>(entity =>
-        {
-            entity.ToTable("Recipes");
-            entity.HasKey(x => x.RecipeID);
-        });
-
-        modelBuilder.Entity<RecipeItem>(entity =>
-        {
-            entity.ToTable("RecipeItems");
-            entity.HasKey(x => new { x.RecipeID, x.ProductID });
-            entity.Property(x => x.QuantityRequired).HasPrecision(18, 3);
-        });
-
-        // ── Region 4: Robot & Navigation ───────────────────────────────────
-
-        modelBuilder.Entity<ForbiddenZone>(entity =>
-        {
-            entity.ToTable("ForbiddenZones");
-            entity.HasKey(x => x.ForbiddenZoneID);
-            entity.HasOne(x => x.Map).WithMany()
-                .HasForeignKey(x => x.MapID).OnDelete(DeleteBehavior.Cascade);
-        });
-
-        modelBuilder.Entity<Map>(entity =>
-        {
-            entity.ToTable("Maps");
-            entity.HasKey(x => x.MapID);
-        });
-
-        modelBuilder.Entity<NavigationEdge>(entity =>
-        {
-            entity.ToTable("NavigationEdges");
-            entity.HasKey(x => x.EdgeID);
-            entity.HasOne(x => x.FromNode)
-                .WithMany(x => x.OutgoingEdges)
-                .HasForeignKey(x => x.FromNodeID)
-                .OnDelete(DeleteBehavior.NoAction);
-            entity.HasOne(x => x.ToNode)
-                .WithMany(x => x.IncomingEdges)
-                .HasForeignKey(x => x.ToNodeID)
-                .OnDelete(DeleteBehavior.NoAction);
-        });
-
-        modelBuilder.Entity<NavigationNode>(entity =>
-        {
-            entity.ToTable("NavigationNodes");
-            entity.HasKey(x => x.NodeID);
-        });
+        // ─────────────────────────────────────────────
+        // REGION 6: Robot & Navigation
+        // ─────────────────────────────────────────────
 
         modelBuilder.Entity<Robot>(entity =>
         {
-            entity.ToTable("Robots");
-            entity.HasKey(x => x.RobotID);
-            entity.HasIndex(x => x.RobotCode).IsUnique();
+            entity.ToTable("ROBOT");
+            entity.HasKey(x => x.RobotId);
+            entity.Property(x => x.RobotId).HasColumnName("robot_id");
+            entity.Property(x => x.RobotName).HasColumnName("robot_name").HasMaxLength(100).IsRequired();
+            entity.Property(x => x.RobotCode).HasColumnName("robot_code").HasMaxLength(50).IsRequired();
+            entity.Property(x => x.BatteryPct).HasColumnName("battery_pct").HasDefaultValue(100);
+            entity.Property(x => x.Mode).HasColumnName("mode").HasMaxLength(20).HasDefaultValue("idle");
+            entity.Property(x => x.IsOnline).HasColumnName("is_online").HasDefaultValue(false);
+            entity.Property(x => x.LastSeenAt).HasColumnName("last_seen_at");
+            entity.HasIndex(x => x.RobotCode).IsUnique().HasDatabaseName("IX_ROBOT_robot_code");
         });
 
         modelBuilder.Entity<RobotLog>(entity =>
         {
-            entity.ToTable("Robot_Logs");
-            entity.HasKey(x => x.LogID);
-            entity.Property(x => x.battery).HasColumnName("battery");
-            entity.Property(x => x.location).HasColumnName("location");
-            entity.Property(x => x.status).HasColumnName("status");
-            entity.Property(x => x.timestamp).HasColumnName("timestamp");
+            entity.ToTable("ROBOT_LOG");
+            entity.HasKey(x => x.LogId);
+            entity.Property(x => x.LogId).HasColumnName("log_id");
+            entity.Property(x => x.RobotId).HasColumnName("robot_id");
+            entity.Property(x => x.Battery).HasColumnName("battery");
+            entity.Property(x => x.Location).HasColumnName("location").HasMaxLength(255);
+            entity.Property(x => x.Status).HasColumnName("status").HasMaxLength(100);
+            entity.Property(x => x.Timestamp).HasColumnName("timestamp").HasDefaultValueSql("SYSUTCDATETIME()");
+            entity.Property(x => x.XCoord).HasColumnName("x_coord");
+            entity.Property(x => x.YCoord).HasColumnName("y_coord");
+            entity.Property(x => x.HeadingRad).HasColumnName("heading_rad");
+            entity.HasOne(x => x.Robot)
+                .WithMany(r => r.RobotLogs)
+                .HasForeignKey(x => x.RobotId)
+                .OnDelete(DeleteBehavior.SetNull);
+            entity.HasIndex(x => new { x.RobotId, x.Timestamp }).HasDatabaseName("IX_ROBOT_LOG_robot_timestamp");
         });
 
         modelBuilder.Entity<RobotZone>(entity =>
         {
-            entity.ToTable("RobotZones");
-            entity.HasKey(x => new { x.RobotID, x.ZoneID });
+            entity.ToTable("ROBOT_ZONE");
+            entity.HasKey(x => x.RobotZoneId);
+            entity.Property(x => x.RobotZoneId).HasColumnName("robot_zone_id");
+            entity.Property(x => x.RobotId).HasColumnName("robot_id");
+            entity.Property(x => x.ZoneId).HasColumnName("zone_id");
+            entity.HasOne(x => x.Robot)
+                .WithMany(r => r.RobotZones)
+                .HasForeignKey(x => x.RobotId)
+                .OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne(x => x.Zone)
+                .WithMany(z => z.RobotZones)
+                .HasForeignKey(x => x.ZoneId);
+        });
+
+        modelBuilder.Entity<Map>(entity =>
+        {
+            entity.ToTable("MAP");
+            entity.HasKey(x => x.MapId);
+            entity.Property(x => x.MapId).HasColumnName("map_id");
+            entity.Property(x => x.FloorId).HasColumnName("floor_id");
+            entity.Property(x => x.MapName).HasColumnName("map_name").HasMaxLength(100).IsRequired();
+            entity.Property(x => x.MapData).HasColumnName("map_data").HasColumnType("nvarchar(max)");
+            entity.Property(x => x.CreatedAt).HasColumnName("created_at").HasDefaultValueSql("GETUTCDATE()");
+            entity.HasOne(x => x.Floor)
+                .WithMany(f => f.Maps)
+                .HasForeignKey(x => x.FloorId);
+        });
+
+        modelBuilder.Entity<NavigationNode>(entity =>
+        {
+            entity.ToTable("NAVIGATION_NODE");
+            entity.HasKey(x => x.NodeId);
+            entity.Property(x => x.NodeId).HasColumnName("node_id");
+            entity.Property(x => x.MapId).HasColumnName("map_id");
+            entity.Property(x => x.NodeName).HasColumnName("node_name").HasMaxLength(100).IsRequired();
+            entity.Property(x => x.XCoord).HasColumnName("x_coord");
+            entity.Property(x => x.YCoord).HasColumnName("y_coord");
+            entity.Property(x => x.NodeType).HasColumnName("node_type").HasMaxLength(20).IsRequired();
+            entity.Property(x => x.IsBlocked).HasColumnName("is_blocked").HasDefaultValue(false);
+            entity.HasOne(x => x.Map)
+                .WithMany(m => m.NavigationNodes)
+                .HasForeignKey(x => x.MapId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<NavigationEdge>(entity =>
+        {
+            entity.ToTable("NAVIGATION_EDGE");
+            entity.HasKey(x => x.EdgeId);
+            entity.Property(x => x.EdgeId).HasColumnName("edge_id");
+            entity.Property(x => x.FromNodeId).HasColumnName("from_node_id");
+            entity.Property(x => x.ToNodeId).HasColumnName("to_node_id");
+            entity.Property(x => x.Distance).HasColumnName("distance");
+            entity.Property(x => x.IsBidirectional).HasColumnName("is_bidirectional").HasDefaultValue(true);
+            // NoAction cả 2 chiều chống cascade cycle
+            entity.HasOne(x => x.FromNode)
+                .WithMany(n => n.OutgoingEdges)
+                .HasForeignKey(x => x.FromNodeId)
+                .OnDelete(DeleteBehavior.NoAction);
+            entity.HasOne(x => x.ToNode)
+                .WithMany(n => n.IncomingEdges)
+                .HasForeignKey(x => x.ToNodeId)
+                .OnDelete(DeleteBehavior.NoAction);
+        });
+
+        modelBuilder.Entity<AisleNode>(entity =>
+        {
+            entity.ToTable("AISLE_NODE");
+            entity.HasKey(x => x.AisleNodeId);
+            entity.Property(x => x.AisleNodeId).HasColumnName("aisle_node_id");
+            entity.Property(x => x.AisleId).HasColumnName("aisle_id");
+            entity.Property(x => x.NodeId).HasColumnName("node_id");
+            entity.HasOne(x => x.Aisle)
+                .WithMany(a => a.AisleNodes)
+                .HasForeignKey(x => x.AisleId)
+                .OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne(x => x.Node)
+                .WithMany(n => n.AisleNodes)
+                .HasForeignKey(x => x.NodeId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<RobotRoute>(entity =>
+        {
+            entity.ToTable("ROBOT_ROUTE");
+            entity.HasKey(x => x.RobotRouteId);
+            entity.Property(x => x.RobotRouteId).HasColumnName("robot_route_id");
+            entity.Property(x => x.RobotId).HasColumnName("robot_id");
+            entity.Property(x => x.MapId).HasColumnName("map_id");
+            entity.Property(x => x.RouteName).HasColumnName("route_name").HasMaxLength(200).IsRequired();
+            entity.Property(x => x.CreatedAt).HasColumnName("created_at").HasDefaultValueSql("GETUTCDATE()");
+            entity.HasOne(x => x.Robot)
+                .WithMany(r => r.RobotRoutes)
+                .HasForeignKey(x => x.RobotId)
+                .OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne(x => x.Map)
+                .WithMany(m => m.RobotRoutes)
+                .HasForeignKey(x => x.MapId);
+        });
+
+        modelBuilder.Entity<RouteNodeMapping>(entity =>
+        {
+            entity.ToTable("ROUTE_NODE_MAPPING");
+            entity.HasKey(x => x.RouteNodeMappingId);
+            entity.Property(x => x.RouteNodeMappingId).HasColumnName("route_node_mapping_id");
+            entity.Property(x => x.RobotRouteId).HasColumnName("robot_route_id");
+            entity.Property(x => x.NodeId).HasColumnName("node_id");
+            entity.Property(x => x.SequenceOrder).HasColumnName("sequence_order");
+            entity.HasOne(x => x.RobotRoute)
+                .WithMany(rr => rr.RouteNodeMappings)
+                .HasForeignKey(x => x.RobotRouteId)
+                .OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne(x => x.Node)
+                .WithMany(n => n.RouteNodeMappings)
+                .HasForeignKey(x => x.NodeId)
+                .OnDelete(DeleteBehavior.NoAction);
+        });
+
+        modelBuilder.Entity<RouteAssignment>(entity =>
+        {
+            entity.ToTable("ROUTE_ASSIGNMENT");
+            entity.HasKey(x => x.RouteAssignmentId);
+            entity.Property(x => x.RouteAssignmentId).HasColumnName("route_assignment_id");
+            entity.Property(x => x.RobotId).HasColumnName("robot_id");
+            entity.Property(x => x.RobotRouteId).HasColumnName("robot_route_id");
+            entity.Property(x => x.AssignedAt).HasColumnName("assigned_at").HasDefaultValueSql("GETUTCDATE()");
+            entity.Property(x => x.Status).HasColumnName("status").HasMaxLength(50).IsRequired();
+            entity.HasOne(x => x.Robot)
+                .WithMany(r => r.RouteAssignments)
+                .HasForeignKey(x => x.RobotId)
+                .OnDelete(DeleteBehavior.Cascade);
+            // NoAction: chống cascade cycle (Robot→Route có thể tham chiếu vòng)
+            entity.HasOne(x => x.RobotRoute)
+                .WithMany(rr => rr.RouteAssignments)
+                .HasForeignKey(x => x.RobotRouteId)
+                .OnDelete(DeleteBehavior.NoAction);
+        });
+
+        modelBuilder.Entity<AisleScan>(entity =>
+        {
+            entity.ToTable("AISLE_SCAN");
+            entity.HasKey(x => x.ScanId);
+            entity.Property(x => x.ScanId).HasColumnName("scan_id");
+            entity.Property(x => x.AisleId).HasColumnName("aisle_id");
+            entity.Property(x => x.RobotId).HasColumnName("robot_id");
+            entity.Property(x => x.ScannedAt).HasColumnName("scanned_at").HasDefaultValueSql("GETUTCDATE()");
+            entity.Property(x => x.ImageUrl).HasColumnName("image_url").HasMaxLength(500);
+            entity.Property(x => x.EmptyPercentage).HasColumnName("empty_percentage").HasPrecision(5, 2);
+            // Computed column: AS CASE WHEN empty_percentage > 30 THEN 1 ELSE 0
+            entity.Property(x => x.NeedsRestock)
+                .HasColumnName("needs_restock")
+                .HasComputedColumnSql("CASE WHEN [empty_percentage] > 30.0 THEN CAST(1 AS BIT) ELSE CAST(0 AS BIT) END", stored: true);
+            entity.Property(x => x.AiResponseRaw).HasColumnName("ai_response_raw").HasColumnType("nvarchar(max)");
+            entity.HasOne(x => x.Aisle)
+                .WithMany(a => a.AisleScans)
+                .HasForeignKey(x => x.AisleId);
+            entity.HasOne(x => x.Robot)
+                .WithMany(r => r.AisleScans)
+                .HasForeignKey(x => x.RobotId);
         });
 
         modelBuilder.Entity<SemanticObject>(entity =>
         {
-            entity.ToTable("SemanticObjects");
-            entity.HasKey(x => x.ObjectID);
-        });
-
-        modelBuilder.Entity<Workstation>(entity =>
-        {
-            entity.ToTable("Workstations");
-            entity.HasKey(x => x.WorkstationID);
-            // Explicit back-navs: prevents shadow FKs 'ZoneID1' and 'NavigationNodeNodeID'
-            // Zone → Workstation: NoAction to break cascade cycle
-            entity.HasOne(x => x.Zone)
-                .WithMany(z => z.Workstations)
-                .HasForeignKey(x => x.ZoneID)
-                .OnDelete(DeleteBehavior.NoAction);
-            entity.HasOne(x => x.Node)
-                .WithMany(n => n.Workstations)
-                .HasForeignKey(x => x.NodeID)
+            entity.ToTable("SEMANTIC_OBJECT");
+            entity.HasKey(x => x.ObjectId);
+            entity.Property(x => x.ObjectId).HasColumnName("object_id");
+            entity.Property(x => x.MapId).HasColumnName("map_id");
+            entity.Property(x => x.ObjectType).HasColumnName("object_type").HasMaxLength(50).IsRequired();
+            entity.Property(x => x.XMin).HasColumnName("x_min");
+            entity.Property(x => x.YMin).HasColumnName("y_min");
+            entity.Property(x => x.XMax).HasColumnName("x_max");
+            entity.Property(x => x.YMax).HasColumnName("y_max");
+            entity.Property(x => x.Label).HasColumnName("label").HasMaxLength(100);
+            entity.Property(x => x.Confidence).HasColumnName("confidence").HasPrecision(5, 2);
+            entity.Property(x => x.DetectedAt).HasColumnName("detected_at");
+            entity.Property(x => x.ImageUrl).HasColumnName("image_url").HasMaxLength(500);
+            entity.HasOne(x => x.Map)
+                .WithMany(m => m.SemanticObjects)
+                .HasForeignKey(x => x.MapId)
                 .OnDelete(DeleteBehavior.Cascade);
         });
 
-        // ── Views ──────────────────────────────────────────────────────────
+        // ─────────────────────────────────────────────
+        // VIEWS (keyless)
+        // ─────────────────────────────────────────────
 
         modelBuilder.Entity<BlockedAisleView>(entity =>
         {

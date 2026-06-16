@@ -1,11 +1,9 @@
 namespace SmartMarketBot.Domain.Entities;
 
+/// <summary>Bảng nối N-N giữa Promotion và Product.</summary>
 public class PromotionProduct
 {
-    public int PromotionID { get; set; }
-    public int ProductID { get; set; }
-    public int Priority { get; set; } = 0;
-
-    public virtual Promotion Promotion { get; set; } = null!;
-    public virtual Product Product { get; set; } = null!;
+    public int PromotionId { get; set; }
+    public int ProductId { get; set; }
+    public int Priority { get; set; }
 }

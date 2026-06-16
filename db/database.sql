@@ -54,22 +54,29 @@ PRINT N'✅ Style đặt tên: SNAKE_CASE (theo ERD V4.0)';
 GO
 
 -- ============================================================================
--- PHẦN 1: TẠO DATABASE (nếu chưa có) + CHUYỂN SANG DB
+-- PHẦN 1: TẠO DATABASE (drop nếu đã có để đảm bảo fresh install)
 -- ============================================================================
 DECLARE @DBName NVARCHAR(128) = N'SuperMarketBot';
+DECLARE @sqlDrop   NVARCHAR(MAX) = N'';
+DECLARE @sqlCreate NVARCHAR(MAX) = N'';
 
-IF DB_ID(@DBName) IS NULL
+-- Bước 1: Drop database nếu đã tồn tại (force close all connections trước)
+IF DB_ID(@DBName) IS NOT NULL
 BEGIN
-    DECLARE @sqlCreate NVARCHAR(MAX) = N'CREATE DATABASE [' + @DBName + N']
+    SET @sqlDrop = N'
+        ALTER DATABASE [' + @DBName + N'] SET SINGLE_USER WITH ROLLBACK IMMEDIATE;
+        DROP DATABASE [' + @DBName + N'];';
+    EXEC sp_executesql @sqlDrop;
+    PRINT N'🗑️  Đã DROP database cũ: ' + @DBName;
+END
+
+-- Bước 2: Tạo database mới sạch sẽ
+SET @sqlCreate = N'
+    CREATE DATABASE [' + @DBName + N']
         COLLATE SQL_Latin1_General_CP1_CI_AS
         WITH RECOVERY FULL;';
-    EXEC sp_executesql @sqlCreate;
-    PRINT N'✅ Đã tạo database: ' + @DBName;
-END
-ELSE
-BEGIN
-    PRINT N'ℹ️  Database đã tồn tại, sẽ xóa sạch và tạo lại: ' + @DBName;
-END
+EXEC sp_executesql @sqlCreate;
+PRINT N'✅ Đã tạo database mới: ' + @DBName;
 GO
 
 USE [SuperMarketBot];
@@ -81,58 +88,9 @@ ALTER DATABASE CURRENT SET RECOVERY SIMPLE;
 GO
 
 -- ============================================================================
--- PHẦN 2: XÓA SẠCH (theo thứ tự ngược FK) - Idempotent
+-- PHẦN 2: SKIP (đã drop & recreate DB ở Phần 1, không cần drop bảng cũ)
 -- ============================================================================
-PRINT N'🗑️  PHẦN 2: Dọn dẹp view + table cũ (nếu có)...';
-
--- Xóa View trước
-DROP VIEW IF EXISTS dbo.Real_Time_Stock;
-DROP VIEW IF EXISTS dbo.Blocked_Aisles;
-DROP VIEW IF EXISTS dbo.Store_Map;
-DROP VIEW IF EXISTS dbo.PurchaseHistory;
-PRINT N'   - Đã xóa 4 view';
-GO
-
--- Xóa Table theo thứ tự ngược FK dependency (con trước, cha sau)
--- Tổng cộng 37 bảng theo ERD V4.0
-DROP TABLE IF EXISTS dbo.AD_CAMPAIGN_LOG;
-DROP TABLE IF EXISTS dbo.SPONSORED_PRODUCT;
-DROP TABLE IF EXISTS dbo.AD_CAMPAIGN;
-DROP TABLE IF EXISTS dbo.ROUTE_ASSIGNMENT;
-DROP TABLE IF EXISTS dbo.ROUTE_NODE_MAPPING;
-DROP TABLE IF EXISTS dbo.ROBOT_ROUTE;
-DROP TABLE IF EXISTS dbo.AISLE_NODE;
-DROP TABLE IF EXISTS dbo.NAVIGATION_EDGE;
-DROP TABLE IF EXISTS dbo.NAVIGATION_NODE;
-DROP TABLE IF EXISTS dbo.SEMANTIC_OBJECT;
-DROP TABLE IF EXISTS dbo.MAP;
-DROP TABLE IF EXISTS dbo.AISLE_SCAN;
-DROP TABLE IF EXISTS dbo.ROBOT_LOG;
-DROP TABLE IF EXISTS dbo.ROBOT_ZONE;
-DROP TABLE IF EXISTS dbo.ROBOT;
-DROP TABLE IF EXISTS dbo.MEAL_ITEM;
-DROP TABLE IF EXISTS dbo.MEAL_SUGGESTION;
-DROP TABLE IF EXISTS dbo.INVOICE_HISTORY_ITEM;
-DROP TABLE IF EXISTS dbo.INVOICE_HISTORY;
-DROP TABLE IF EXISTS dbo.PRODUCT_SLOT;
-DROP TABLE IF EXISTS dbo.SLOT;
-DROP TABLE IF EXISTS dbo.SHELF;
-DROP TABLE IF EXISTS dbo.AISLE;
-DROP TABLE IF EXISTS dbo.ZONE;
-DROP TABLE IF EXISTS dbo.FLOOR;
-DROP TABLE IF EXISTS dbo.PRODUCT_HEALTHTAG;
-DROP TABLE IF EXISTS dbo.MEMBERHEALTH_PREFERENCE;
-DROP TABLE IF EXISTS dbo.HEALTH_TAG;
-DROP TABLE IF EXISTS dbo.PRODUCT;
-DROP TABLE IF EXISTS dbo.PRODUCT_TYPE;
-DROP TABLE IF EXISTS dbo.SUBCATEGORY;
-DROP TABLE IF EXISTS dbo.CATEGORY;
-DROP TABLE IF EXISTS dbo.MEMBERSHIP;
-DROP TABLE IF EXISTS dbo.MEMBER;
-DROP TABLE IF EXISTS dbo.ACCOUNT;
-DROP TABLE IF EXISTS dbo.AD_PACKAGE;
-DROP TABLE IF EXISTS dbo.BRAND;
-PRINT N'   - Đã xóa 37 table (theo ERD V4.0)';
+PRINT N'ℹ️  PHẦN 2: Database đã fresh - bỏ qua DROP TABLE';
 GO
 
 -- ============================================================================

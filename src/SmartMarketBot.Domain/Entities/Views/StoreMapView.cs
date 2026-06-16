@@ -4,7 +4,7 @@ public class StoreMapView
 {
     public int MapID { get; set; }
     public string ProductName { get; set; } = string.Empty;
-    public string ShelfLocation { get; set; } = string.Empty;
-    public string Landmark { get; set; } = string.Empty;
-    public string AisleNote { get; set; } = string.Empty;
+    public string? ShelfLocation { get; set; }
+    public string? Landmark { get; set; }
+    public string? AisleNote { get; set; }
 }

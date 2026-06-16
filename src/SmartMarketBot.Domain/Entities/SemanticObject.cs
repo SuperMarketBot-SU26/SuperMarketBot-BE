@@ -2,13 +2,17 @@ namespace SmartMarketBot.Domain.Entities;
 
 public class SemanticObject
 {
-    public int ObjectID { get; set; }
-    public int MapID { get; set; }
+    public int ObjectId { get; set; }
+    public int MapId { get; set; }
     public string ObjectType { get; set; } = string.Empty;
     public double XMin { get; set; }
     public double YMin { get; set; }
     public double XMax { get; set; }
     public double YMax { get; set; }
+    public string? Label { get; set; }
+    public decimal? Confidence { get; set; }
+    public DateTime? DetectedAt { get; set; }
+    public string? ImageUrl { get; set; }
 
-    public virtual Map Map { get; set; } = null!;
+    public virtual Map? Map { get; set; }
 }

@@ -47,7 +47,7 @@ public sealed class NavigationCommandService(
         if (request.BlockedNodeIds is { Count: > 0 })
         {
             var blockedNodes = await dbContext.NavigationNodes
-                .Where(n => request.BlockedNodeIds.Contains(n.NodeID))
+                .Where(n => request.BlockedNodeIds.Contains(n.NodeId))
                 .ToListAsync(ct);
 
             foreach (var node in blockedNodes)
@@ -67,7 +67,7 @@ public sealed class NavigationCommandService(
     public async Task UnblockNodesAsync(List<int> nodeIds, CancellationToken ct = default)
     {
         var nodes = await dbContext.NavigationNodes
-            .Where(n => nodeIds.Contains(n.NodeID))
+            .Where(n => nodeIds.Contains(n.NodeId))
             .ToListAsync(ct);
 
         foreach (var node in nodes)

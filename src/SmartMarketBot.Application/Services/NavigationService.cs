@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using SmartMarketBot.Application.Interfaces;
 using SmartMarketBot.Application.Models.Navigation;
+using SmartMarketBot.Domain.Entities;
 
 namespace SmartMarketBot.Application.Services;
 
@@ -8,46 +9,48 @@ public sealed class NavigationService(IAppDbContext dbContext, ILocalizationServ
 {
     private sealed record NodeData(int NodeId, double XCoord, double YCoord, bool IsBlocked);
     private sealed record EdgeData(int FromNodeId, int ToNodeId, double Distance, bool IsBidirectional);
-    private sealed record ForbiddenZoneRect(double XMin, double YMin, double XMax, double YMax);
+    private sealed record ObstacleRect(double XMin, double YMin, double XMax, double YMax);
 
     // ── Shared helpers ────────────────────────────────────────────────────────
 
     /// <summary>
-    /// Tải danh sách ForbiddenZones đang hoạt động và đánh dấu bất kỳ node nào
-    /// có tọa độ nằm trong vùng cấm là IsBlocked = true trong bộ nhớ.
+    /// Tải danh sách NavigationNodes và đánh dấu bất kỳ node nào
+    /// có tọa độ nằm trong vùng cấm (SEMANTIC_OBJECT loại 'obstacle') là IsBlocked = true.
+    /// Schema mới (V4.0): thay thế bảng ForbiddenZones bằng SEMANTIC_OBJECT (object_type = 'obstacle').
     /// </summary>
-    private async Task<Dictionary<int, NodeData>> LoadNodesWithForbiddenZonesAsync(
+    private async Task<Dictionary<int, NodeData>> LoadNodesWithObstaclesAsync(
         CancellationToken ct)
     {
         var nodes = await dbContext.NavigationNodes
             .AsNoTracking()
-            .Select(n => new NodeData(n.NodeID, n.XCoord, n.YCoord, n.IsBlocked))
+            .Select(n => new NodeData(n.NodeId, n.XCoord, n.YCoord, n.IsBlocked))
             .ToDictionaryAsync(n => n.NodeId, ct);
 
-        var zones = await dbContext.ForbiddenZones
+        // Vùng cấm động giờ là SEMANTIC_OBJECT loại 'obstacle' (cùng cấu trúc AABB)
+        var obstacles = await dbContext.SemanticObjects
             .AsNoTracking()
-            .Where(fz => fz.IsActive)
-            .Select(fz => new ForbiddenZoneRect(fz.XMin, fz.YMin, fz.XMax, fz.YMax))
+            .Where(so => so.ObjectType == "obstacle")
+            .Select(so => new ObstacleRect(so.XMin, so.YMin, so.XMax, so.YMax))
             .ToListAsync(ct);
 
-        if (zones.Count == 0)
+        if (obstacles.Count == 0)
             return nodes;
 
         // Đánh dấu các node nằm trong vùng cấm là blocked (in-memory)
         foreach (var nodeId in nodes.Keys.ToList())
         {
             var n = nodes[nodeId];
-            if (!n.IsBlocked && IsInsideAnyZone(n.XCoord, n.YCoord, zones))
+            if (!n.IsBlocked && IsInsideAnyObstacle(n.XCoord, n.YCoord, obstacles))
                 nodes[nodeId] = n with { IsBlocked = true };
         }
 
         return nodes;
     }
 
-    private static bool IsInsideAnyZone(double x, double y, IReadOnlyList<ForbiddenZoneRect> zones)
+    private static bool IsInsideAnyObstacle(double x, double y, IReadOnlyList<ObstacleRect> obstacles)
     {
-        foreach (var z in zones)
-            if (x >= z.XMin && x <= z.XMax && y >= z.YMin && y <= z.YMax)
+        foreach (var o in obstacles)
+            if (x >= o.XMin && x <= o.XMax && y >= o.YMin && y <= o.YMax)
                 return true;
         return false;
     }
@@ -57,8 +60,8 @@ public sealed class NavigationService(IAppDbContext dbContext, ILocalizationServ
     public async Task<RoutePlanResultDto> PlanRouteAsync(
         RoutePlanRequestDto request, CancellationToken cancellationToken = default)
     {
-        // Nodes already include ForbiddenZone coordinate filtering
-        var nodes = await LoadNodesWithForbiddenZonesAsync(cancellationToken);
+        // Nodes already include obstacle (ForbiddenZone) coordinate filtering
+        var nodes = await LoadNodesWithObstaclesAsync(cancellationToken);
 
         if (!nodes.ContainsKey(request.StartNodeId) || !nodes.ContainsKey(request.EndNodeId))
             throw new InvalidOperationException(localizer.Get("StartEndNodeNotExist"));
@@ -68,7 +71,7 @@ public sealed class NavigationService(IAppDbContext dbContext, ILocalizationServ
 
         var edges = await dbContext.NavigationEdges
             .AsNoTracking()
-            .Select(e => new EdgeData(e.FromNodeID, e.ToNodeID, e.Distance, e.IsBidirectional))
+            .Select(e => new EdgeData(e.FromNodeId, e.ToNodeId, e.Distance, e.IsBidirectional))
             .ToListAsync(cancellationToken);
 
         var adjacency = BuildAdjacency(edges, nodes);
@@ -97,33 +100,36 @@ public sealed class NavigationService(IAppDbContext dbContext, ILocalizationServ
         OptimizeShoppingRouteRequestDto request,
         CancellationToken cancellationToken = default)
     {
-        // 1. Load nodes (với ForbiddenZone coordinate check) + edges
-        var nodes = await LoadNodesWithForbiddenZonesAsync(cancellationToken);
+        // 1. Load nodes (với obstacle coordinate check) + edges
+        var nodes = await LoadNodesWithObstaclesAsync(cancellationToken);
 
         var edges = await dbContext.NavigationEdges
             .AsNoTracking()
-            .Select(e => new EdgeData(e.FromNodeID, e.ToNodeID, e.Distance, e.IsBidirectional))
+            .Select(e => new EdgeData(e.FromNodeId, e.ToNodeId, e.Distance, e.IsBidirectional))
             .ToListAsync(cancellationToken);
 
         // Lấy IDs vùng cấm để trả về response (thông tin cho client)
-        var forbiddenZoneIds = await dbContext.ForbiddenZones
+        var obstacleIds = await dbContext.SemanticObjects
             .AsNoTracking()
-            .Where(fz => fz.IsActive)
-            .Select(fz => fz.ForbiddenZoneID)
+            .Where(so => so.ObjectType == "obstacle")
+            .Select(so => so.ObjectId)
             .ToListAsync(cancellationToken);
 
-        // Adjacency graph: tự động loại các node bị blocked (kể cả từ ForbiddenZone)
+        // Adjacency graph: tự động loại các node bị blocked (kể cả từ obstacle)
         var adjacency = BuildAdjacency(edges, nodes);
 
-        // 2. Tìm NodeID gần nhất cho từng ProductID (qua Slots → ShelfLevel → Aisle → NavigationNode)
-        var rawMap = await dbContext.Slots
-            .AsNoTracking()
-            .Where(s => request.ProductIds.Contains(s.ProductID ?? 0) && s.ProductID != null)
-            .Join(dbContext.ShelfLevels, s => s.ShelfLevelID, sl => sl.ShelfLevelID,
-                  (s, sl) => new { s.ProductID, sl.AisleID, s.SlotCode })
-            .Join(dbContext.NavigationNodes, x => x.AisleID, n => n.LinkedAisleID,
-                  (x, n) => new ProductNodeInfo(x.ProductID!.Value, n.NodeID, n.XCoord, n.YCoord, x.SlotCode))
-            .ToListAsync(cancellationToken);
+        // 2. Tìm NodeId gần nhất cho từng ProductId
+        //    Schema mới (V4.0): Product → ProductSlot → Slot → Shelf → Aisle → AisleNode → NavigationNode
+        var rawMap = await (
+            from ps in dbContext.ProductSlots.AsNoTracking()
+            where request.ProductIds.Contains(ps.ProductId)
+            join s  in dbContext.Slots.AsNoTracking()       on ps.SlotId   equals s.SlotId
+            join sh in dbContext.Shelves.AsNoTracking()     on s.ShelfId   equals sh.ShelfId
+            join a  in dbContext.Aisles.AsNoTracking()      on sh.AisleId  equals a.AisleId
+            join an in dbContext.AisleNodes.AsNoTracking()  on a.AisleId   equals an.AisleId
+            join n  in dbContext.NavigationNodes.AsNoTracking() on an.NodeId equals n.NodeId
+            select new ProductNodeInfo(ps.ProductId, n.NodeId, n.XCoord, n.YCoord, s.SlotCode)
+        ).ToListAsync(cancellationToken);
 
         var productNodeMap = rawMap
             .GroupBy(x => x.ProductId)
@@ -186,8 +192,8 @@ public sealed class NavigationService(IAppDbContext dbContext, ILocalizationServ
             Math.Round(totalDistance, 2),
             waypoints.Count,
             waypoints,
-            forbiddenZoneIds,
-            $"TSP Nearest-Neighbour + Dijkstra. {forbiddenZoneIds.Count} ForbiddenZone(s) excluded from graph.");
+            obstacleIds,
+            $"TSP Nearest-Neighbour + Dijkstra. {obstacleIds.Count} obstacle(s) excluded from graph.");
     }
 
     // ── SetNodeBlockedAsync ───────────────────────────────────────────────────
@@ -195,11 +201,12 @@ public sealed class NavigationService(IAppDbContext dbContext, ILocalizationServ
     public async Task SetNodeBlockedAsync(int nodeId, bool isBlocked, string? reason, CancellationToken cancellationToken = default)
     {
         var node = await dbContext.NavigationNodes
-            .FirstOrDefaultAsync(n => n.NodeID == nodeId, cancellationToken)
+            .FirstOrDefaultAsync(n => n.NodeId == nodeId, cancellationToken)
             ?? throw new InvalidOperationException(localizer.Get("NodeNotFound", nodeId));
 
         node.IsBlocked = isBlocked;
         await dbContext.SaveChangesAsync(cancellationToken);
+        _ = reason; // Reason chưa có cột lưu trong schema V4.0; bỏ qua (reserved cho tương lai)
     }
 
     // ── Graph algorithms ─────────────────────────────────────────────────────

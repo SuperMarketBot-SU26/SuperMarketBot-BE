@@ -1,14 +1,16 @@
 namespace SmartMarketBot.Domain.Entities;
 
+/// <summary>
+/// Khuyến mãi giảm giá sản phẩm. ERD V4.0 không có bảng này - code cũ dùng Promotion,
+/// giờ gộp vào AD_CAMPAIGN. Tạm giữ riêng để không vỡ service cũ.
+/// </summary>
 public class Promotion
 {
-    public int PromotionID { get; set; }
+    public int PromotionId { get; set; }
     public string PromotionName { get; set; } = string.Empty;
-    public string PromotionType { get; set; } = string.Empty;
-    public decimal DiscountValue { get; set; } = 0.00m;
-    public DateOnly StartDate { get; set; }
-    public DateOnly EndDate { get; set; }
+    public string? Description { get; set; }
+    public decimal DiscountValue { get; set; }
+    public DateTime StartDate { get; set; }
+    public DateTime EndDate { get; set; }
     public bool IsActive { get; set; } = true;
-
-    public virtual ICollection<PromotionProduct> PromotionProducts { get; set; } = new List<PromotionProduct>();
 }

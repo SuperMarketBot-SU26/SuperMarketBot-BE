@@ -6,52 +6,62 @@ namespace SmartMarketBot.Application.Interfaces;
 
 public interface IAppDbContext
 {
-    // Region 1: Customer & Identity
+    // Region 1: Customer & Identity (5)
     DbSet<Account> Accounts { get; }
-    DbSet<Admin> Admins { get; }
     DbSet<Member> Members { get; }
+    DbSet<Membership> Memberships { get; }
+    DbSet<HealthTag> HealthTags { get; }
     DbSet<MemberHealthPreference> MemberHealthPreferences { get; }
+    DbSet<EmailOtp> EmailOtps { get; }
+    DbSet<UserToken> UserTokens { get; }
     DbSet<MemberAlert> MemberAlerts { get; }
     DbSet<MemberEvent> MemberEvents { get; }
-    DbSet<Staff> Staffs { get; }
-    DbSet<UserToken> UserTokens { get; }
-    DbSet<EmailOtp> EmailOtps { get; }
 
-    // Region 2: Space & Goods
-    DbSet<Aisle> Aisles { get; }
+    // Region 2: Product Catalog
     DbSet<Category> Categories { get; }
-    DbSet<Floor> Floors { get; }
-    DbSet<HealthTag> HealthTags { get; }
-    DbSet<HistoryItem> HistoryItems { get; }
+    DbSet<Subcategory> Subcategories { get; }
+    DbSet<ProductType> ProductTypes { get; }
     DbSet<Product> Products { get; }
     DbSet<ProductHealthTag> ProductHealthTags { get; }
-    DbSet<ProductType> ProductTypes { get; }
-    DbSet<ShelfLevel> ShelfLevels { get; }
-    DbSet<ShelfScan> ShelfScans { get; }
-    DbSet<ShoppingHistory> ShoppingHistories { get; }
-    DbSet<Slot> Slots { get; }
-    DbSet<Subcategory> Subcategories { get; }
-    DbSet<Zone> Zones { get; }
 
-    // Region 3: Ads & Revenue
-    DbSet<AdPackage> AdPackages { get; }
-    DbSet<Brand> Brands { get; }
-    DbSet<SponsoredProduct> SponsoredProducts { get; }
+    // Region 3 (legacy): Ads & Promotions
     DbSet<Promotion> Promotions { get; }
     DbSet<PromotionProduct> PromotionProducts { get; }
-    DbSet<Recipe> Recipes { get; }
-    DbSet<RecipeItem> RecipeItems { get; }
 
-    // Region 4: Robot & Navigation
-    DbSet<ForbiddenZone> ForbiddenZones { get; }
-    DbSet<Map> Maps { get; }
-    DbSet<NavigationEdge> NavigationEdges { get; }
-    DbSet<NavigationNode> NavigationNodes { get; }
+    // Region 3: Shopping & Meal (4)
+    DbSet<InvoiceHistory> InvoiceHistories { get; }
+    DbSet<InvoiceHistoryItem> InvoiceHistoryItems { get; }
+    DbSet<MealSuggestion> MealSuggestions { get; }
+    DbSet<MealItem> MealItems { get; }
+
+    // Region 4: Store Layout (6)
+    DbSet<Floor> Floors { get; }
+    DbSet<Zone> Zones { get; }
+    DbSet<Aisle> Aisles { get; }
+    DbSet<Shelf> Shelves { get; }
+    DbSet<Slot> Slots { get; }
+    DbSet<ProductSlot> ProductSlots { get; }
+
+    // Region 5: Ad & Sponsorship (5)
+    DbSet<Brand> Brands { get; }
+    DbSet<AdPackage> AdPackages { get; }
+    DbSet<AdCampaign> AdCampaigns { get; }
+    DbSet<SponsoredProduct> SponsoredProducts { get; }
+    DbSet<AdCampaignLog> AdCampaignLogs { get; }
+
+    // Region 6: Robot & Navigation (10)
     DbSet<Robot> Robots { get; }
     DbSet<RobotLog> RobotLogs { get; }
     DbSet<RobotZone> RobotZones { get; }
+    DbSet<Map> Maps { get; }
+    DbSet<NavigationNode> NavigationNodes { get; }
+    DbSet<NavigationEdge> NavigationEdges { get; }
+    DbSet<AisleNode> AisleNodes { get; }
+    DbSet<RobotRoute> RobotRoutes { get; }
+    DbSet<RouteNodeMapping> RouteNodeMappings { get; }
+    DbSet<RouteAssignment> RouteAssignments { get; }
+    DbSet<AisleScan> AisleScans { get; }
     DbSet<SemanticObject> SemanticObjects { get; }
-    DbSet<Workstation> Workstations { get; }
 
     // Views (keyless)
     DbSet<BlockedAisleView> BlockedAisleViews { get; }

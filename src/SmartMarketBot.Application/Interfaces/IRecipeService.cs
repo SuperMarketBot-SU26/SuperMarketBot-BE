@@ -3,7 +3,7 @@ using SmartMarketBot.Application.Models.MealSuggestions;
 namespace SmartMarketBot.Application.Interfaces;
 
 /// <summary>Flow 2 — Smart Menu Assistant: gợi ý nguyên liệu và lộ trình gom hàng.</summary>
-public interface IRecipeService
+public interface IMealSuggestionService
 {
     Task<IReadOnlyList<RecipeDto>> GetAllAsync(CancellationToken ct = default);
 

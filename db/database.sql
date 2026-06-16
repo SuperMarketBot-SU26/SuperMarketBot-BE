@@ -73,8 +73,7 @@ END
 -- Bước 2: Tạo database mới sạch sẽ
 SET @sqlCreate = N'
     CREATE DATABASE [' + @DBName + N']
-        COLLATE SQL_Latin1_General_CP1_CI_AS
-        WITH RECOVERY FULL;';
+        COLLATE SQL_Latin1_General_CP1_CI_AS;';
 EXEC sp_executesql @sqlCreate;
 PRINT N'✅ Đã tạo database mới: ' + @DBName;
 GO

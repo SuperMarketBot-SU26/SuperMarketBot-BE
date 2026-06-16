@@ -7,8 +7,8 @@ namespace SmartMarketBot.API.Controllers;
 
 [ApiController]
 [Route("api/shelf-scans")]
-public sealed class ShelfScansController(
-    IShelfScanService shelfScanService,
+public sealed class AisleScansController(
+    IAisleScanService AisleScanService,
     IStaffService staffService) : ControllerBase
 {
     /// <summary>Lấy danh sách quét kệ gần nhất.</summary>
@@ -17,17 +17,17 @@ public sealed class ShelfScansController(
         [FromQuery] int take = 20,
         CancellationToken cancellationToken = default)
     {
-        var scans = await shelfScanService.GetRecentScansAsync(take, cancellationToken);
+        var scans = await AisleScanService.GetRecentScansAsync(take, cancellationToken);
         return Ok(scans);
     }
 
     /// <summary>Tạo bản ghi quét kệ mới (Robot gọi sau khi chụp ảnh AI Vision).</summary>
     [HttpPost]
     public async Task<ActionResult<ShelfScanDto>> Create(
-        [FromBody] CreateShelfScanRequestDto request,
+        [FromBody] CreateAisleScanRequestDto request,
         CancellationToken cancellationToken = default)
     {
-        var scan = await shelfScanService.CreateScanAsync(request, cancellationToken);
+        var scan = await AisleScanService.CreateScanAsync(request, cancellationToken);
         return Ok(scan);
     }
 

@@ -6,7 +6,7 @@ using SmartMarketBot.Infrastructure.Persistence;
 namespace SmartMarketBot.Infrastructure.Services;
 
 /// <summary>Flow 2 — Smart Menu Assistant.</summary>
-public sealed class RecipeService(AppDbContext db) : IRecipeService
+public sealed class MealSuggestionService(AppDbContext db) : IMealSuggestionService
 {
     public async Task<IReadOnlyList<RecipeDto>> GetAllAsync(CancellationToken ct = default)
     {

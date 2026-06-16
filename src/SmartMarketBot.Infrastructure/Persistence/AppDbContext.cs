@@ -197,7 +197,7 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
             entity.Property(x => x.IpAddress).HasColumnName("ip_address").HasMaxLength(64);
             entity.Property(x => x.CreatedAt).HasColumnName("created_at").HasDefaultValueSql("GETUTCDATE()");
             entity.HasOne(x => x.Account)
-                .WithMany()
+                .WithMany()                                   // không navigate ngược từ Account
                 .HasForeignKey(x => x.AccountId)
                 .OnDelete(DeleteBehavior.Cascade);
         });

@@ -22,6 +22,6 @@ public class Account
     public string Role { get; set; } = "Member";
 
     // Navigation
-    public virtual ICollection<UserToken> UserTokens { get; set; } = new List<UserToken>();
     public virtual Member? Member { get; set; }
+    // Không khai báo UserTokens collection ở Account để tránh EF shadow FK 'AccountId1'
 }

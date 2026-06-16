@@ -7,7 +7,7 @@ using SmartMarketBot.Infrastructure.Persistence;
 
 namespace SmartMarketBot.Infrastructure.Services;
 
-public sealed class ShelfScanService(AppDbContext dbContext) : IShelfScanService
+public sealed class AisleScanService(AppDbContext dbContext) : IAisleScanService
 {
     public async Task<IReadOnlyList<ShelfScanDto>> GetRecentScansAsync(int take = 20, CancellationToken cancellationToken = default)
     {
@@ -33,7 +33,7 @@ public sealed class ShelfScanService(AppDbContext dbContext) : IShelfScanService
             .ToListAsync(cancellationToken);
     }
 
-    public async Task<ShelfScanDto> CreateScanAsync(CreateShelfScanRequestDto request, CancellationToken cancellationToken = default)
+    public async Task<ShelfScanDto> CreateScanAsync(CreateAisleScanRequestDto request, CancellationToken cancellationToken = default)
     {
         var entity = new AisleScan
         {

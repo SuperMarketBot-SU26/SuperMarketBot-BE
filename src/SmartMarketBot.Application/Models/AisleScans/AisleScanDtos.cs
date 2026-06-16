@@ -11,7 +11,7 @@ public sealed record ShelfScanDto(
     string? ImageUrl,
     string? AiResponseRaw);
 
-public sealed record CreateShelfScanRequestDto(
+public sealed record CreateAisleScanRequestDto(
     int AisleId,
     int? ShelfLevelId,
     int RobotId,

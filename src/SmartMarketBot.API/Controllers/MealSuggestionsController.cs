@@ -8,14 +8,14 @@ namespace SmartMarketBot.API.Controllers;
 /// <summary>Flow 2 — Smart Menu Assistant: thực đơn dinh dưỡng + lộ trình gom nguyên liệu.</summary>
 [ApiController]
 [Route("api/[controller]")]
-public sealed class RecipesController(IRecipeService recipeService) : ControllerBase
+public sealed class MealSuggestionsController(IMealSuggestionService MealSuggestionService) : ControllerBase
 {
     /// <summary>Lấy danh sách tất cả công thức nấu ăn.</summary>
     [HttpGet]
     [AllowAnonymous]
     public async Task<ActionResult<IReadOnlyList<RecipeDto>>> GetAll(CancellationToken cancellationToken)
     {
-        var recipes = await recipeService.GetAllAsync(cancellationToken);
+        var recipes = await MealSuggestionService.GetAllAsync(cancellationToken);
         return Ok(recipes);
     }
 
@@ -24,7 +24,7 @@ public sealed class RecipesController(IRecipeService recipeService) : Controller
     [AllowAnonymous]
     public async Task<ActionResult<RecipeDto>> GetById(int id, CancellationToken cancellationToken)
     {
-        var MealSuggestion = await recipeService.GetByIdAsync(id, cancellationToken);
+        var MealSuggestion = await MealSuggestionService.GetByIdAsync(id, cancellationToken);
         return MealSuggestion is null ? NotFound() : Ok(MealSuggestion);
     }
 
@@ -39,7 +39,7 @@ public sealed class RecipesController(IRecipeService recipeService) : Controller
         [FromQuery] int portions = 1,
         CancellationToken cancellationToken = default)
     {
-        var result = await recipeService.GetMenuAssistantAsync(recipeId, portions, cancellationToken);
+        var result = await MealSuggestionService.GetMenuAssistantAsync(recipeId, portions, cancellationToken);
         return result is null ? NotFound($"MealSuggestion {recipeId} not found.") : Ok(result);
     }
 }

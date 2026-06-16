@@ -36,15 +36,15 @@ public sealed record CompleteRestockRequestDto(
 
 /// <summary>Request báo cáo kệ trống từ robot hoặc khách hàng.</summary>
 public sealed record ReportOosRequestDto(
-    [property: Range(1, int.MaxValue, ErrorMessage = "SlotId phải hợp lệ.")]
+    [Range(1, int.MaxValue, ErrorMessage = "SlotId phải hợp lệ.")]
     int SlotId,
 
-    [property: Range(1, int.MaxValue, ErrorMessage = "RobotId phải hợp lệ.")]
+    [Range(1, int.MaxValue, ErrorMessage = "RobotId phải hợp lệ.")]
     int RobotId,
 
     string? ImageUrl,
 
-    [property: Range(0.0, 100.0, ErrorMessage = "EmptyPercentage phải từ 0 đến 100.")]
+    [Range(0.0, 100.0, ErrorMessage = "EmptyPercentage phải từ 0 đến 100.")]
     decimal EmptyPercentage,
 
     bool IsOccluded = false,

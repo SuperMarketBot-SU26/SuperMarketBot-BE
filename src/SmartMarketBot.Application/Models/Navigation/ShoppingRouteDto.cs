@@ -6,14 +6,14 @@ namespace SmartMarketBot.Application.Models.Navigation;
 
 /// <summary>Request tối ưu hoá lộ trình gom hàng đa điểm (TSP + Dijkstra + ForbiddenZones).</summary>
 public sealed record OptimizeShoppingRouteRequestDto(
-    [property: Range(1, int.MaxValue, ErrorMessage = "RobotId phải hợp lệ.")]
+    [Range(1, int.MaxValue, ErrorMessage = "RobotId phải hợp lệ.")]
     int RobotId,
-    
-    [property: Range(1, int.MaxValue, ErrorMessage = "StartNodeId phải hợp lệ.")]
+
+    [Range(1, int.MaxValue, ErrorMessage = "StartNodeId phải hợp lệ.")]
     int StartNodeId,
-    
-    [property: Required(ErrorMessage = "Danh sách ProductIds là bắt buộc.")]
-    [property: MinLength(1, ErrorMessage = "Danh sách ProductIds phải chứa ít nhất 1 sản phẩm.")]
+
+    [Required(ErrorMessage = "Danh sách ProductIds là bắt buộc.")]
+    [MinLength(1, ErrorMessage = "Danh sách ProductIds phải chứa ít nhất 1 sản phẩm.")]
     IReadOnlyList<int> ProductIds);
 
 /// <summary>Một điểm dừng trong lộ trình mua sắm tối ưu.</summary>

@@ -139,6 +139,8 @@ CREATE TABLE dbo.PRODUCT (
     ProductTypeID       INT            NOT NULL REFERENCES dbo.PRODUCT_TYPE(ProductTypeID),
     ProductName         NVARCHAR(200)  NOT NULL,
     UnitPrice           DECIMAL(18,2)  NOT NULL DEFAULT 0,
+    PromotionPrice      DECIMAL(18,2)  NULL,      -- Giá khuyến mãi đã giảm
+    AdCampaignID        INT            NULL,      -- Liên kết chiến dịch quảng cáo/khuyến mãi (Nối ngoại ở cuối file)
     Barcode             NVARCHAR(50)   NULL UNIQUE,
     ExpiredDate         DATETIME2      NULL,
     ImageUrl            NVARCHAR(500)  NULL,
@@ -374,7 +376,7 @@ CREATE TABLE dbo.AD_CAMPAIGN (
     AdCampaignID    INT IDENTITY(1,1) PRIMARY KEY,
     PackageID       INT            NOT NULL REFERENCES dbo.AD_PACKAGE(PackageID),
     BrandID         INT            NOT NULL REFERENCES dbo.BRAND(BrandID),
-    RobotZoneID     INT            NOT NULL REFERENCES dbo.ROBOT_ZONE(RobotZoneID),
+    RobotZoneID     INT            NULL REFERENCES dbo.ROBOT_ZONE(RobotZoneID) ON DELETE SET NULL, -- Cho phép NULL để tăng linh hoạt (Đã sửa)
     CampaignName    NVARCHAR(200)  NOT NULL,
     StartDate       DATETIME2      NOT NULL,
     EndDate         DATETIME2      NOT NULL,
@@ -385,6 +387,7 @@ CREATE TABLE dbo.AD_CAMPAIGN_LOG (
     LogID           INT IDENTITY(1,1) PRIMARY KEY,
     AdCampaignID    INT            NOT NULL REFERENCES dbo.AD_CAMPAIGN(AdCampaignID) ON DELETE CASCADE,
     ActionType      NVARCHAR(50)   NOT NULL,  -- Click / View
+    ChargedAmount   DECIMAL(18,2)  NOT NULL DEFAULT 0, -- Số tiền bị trừ của lượt click/view này (Đã thêm)
     Timestamp       DATETIME2      NOT NULL DEFAULT DATEADD(hour, 7, GETUTCDATE()) -- Múi giờ Việt Nam (UTC+7)
 );
 
@@ -392,11 +395,16 @@ CREATE TABLE dbo.SPONSORED_PRODUCT (
     SponsoredID     INT IDENTITY(1,1) PRIMARY KEY,
     AdCampaignID    INT            NOT NULL REFERENCES dbo.AD_CAMPAIGN(AdCampaignID),
     ProductID       INT            NOT NULL REFERENCES dbo.PRODUCT(ProductID) ON DELETE CASCADE,
-    BrandID         INT            NOT NULL REFERENCES dbo.BRAND(BrandID),
     Priority        INT            NOT NULL DEFAULT 0,
-    status          NVARCHAR(50)   NOT NULL  -- enum
+    status          NVARCHAR(50)   NOT NULL  -- enum (Đã xóa cột BrandID thừa)
 );
 
+GO
+
+-- ===================== RÀNG BUỘC KHÓA NGOẠI PRODUCT -> AD_CAMPAIGN =====================
+-- Nối sau cùng để tránh lỗi vòng lặp phụ thuộc khi tạo bảng (Dependency Cycle)
+ALTER TABLE dbo.PRODUCT ADD CONSTRAINT FK_PRODUCT_AD_CAMPAIGN 
+    FOREIGN KEY (AdCampaignID) REFERENCES dbo.AD_CAMPAIGN(AdCampaignID) ON DELETE SET NULL;
 GO
 
 -- ============================================================

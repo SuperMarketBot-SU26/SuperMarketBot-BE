@@ -118,8 +118,7 @@ CREATE TABLE dbo.MEMBERHEALTH_PREFERENCE (
 
 CREATE TABLE dbo.CATEGORY (
     CategoryID      INT IDENTITY(1,1) PRIMARY KEY,
-    CategoryName    NVARCHAR(100)  NOT NULL,
-    Description     NVARCHAR(500)  NULL
+    CategoryName    NVARCHAR(100)  NOT NULL
 );
 
 CREATE TABLE dbo.SUBCATEGORY (
@@ -141,7 +140,6 @@ CREATE TABLE dbo.PRODUCT (
     UnitPrice           DECIMAL(18,2)  NOT NULL DEFAULT 0,
     PromotionPrice      DECIMAL(18,2)  NULL,      -- Giá khuyến mãi đã giảm
     AdCampaignID        INT            NULL,      -- Liên kết chiến dịch quảng cáo/khuyến mãi (Nối ngoại ở cuối file)
-    Barcode             NVARCHAR(50)   NULL UNIQUE,
     ExpiredDate         DATETIME2      NULL,
     ImageUrl            NVARCHAR(500)  NULL,
     WeightOrVolume      DECIMAL(18,3)  NULL,

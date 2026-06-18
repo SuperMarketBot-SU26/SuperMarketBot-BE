@@ -4,9 +4,13 @@ public class AdPackage
 {
     public int PackageId { get; set; }
     public string PackageName { get; set; } = string.Empty;
-    public decimal Price { get; set; } = 0.00m;
+    public decimal PricePackage { get; set; } = 0.00m;
+    public decimal PriceRoute { get; set; } = 0.00m;
+    public decimal BasePriceClick { get; set; } = 0.00m;
     public int AdScore { get; set; } = 0;
-    public bool IsWeekendOnly { get; set; } = false;
+
+    /// <summary>Enum dạng string: 'Active' | 'Inactive'.</summary>
+    public string Status { get; set; } = "Active";
 
     public virtual ICollection<AdCampaign> AdCampaigns { get; set; } = new List<AdCampaign>();
 }

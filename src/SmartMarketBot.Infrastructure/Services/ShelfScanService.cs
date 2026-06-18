@@ -28,8 +28,7 @@ public sealed class AisleScanService(AppDbContext dbContext) : IAisleScanService
                 x.ScannedAt,
                 x.EmptyPercentage,
                 x.NeedsRestock,
-                x.ImageUrl,
-                x.AiResponseRaw))
+                x.ImageUrl))
             .ToListAsync(cancellationToken);
     }
 
@@ -41,7 +40,6 @@ public sealed class AisleScanService(AppDbContext dbContext) : IAisleScanService
             RobotId = request.RobotId,
             EmptyPercentage = request.EmptyPercentage,
             ImageUrl = request.ImageUrl,
-            AiResponseRaw = request.AiResponseRaw,
             ScannedAt = VnDateTime.Now
         };
 
@@ -56,7 +54,6 @@ public sealed class AisleScanService(AppDbContext dbContext) : IAisleScanService
             entity.ScannedAt,
             entity.EmptyPercentage,
             entity.NeedsRestock,
-            entity.ImageUrl,
-            entity.AiResponseRaw);
+            entity.ImageUrl);
     }
 }

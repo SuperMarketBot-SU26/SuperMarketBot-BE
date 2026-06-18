@@ -19,13 +19,13 @@ public sealed class MemberService(AppDbContext db, ILocalizationService localize
         var member = await db.Members.FindAsync([memberId], ct)
             ?? throw new KeyNotFoundException(localizer.Get("MemberNotFound", memberId));
 
-        member.ShoppingBudget = request.Budget;
+        member.SpendingLimit = request.Budget;
         await db.SaveChangesAsync(ct);
 
         return new SetBudgetResponseDto(
             memberId,
             request.Budget,
-            member.SearchMode,
+            "Normal",
             localizer.Get("BudgetSet", request.Budget));
     }
 
@@ -41,16 +41,16 @@ public sealed class MemberService(AppDbContext db, ILocalizationService localize
 
         var product = await db.Products
             .AsNoTracking()
-            .FirstOrDefaultAsync(p => p.Barcode == request.Barcode, ct);
+            .FirstOrDefaultAsync(p => p.ProductId == request.ProductId, ct);
 
         if (product is null)
-            return new ScanItemResponseDto(false, null, localizer.Get("ProductNotFound", request.Barcode),
+            return new ScanItemResponseDto(false, null, localizer.Get("ProductNotFound", request.ProductId),
                 0, "Unknown", 0, request.CurrentCartTotal, null, []);
 
-        // 1. Kiểm tra dị ứng
+        // 1. Kiểm tra dị ứng (status = 'Allergy' trong MEMBERHEALTH_PREFERENCE)
         var allergyTagIds = await db.MemberHealthPreferences
             .AsNoTracking()
-            .Where(mhp => mhp.MemberId == memberId && mhp.IsAllergy)
+            .Where(mhp => mhp.MemberId == memberId && mhp.Status == "Allergy")
             .Select(mhp => mhp.HealthTagId)
             .ToListAsync(ct);
 
@@ -58,9 +58,9 @@ public sealed class MemberService(AppDbContext db, ILocalizationService localize
             .AsNoTracking()
             .AnyAsync(pht => pht.ProductId == product.ProductId && allergyTagIds.Contains(pht.HealthTagId), ct);
 
-        // 2. Kiểm tra vượt ngân sách
+        // 2. Kiểm tra vượt ngân sách (SpendingLimit)
         var newTotal = request.CurrentCartTotal + product.UnitPrice * request.Quantity;
-        bool overBudget = member.ShoppingBudget.HasValue && newTotal > member.ShoppingBudget.Value;
+        bool overBudget = member.SpendingLimit.HasValue && newTotal > member.SpendingLimit.Value;
 
         // 3. Kiểm tra mua trùng trong 7 ngày gần nhất
         var sevenDaysAgo = VnDateTime.Now.AddDays(-7);
@@ -82,7 +82,7 @@ public sealed class MemberService(AppDbContext db, ILocalizationService localize
         else if (overBudget)
         {
             alertType = "BudgetExceeded";
-            alertMessage = localizer.Get("BudgetExceededAlert", product.ProductName, product.UnitPrice, member.ShoppingBudget.GetValueOrDefault());
+            alertMessage = localizer.Get("BudgetExceededAlert", product.ProductName, product.UnitPrice, member.SpendingLimit.GetValueOrDefault());
         }
         else if (isDuplicate)
         {
@@ -112,7 +112,7 @@ public sealed class MemberService(AppDbContext db, ILocalizationService localize
                 .AsNoTracking()
                 .Where(p => p.ProductTypeId == product.ProductTypeId
                     && p.ProductId != product.ProductId
-                    && p.IsActive)
+                    && p.Status == "Available")
                 .Take(3)
                 .ToListAsync(ct);
 
@@ -129,7 +129,7 @@ public sealed class MemberService(AppDbContext db, ILocalizationService localize
             product.ProductName,
             product.UnitPrice,
             isAllowed ? newTotal : request.CurrentCartTotal,
-            member.ShoppingBudget.HasValue ? member.ShoppingBudget.Value - (isAllowed ? newTotal : request.CurrentCartTotal) : null,
+            member.SpendingLimit.HasValue ? member.SpendingLimit.Value - (isAllowed ? newTotal : request.CurrentCartTotal) : null,
             alternatives);
     }
 

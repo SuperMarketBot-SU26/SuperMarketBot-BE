@@ -8,13 +8,11 @@ public sealed record ShelfScanDto(
     DateTime ScannedAt,
     decimal EmptyPercentage,
     bool NeedsRestock,
-    string? ImageUrl,
-    string? AiResponseRaw);
+    string? ImageUrl);
 
 public sealed record CreateAisleScanRequestDto(
     int AisleId,
     int? ShelfLevelId,
     int RobotId,
     decimal EmptyPercentage,
-    string? ImageUrl,
-    string? AiResponseRaw);
+    string? ImageUrl);

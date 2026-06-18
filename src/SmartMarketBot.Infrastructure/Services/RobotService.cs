@@ -24,7 +24,7 @@ public sealed class RobotService(
                 x.RobotCode,
                 x.BatteryPct,
                 x.Mode,
-                x.IsOnline,
+                x.Status,
                 x.LastSeenAt))
             .ToListAsync(cancellationToken);
     }

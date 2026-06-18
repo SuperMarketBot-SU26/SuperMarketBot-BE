@@ -6,7 +6,10 @@ public class RobotLog
     public int? RobotId { get; set; }
     public int? Battery { get; set; }
     public string? Location { get; set; }
-    public string? Status { get; set; }
+
+    /// <summary>Enum dạng string: 'Idle' | 'Navigating' | 'Scanning' | 'Charging' | 'Error' | 'Offline'.</summary>
+    public string Status { get; set; } = "Idle";
+
     public DateTime Timestamp { get; set; } = DateTime.UtcNow;
     public double? XCoord { get; set; }
     public double? YCoord { get; set; }

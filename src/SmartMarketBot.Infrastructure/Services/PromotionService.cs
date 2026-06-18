@@ -16,19 +16,18 @@ public sealed class PromotionService(AppDbContext db, ILocalizationService local
         SponsoredRecommendationQueryDto query,
         CancellationToken ct = default)
     {
-        // Đánh giá động mỗi request, dùng giờ Việt Nam — tránh stale time khi deploy Azure (UTC)
-        var isWeekend = VnDateTime.Today.DayOfWeek is DayOfWeek.Saturday or DayOfWeek.Sunday;
         // 1. Lấy SearchMode + allergy tags của member
         var member = await db.Members
             .AsNoTracking()
             .FirstOrDefaultAsync(m => m.MemberId == query.MemberId, ct);
 
-        var searchMode = member?.SearchMode ?? "Normal";
+        // SearchMode không còn trong schema mới — dùng "Normal" mặc định.
+        const string searchMode = "Normal";
 
         var allergyTagIds = member is null ? new HashSet<int>() :
             (await db.MemberHealthPreferences
                 .AsNoTracking()
-                .Where(mhp => mhp.MemberId == query.MemberId && mhp.IsAllergy)
+                .Where(mhp => mhp.MemberId == query.MemberId && mhp.Status == "Allergy")
                 .Select(mhp => mhp.HealthTagId)
                 .ToListAsync(ct))
             .ToHashSet();
@@ -41,10 +40,10 @@ public sealed class PromotionService(AppDbContext db, ILocalizationService local
                 .ToListAsync(ct))
             .ToHashSet();
 
-        // 2. Lấy sản phẩm khớp từ khóa (null = tất cả)
+        // 2. Lấy sản phẩm khớp từ khoá (Status = 'Available')
         var productsQuery = db.Products
             .AsNoTracking()
-            .Where(p => p.IsActive);
+            .Where(p => p.Status == "Available");
 
         if (!string.IsNullOrWhiteSpace(query.Query))
             productsQuery = productsQuery.Where(p => p.ProductName.Contains(query.Query));
@@ -56,8 +55,8 @@ public sealed class PromotionService(AppDbContext db, ILocalizationService local
                 p.ProductId,
                 p.ProductName,
                 p.UnitPrice,
+                p.PromotionPrice,
                 p.ImageUrl,
-                p.Barcode,
                 p.ProductTypeId
             })
             .ToListAsync(ct);
@@ -66,27 +65,24 @@ public sealed class PromotionService(AppDbContext db, ILocalizationService local
         var today = DateOnly.FromDateTime(VnDateTime.Now);
         var sponsored = await db.SponsoredProducts
             .AsNoTracking()
-            .Include(sp => sp.Brand)
             .Include(sp => sp.AdCampaign)
                 .ThenInclude(c => c!.Package)
-            .Where(sp => sp.IsActive && sp.AdCampaign != null
+            .Where(sp => sp.Status == "Active" && sp.AdCampaign != null
+                && sp.AdCampaign.Status == "Running"
                 && DateOnly.FromDateTime(sp.AdCampaign.StartDate) <= today && DateOnly.FromDateTime(sp.AdCampaign.EndDate) >= today)
             .Select(sp => new
             {
                 sp.ProductId,
-                BrandName = sp.Brand != null ? sp.Brand.BrandName : "",
                 AdScore = sp.AdCampaign != null && sp.AdCampaign.Package != null ? sp.AdCampaign.Package.AdScore : 0,
-                IsWeekendOnly = sp.AdCampaign != null && sp.AdCampaign.Package != null ? sp.AdCampaign.Package.IsWeekendOnly : false
+                BrandName = sp.AdCampaign != null && sp.AdCampaign.Brand != null ? sp.AdCampaign.Brand.BrandName : ""
             })
             .ToDictionaryAsync(sp => sp.ProductId, ct);
 
-        // 4. Lấy PromotionProducts đang active (DateTime -> DateOnly comparison)
-        var activePromos = await db.PromotionProducts
-            .AsNoTracking()
-            .Join(db.Promotions.Where(pr => pr.IsActive && DateOnly.FromDateTime(pr.StartDate) <= today && DateOnly.FromDateTime(pr.EndDate) >= today),
-                pp => pp.PromotionId, pr => pr.PromotionId,
-                (pp, pr) => new { pp.ProductId, pp.Priority, pr.DiscountValue })
-            .ToDictionaryAsync(x => x.ProductId, ct);
+        // 4. Lấy PromotionScore từ PromotionPrice của Product (schema mới không còn PROMOTION_PRODUCT)
+        // PromotionPrice != null → sản phẩm đang khuyến mãi; giá chiết khấu = PromotionPrice
+        var activePromos = products
+            .Where(p => p.PromotionPrice.HasValue && p.PromotionPrice.Value < p.UnitPrice)
+            .ToDictionary(p => p.ProductId, p => new { DiscountPct = (p.UnitPrice - p.PromotionPrice!.Value) / p.UnitPrice * 100m });
 
         // 5. Tính Priority Score
         var recommendations = products.Select(p =>
@@ -95,12 +91,8 @@ public sealed class PromotionService(AppDbContext db, ILocalizationService local
             string? sponsorBrand = null;
             if (sponsored.TryGetValue(p.ProductId, out var sp))
             {
-                bool weekendOk = !sp.IsWeekendOnly || isWeekend;
-                if (weekendOk)
-                {
-                    adScore = sp.AdScore;
-                    sponsorBrand = sp.BrandName;
-                }
+                adScore = sp.AdScore;
+                sponsorBrand = sp.BrandName;
             }
 
             int customerMatchScore = 0;
@@ -117,8 +109,9 @@ public sealed class PromotionService(AppDbContext db, ILocalizationService local
             decimal? discountedPrice = null;
             if (activePromos.TryGetValue(p.ProductId, out var promo))
             {
-                promotionScore = promo.Priority * 5;
-                discountedPrice = p.UnitPrice * (1 - promo.DiscountValue / 100m);
+                // promotionScore tỉ lệ thuận với % giảm giá (cao hơn = ưu tiên hơn)
+                promotionScore = (int)(promo.DiscountPct / 5);
+                discountedPrice = p.UnitPrice - (p.UnitPrice * promo.DiscountPct / 100m);
             }
 
             int totalScore = adScore + customerMatchScore + promotionScore;
@@ -128,7 +121,6 @@ public sealed class PromotionService(AppDbContext db, ILocalizationService local
                 p.ProductName,
                 p.UnitPrice,
                 p.ImageUrl,
-                p.Barcode,
                 totalScore,
                 adScore,
                 customerMatchScore,

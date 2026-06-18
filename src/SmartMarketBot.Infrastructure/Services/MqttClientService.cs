@@ -195,7 +195,7 @@ public sealed class MqttClientService(
 
                 if (payload.IsOnline.HasValue)
                 {
-                    robot.IsOnline = payload.IsOnline.Value;
+                    robot.Status = payload.IsOnline.Value ? "Online" : "Offline";
                 }
 
                 robot.LastSeenAt = timestamp;

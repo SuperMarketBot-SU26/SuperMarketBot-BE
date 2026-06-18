@@ -6,7 +6,7 @@ public sealed record RobotDto(
     string RobotCode,
     int BatteryPct,
     string Mode,
-    bool IsOnline,
+    string Status,
     DateTime? LastSeenAt);
 
 public sealed record PublishRobotCommandRequestDto(string RobotCode, string Command, string? Payload);

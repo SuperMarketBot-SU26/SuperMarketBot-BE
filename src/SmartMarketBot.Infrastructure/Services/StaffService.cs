@@ -75,7 +75,7 @@ public sealed class StaffService(AppDbContext db, ILocalizationService localizer
                 x.ss.ScanId,
                 0,  // SlotId — enriched lazily if needed
                 "-",
-                $"Khu {x.z.ZoneCode} - Dãy {x.a.AisleCode}",
+                $"Khu {x.z.ZoneName ?? x.z.ZoneId.ToString()} - Dãy {x.a.AisleCode}",
                 0,
                 "Unknown",
                 x.ss.ImageUrl,

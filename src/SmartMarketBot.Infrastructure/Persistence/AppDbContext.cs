@@ -13,7 +13,6 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
     public DbSet<Membership> Memberships => Set<Membership>();
     public DbSet<HealthTag> HealthTags => Set<HealthTag>();
     public DbSet<MemberHealthPreference> MemberHealthPreferences => Set<MemberHealthPreference>();
-    public DbSet<EmailOtp> EmailOtps => Set<EmailOtp>();
     public DbSet<UserToken> UserTokens => Set<UserToken>();
     public DbSet<MemberAlert> MemberAlerts => Set<MemberAlert>();
     public DbSet<MemberEvent> MemberEvents => Set<MemberEvent>();
@@ -74,6 +73,12 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
     {
         base.OnModelCreating(modelBuilder);
 
+        // ═══════════════════════════════════════════════════════════════════════
+        // ERD V4.0 — Direct Schema Mapping
+        // DB chuẩn: db/erd_database.sql (37 bảng, gộp EMAIL_OTP vào ACCOUNT)
+        // Default thời gian: DATEADD(hour, 7, GETUTCDATE()) — UTC+7 (VN)
+        // ═══════════════════════════════════════════════════════════════════════
+
         // ─────────────────────────────────────────────
         // REGION 1: Customer & Identity
         // ─────────────────────────────────────────────
@@ -82,41 +87,33 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
         {
             entity.ToTable("ACCOUNT");
             entity.HasKey(x => x.AccountId);
-            entity.Property(x => x.AccountId).HasColumnName("account_id");
-            entity.Property(x => x.Username).HasColumnName("username").HasMaxLength(100).IsRequired();
-            entity.Property(x => x.PasswordHash).HasColumnName("password_hash").HasMaxLength(500).IsRequired();
-            entity.Property(x => x.Email).HasColumnName("email").HasMaxLength(256);
-            entity.Property(x => x.EmailConfirmed).HasColumnName("email_confirmed").HasDefaultValue(false);
-            entity.Property(x => x.Phone).HasColumnName("phone").HasMaxLength(20);
-            entity.Property(x => x.FullName).HasColumnName("full_name").HasMaxLength(100);
-            entity.Property(x => x.AvatarUrl).HasColumnName("avatar_url").HasMaxLength(500);
-            entity.Property(x => x.IsActive).HasColumnName("is_active").HasDefaultValue(true);
-            entity.Property(x => x.Role).HasColumnName("role").HasMaxLength(20).HasDefaultValue("Member");
-            entity.Property(x => x.CreatedAt).HasColumnName("created_at").HasDefaultValueSql("GETUTCDATE()");
-            entity.Property(x => x.UpdatedAt).HasColumnName("updated_at");
-            entity.HasIndex(x => x.Username).IsUnique().HasDatabaseName("IX_ACCOUNT_username");
-            entity.HasIndex(x => x.Email)
-                .IsUnique()
-                .HasFilter("[email] IS NOT NULL")
-                .HasDatabaseName("IX_ACCOUNT_email");
+            entity.Property(x => x.AccountId).HasColumnName("AccountID");
+            entity.Property(x => x.Username).HasColumnName("Username").HasMaxLength(100).IsRequired();
+            entity.Property(x => x.PasswordHash).HasColumnName("PasswordHash").HasMaxLength(500).IsRequired();
+            entity.Property(x => x.Email).HasColumnName("Email").HasMaxLength(256).IsRequired();
+            entity.Property(x => x.Phone).HasColumnName("Phone").HasMaxLength(20);
+            entity.Property(x => x.FullName).HasColumnName("FullName").HasMaxLength(100);
+            entity.Property(x => x.Status).HasColumnName("Status").HasMaxLength(50).IsRequired();
+            entity.Property(x => x.Role).HasColumnName("Role").HasMaxLength(50).IsRequired();
+            entity.Property(x => x.OtpCode).HasColumnName("OtpCode").HasMaxLength(6);
+            entity.Property(x => x.OtpExpiredAt).HasColumnName("OtpExpiredAt");
+            entity.Property(x => x.OtpType).HasColumnName("OtpType").HasMaxLength(50);
+            entity.Property(x => x.CreatedAt).HasColumnName("CreatedAt").HasDefaultValueSql("DATEADD(hour, 7, GETUTCDATE())");
+            entity.HasIndex(x => x.Username).IsUnique().HasDatabaseName("IX_ACCOUNT_Username");
+            entity.HasIndex(x => x.Email).IsUnique().HasDatabaseName("IX_ACCOUNT_Email");
         });
 
         modelBuilder.Entity<Member>(entity =>
         {
             entity.ToTable("MEMBER");
             entity.HasKey(x => x.MemberId);
-            entity.Property(x => x.MemberId).HasColumnName("member_id");
-            entity.Property(x => x.AccountId).HasColumnName("account_id");
-            entity.Property(x => x.FullName).HasColumnName("full_name").HasMaxLength(255).IsRequired();
-            entity.Property(x => x.FacePath).HasColumnName("face_path").HasMaxLength(500);
-            entity.Property(x => x.FaceVector).HasColumnName("face_vector").HasColumnType("nvarchar(max)");
-            entity.Property(x => x.SpendingLimit).HasColumnName("spending_limit").HasPrecision(12, 2);
-            entity.Property(x => x.WarningThreshold).HasColumnName("warning_threshold").HasPrecision(12, 2);
-            entity.Property(x => x.TotalPoints).HasColumnName("total_points").HasDefaultValue(0);
-            // Backward-compat columns (không thuộc ERD V4.0 - chỉ dùng cho code cũ)
-            entity.Ignore(x => x.ShoppingBudget);
-            entity.Ignore(x => x.SearchMode);
-            entity.Ignore(x => x.Tier);
+            entity.Property(x => x.MemberId).HasColumnName("MemberID");
+            entity.Property(x => x.AccountId).HasColumnName("AccountID");
+            entity.Property(x => x.FullName).HasColumnName("FullName").HasMaxLength(200).IsRequired();
+            entity.Property(x => x.FacePath).HasColumnName("FacePath").HasMaxLength(500);
+            entity.Property(x => x.FaceVector).HasColumnName("FaceVector").HasColumnType("nvarchar(max)");
+            entity.Property(x => x.SpendingLimit).HasColumnName("SpendingLimit").HasPrecision(18, 2);
+            entity.Property(x => x.TotalPoints).HasColumnName("TotalPoints").HasDefaultValue(0);
             // 1-1 nullable: Account.Member back-navigation prevents shadow FK
             entity.HasOne(x => x.Account)
                 .WithOne(a => a.Member)
@@ -129,33 +126,32 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
         {
             entity.ToTable("MEMBERSHIP");
             entity.HasKey(x => x.MembershipId);
-            entity.Property(x => x.MembershipId).HasColumnName("membership_id");
-            entity.Property(x => x.MemberId).HasColumnName("member_id");
-            entity.Property(x => x.TierName).HasColumnName("tier_name").HasMaxLength(20).IsRequired();
-            entity.Property(x => x.PointsThreshold).HasColumnName("points_threshold");
+            entity.Property(x => x.MembershipId).HasColumnName("MembershipID");
+            entity.Property(x => x.MemberId).HasColumnName("MemberID");
+            entity.Property(x => x.TierName).HasColumnName("TierName").HasMaxLength(50).IsRequired();
+            entity.Property(x => x.Status).HasColumnName("Status").HasMaxLength(50).IsRequired();
             entity.HasOne(x => x.Member)
                 .WithMany(m => m.Memberships)
                 .HasForeignKey(x => x.MemberId)
                 .OnDelete(DeleteBehavior.Cascade);
-            entity.HasIndex(x => new { x.MemberId, x.TierName }).IsUnique();
         });
 
         modelBuilder.Entity<HealthTag>(entity =>
         {
             entity.ToTable("HEALTH_TAG");
             entity.HasKey(x => x.HealthTagId);
-            entity.Property(x => x.HealthTagId).HasColumnName("health_tag_id");
-            entity.Property(x => x.TagName).HasColumnName("tag_name").HasMaxLength(50).IsRequired();
-            entity.Property(x => x.TagType).HasColumnName("tag_type").HasMaxLength(20).IsRequired();
+            entity.Property(x => x.HealthTagId).HasColumnName("HealthTagID");
+            entity.Property(x => x.TagName).HasColumnName("TagName").HasMaxLength(100).IsRequired();
+            entity.Property(x => x.TagType).HasColumnName("TagType").HasMaxLength(50).IsRequired().HasDefaultValue("diet");
         });
 
         modelBuilder.Entity<MemberHealthPreference>(entity =>
         {
             entity.ToTable("MEMBERHEALTH_PREFERENCE");
             entity.HasKey(x => new { x.MemberId, x.HealthTagId });
-            entity.Property(x => x.MemberId).HasColumnName("member_id");
-            entity.Property(x => x.HealthTagId).HasColumnName("health_tag_id");
-            entity.Property(x => x.IsAllergy).HasColumnName("is_allergy").HasDefaultValue(false);
+            entity.Property(x => x.MemberId).HasColumnName("MemberID");
+            entity.Property(x => x.HealthTagId).HasColumnName("HealthTagID");
+            entity.Property(x => x.Status).HasColumnName("status").HasMaxLength(50).IsRequired();
             entity.HasOne(x => x.Member)
                 .WithMany(m => m.MemberHealthPreferences)
                 .HasForeignKey(x => x.MemberId)
@@ -166,24 +162,7 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
                 .OnDelete(DeleteBehavior.Cascade);
         });
 
-        // EmailOtp - bảng phụ trợ cho AuthService (không thuộc ERD V4.0 cốt lõi)
-        modelBuilder.Entity<EmailOtp>(entity =>
-        {
-            entity.ToTable("EMAIL_OTP");
-            entity.HasKey(x => x.OtpId);
-            entity.Property(x => x.OtpId).HasColumnName("otp_id").HasDefaultValueSql("NEWID()");
-            entity.Property(x => x.Email).HasColumnName("email").HasMaxLength(256).IsRequired();
-            entity.Property(x => x.OtpCode).HasColumnName("otp_code").HasMaxLength(6).IsRequired();
-            entity.Property(x => x.OtpType).HasColumnName("otp_type").HasMaxLength(50).HasDefaultValue("Registration");
-            entity.Property(x => x.IsUsed).HasColumnName("is_used").HasDefaultValue(false);
-            entity.Property(x => x.CreatedAt).HasColumnName("created_at").HasDefaultValueSql("GETUTCDATE()");
-            entity.Property(x => x.ExpiredAt).HasColumnName("expired_at");
-            entity.Property(x => x.TemporaryFullName).HasColumnName("temporary_full_name").HasMaxLength(100);
-            entity.Property(x => x.TemporaryPhone).HasColumnName("temporary_phone").HasMaxLength(20);
-            entity.Property(x => x.TemporaryPasswordHash).HasColumnName("temporary_password_hash").HasMaxLength(500);
-        });
-
-        // UserToken - refresh token
+        // UserToken - refresh token (giữ nguyên convention cũ, không thuộc ERD V4.0 core)
         modelBuilder.Entity<UserToken>(entity =>
         {
             entity.ToTable("USER_TOKEN");
@@ -197,7 +176,7 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
             entity.Property(x => x.IpAddress).HasColumnName("ip_address").HasMaxLength(64);
             entity.Property(x => x.CreatedAt).HasColumnName("created_at").HasDefaultValueSql("GETUTCDATE()");
             entity.HasOne(x => x.Account)
-                .WithMany()                                   // không navigate ngược từ Account
+                .WithMany()
                 .HasForeignKey(x => x.AccountId)
                 .OnDelete(DeleteBehavior.Cascade);
         });
@@ -264,18 +243,17 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
         {
             entity.ToTable("CATEGORY");
             entity.HasKey(x => x.CategoryId);
-            entity.Property(x => x.CategoryId).HasColumnName("category_id");
-            entity.Property(x => x.CategoryName).HasColumnName("category_name").HasMaxLength(100).IsRequired();
-            entity.Property(x => x.Description).HasColumnName("description").HasMaxLength(500);
+            entity.Property(x => x.CategoryId).HasColumnName("CategoryID");
+            entity.Property(x => x.CategoryName).HasColumnName("CategoryName").HasMaxLength(100).IsRequired();
         });
 
         modelBuilder.Entity<Subcategory>(entity =>
         {
             entity.ToTable("SUBCATEGORY");
             entity.HasKey(x => x.SubcategoryId);
-            entity.Property(x => x.SubcategoryId).HasColumnName("subcategory_id");
-            entity.Property(x => x.CategoryId).HasColumnName("category_id");
-            entity.Property(x => x.SubcategoryName).HasColumnName("subcategory_name").HasMaxLength(100).IsRequired();
+            entity.Property(x => x.SubcategoryId).HasColumnName("SubcategoryID");
+            entity.Property(x => x.CategoryId).HasColumnName("CategoryID");
+            entity.Property(x => x.SubcategoryName).HasColumnName("SubcategoryName").HasMaxLength(100).IsRequired();
             entity.HasOne(x => x.Category)
                 .WithMany(c => c.Subcategories)
                 .HasForeignKey(x => x.CategoryId);
@@ -285,9 +263,9 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
         {
             entity.ToTable("PRODUCT_TYPE");
             entity.HasKey(x => x.ProductTypeId);
-            entity.Property(x => x.ProductTypeId).HasColumnName("product_type_id");
-            entity.Property(x => x.SubcategoryId).HasColumnName("subcategory_id");
-            entity.Property(x => x.TypeName).HasColumnName("type_name").HasMaxLength(100).IsRequired();
+            entity.Property(x => x.ProductTypeId).HasColumnName("ProductTypeID");
+            entity.Property(x => x.SubcategoryId).HasColumnName("SubcategoryID");
+            entity.Property(x => x.TypeName).HasColumnName("TypeName").HasMaxLength(100).IsRequired();
             entity.HasOne(x => x.Subcategory)
                 .WithMany(s => s.ProductTypes)
                 .HasForeignKey(x => x.SubcategoryId);
@@ -297,17 +275,19 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
         {
             entity.ToTable("PRODUCT");
             entity.HasKey(x => x.ProductId);
-            entity.Property(x => x.ProductId).HasColumnName("product_id");
-            entity.Property(x => x.ProductTypeId).HasColumnName("product_type_id");
-            entity.Property(x => x.ProductName).HasColumnName("product_name").HasMaxLength(200).IsRequired();
-            entity.Property(x => x.UnitPrice).HasColumnName("unit_price").HasPrecision(12, 2);
-            entity.Property(x => x.Barcode).HasColumnName("barcode").HasMaxLength(50);
-            entity.Property(x => x.ImageUrl).HasColumnName("image_url").HasMaxLength(500);
-            entity.Property(x => x.WeightOrVolume).HasColumnName("weight_or_volume").HasPrecision(10, 2);
-            entity.Property(x => x.Unit).HasColumnName("unit").HasMaxLength(20);
-            entity.Property(x => x.Description).HasColumnName("description").HasMaxLength(1000);
-            entity.Property(x => x.IsActive).HasColumnName("is_active").HasDefaultValue(true);
-            entity.Property(x => x.SubstituteProductId).HasColumnName("substitute_product_id");
+            entity.Property(x => x.ProductId).HasColumnName("ProductID");
+            entity.Property(x => x.ProductTypeId).HasColumnName("ProductTypeID");
+            entity.Property(x => x.ProductName).HasColumnName("ProductName").HasMaxLength(200).IsRequired();
+            entity.Property(x => x.UnitPrice).HasColumnName("UnitPrice").HasPrecision(18, 2).HasDefaultValue(0m);
+            entity.Property(x => x.PromotionPrice).HasColumnName("PromotionPrice").HasPrecision(18, 2);
+            entity.Property(x => x.AdCampaignId).HasColumnName("AdCampaignID");
+            entity.Property(x => x.ExpiredDate).HasColumnName("ExpiredDate");
+            entity.Property(x => x.ImageUrl).HasColumnName("ImageUrl").HasMaxLength(500);
+            entity.Property(x => x.WeightOrVolume).HasColumnName("WeightOrVolume").HasPrecision(18, 3);
+            entity.Property(x => x.Unit).HasColumnName("Unit").HasMaxLength(20);
+            entity.Property(x => x.Description).HasColumnName("Description").HasColumnType("nvarchar(max)");
+            entity.Property(x => x.Status).HasColumnName("Status").HasMaxLength(50).IsRequired();
+            entity.Property(x => x.SubstituteProductId).HasColumnName("SubstituteProductID");
             entity.HasOne(x => x.ProductType)
                 .WithMany(pt => pt.Products)
                 .HasForeignKey(x => x.ProductTypeId);
@@ -316,18 +296,20 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
                 .WithMany()
                 .HasForeignKey(x => x.SubstituteProductId)
                 .OnDelete(DeleteBehavior.NoAction);
-            entity.HasIndex(x => x.Barcode)
-                .IsUnique()
-                .HasFilter("[barcode] IS NOT NULL")
-                .HasDatabaseName("IX_PRODUCT_barcode");
+            // FK AdCampaign (nullable, SET NULL) - declared last to avoid dependency cycle
+            entity.HasOne(x => x.AdCampaign)
+                .WithMany()
+                .HasForeignKey(x => x.AdCampaignId)
+                .IsRequired(false)
+                .OnDelete(DeleteBehavior.SetNull);
         });
 
         modelBuilder.Entity<ProductHealthTag>(entity =>
         {
             entity.ToTable("PRODUCT_HEALTHTAG");
             entity.HasKey(x => new { x.ProductId, x.HealthTagId });
-            entity.Property(x => x.ProductId).HasColumnName("product_id");
-            entity.Property(x => x.HealthTagId).HasColumnName("health_tag_id");
+            entity.Property(x => x.ProductId).HasColumnName("ProductID");
+            entity.Property(x => x.HealthTagId).HasColumnName("HealthTagID");
             entity.HasOne(x => x.Product)
                 .WithMany(p => p.ProductHealthTags)
                 .HasForeignKey(x => x.ProductId)
@@ -346,10 +328,10 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
         {
             entity.ToTable("INVOICE_HISTORY");
             entity.HasKey(x => x.InvoiceHistoryId);
-            entity.Property(x => x.InvoiceHistoryId).HasColumnName("invoice_history_id");
-            entity.Property(x => x.MemberId).HasColumnName("member_id");
-            entity.Property(x => x.PurchaseDate).HasColumnName("purchase_date").HasDefaultValueSql("GETUTCDATE()");
-            entity.Property(x => x.TotalAmount).HasColumnName("total_amount").HasPrecision(12, 2);
+            entity.Property(x => x.InvoiceHistoryId).HasColumnName("InvoiceHistoryID");
+            entity.Property(x => x.MemberId).HasColumnName("MemberID");
+            entity.Property(x => x.PurchaseDate).HasColumnName("PurchaseDate").HasDefaultValueSql("DATEADD(hour, 7, GETUTCDATE())");
+            entity.Property(x => x.TotalPrice).HasColumnName("TotalPrice").HasPrecision(18, 2).HasDefaultValue(0m);
             entity.HasOne(x => x.Member)
                 .WithMany(m => m.InvoiceHistories)
                 .HasForeignKey(x => x.MemberId);
@@ -359,11 +341,11 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
         {
             entity.ToTable("INVOICE_HISTORY_ITEM");
             entity.HasKey(x => x.InvoiceHistoryItemId);
-            entity.Property(x => x.InvoiceHistoryItemId).HasColumnName("invoice_history_item_id");
-            entity.Property(x => x.InvoiceHistoryId).HasColumnName("invoice_history_id");
-            entity.Property(x => x.ProductId).HasColumnName("product_id");
-            entity.Property(x => x.Quantity).HasColumnName("quantity").HasDefaultValue(1);
-            entity.Property(x => x.UnitPrice).HasColumnName("unit_price").HasPrecision(12, 2);
+            entity.Property(x => x.InvoiceHistoryItemId).HasColumnName("InvoiceHistoryItemID");
+            entity.Property(x => x.InvoiceHistoryId).HasColumnName("InvoiceHistoryID");
+            entity.Property(x => x.ProductId).HasColumnName("ProductID");
+            entity.Property(x => x.Quantity).HasColumnName("Quantity").HasDefaultValue(1);
+            entity.Property(x => x.UnitPrice).HasColumnName("UnitPrice").HasPrecision(18, 2).IsRequired();
             entity.HasOne(x => x.InvoiceHistory)
                 .WithMany(ih => ih.InvoiceHistoryItems)
                 .HasForeignKey(x => x.InvoiceHistoryId)
@@ -377,12 +359,12 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
         {
             entity.ToTable("MEAL_SUGGESTION");
             entity.HasKey(x => x.MealSuggestionId);
-            entity.Property(x => x.MealSuggestionId).HasColumnName("meal_suggestion_id");
-            entity.Property(x => x.MealName).HasColumnName("meal_name").HasMaxLength(200).IsRequired();
-            entity.Property(x => x.Description).HasColumnName("description").HasColumnType("nvarchar(max)");
-            entity.Property(x => x.YieldPortions).HasColumnName("yield_portions").HasDefaultValue(1);
-            entity.Property(x => x.ImageUrl).HasColumnName("image_url").HasMaxLength(500);
-            entity.Property(x => x.Calories).HasColumnName("calories");
+            entity.Property(x => x.MealSuggestionId).HasColumnName("MealSuggestionID");
+            entity.Property(x => x.MealName).HasColumnName("MealName").HasMaxLength(200).IsRequired();
+            entity.Property(x => x.Description).HasColumnName("Description").HasColumnType("nvarchar(max)");
+            entity.Property(x => x.YieldPortions).HasColumnName("YieldPortions").HasDefaultValue(1);
+            entity.Property(x => x.ImageUrl).HasColumnName("ImageUrl").HasMaxLength(500);
+            entity.Property(x => x.Calories).HasColumnName("Calories");
             entity.Property(x => x.HealthyScore).HasColumnName("healthy_score");
             entity.Property(x => x.AlternativeSuggestion).HasColumnName("alternative_suggestion").HasMaxLength(500);
         });
@@ -391,10 +373,10 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
         {
             entity.ToTable("MEAL_ITEM");
             entity.HasKey(x => new { x.MealSuggestionId, x.ProductId });
-            entity.Property(x => x.MealSuggestionId).HasColumnName("meal_suggestion_id");
-            entity.Property(x => x.ProductId).HasColumnName("product_id");
-            entity.Property(x => x.QuantityRequired).HasColumnName("quantity_required").HasPrecision(10, 2);
-            entity.Property(x => x.UnitOfMeasure).HasColumnName("unit_of_measure").HasMaxLength(20);
+            entity.Property(x => x.MealSuggestionId).HasColumnName("MealSuggestionID");
+            entity.Property(x => x.ProductId).HasColumnName("ProductID");
+            entity.Property(x => x.QuantityRequired).HasColumnName("QuantityRequired").HasPrecision(18, 3).HasDefaultValue(1m);
+            entity.Property(x => x.UnitOfMeasure).HasColumnName("UnitOfMeasure").HasMaxLength(20);
             entity.HasOne(x => x.MealSuggestion)
                 .WithMany(ms => ms.MealItems)
                 .HasForeignKey(x => x.MealSuggestionId)
@@ -412,74 +394,73 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
         {
             entity.ToTable("FLOOR");
             entity.HasKey(x => x.FloorId);
-            entity.Property(x => x.FloorId).HasColumnName("floor_id");
-            entity.Property(x => x.FloorNumber).HasColumnName("floor_number");
+            entity.Property(x => x.FloorId).HasColumnName("FloorID");
+            entity.Property(x => x.FloorNumber).HasColumnName("FloorNumber").HasDefaultValue(1);
         });
 
         modelBuilder.Entity<Zone>(entity =>
         {
             entity.ToTable("ZONE");
             entity.HasKey(x => x.ZoneId);
-            entity.Property(x => x.ZoneId).HasColumnName("zone_id");
-            entity.Property(x => x.FloorId).HasColumnName("floor_id");
-            entity.Property(x => x.ZoneCode).HasColumnName("zone_code").HasColumnType("char(1)").IsRequired();
-            entity.Property(x => x.ZoneName).HasColumnName("zone_name").HasMaxLength(100).IsRequired();
-            entity.Property(x => x.Description).HasColumnName("description").HasMaxLength(500);
-            entity.Property(x => x.IsBlocked).HasColumnName("is_blocked").HasDefaultValue(false);
+            entity.Property(x => x.ZoneId).HasColumnName("ZoneID");
+            entity.Property(x => x.FloorId).HasColumnName("FloorID");
+            entity.Property(x => x.ZoneName).HasColumnName("ZoneName").HasMaxLength(100);
+            entity.Property(x => x.Description).HasColumnName("Description").HasMaxLength(500);
             entity.HasOne(x => x.Floor)
                 .WithMany(f => f.Zones)
-                .HasForeignKey(x => x.FloorId);
+                .HasForeignKey(x => x.FloorId)
+                .OnDelete(DeleteBehavior.Cascade);
         });
 
         modelBuilder.Entity<Aisle>(entity =>
         {
             entity.ToTable("AISLE");
             entity.HasKey(x => x.AisleId);
-            entity.Property(x => x.AisleId).HasColumnName("aisle_id");
-            entity.Property(x => x.ZoneId).HasColumnName("zone_id");
-            entity.Property(x => x.AisleCode).HasColumnName("aisle_code").HasMaxLength(10).IsRequired();
-            entity.Property(x => x.AisleName).HasColumnName("aisle_name").HasMaxLength(100);
-            entity.Property(x => x.IsBlocked).HasColumnName("is_blocked").HasDefaultValue(false);
+            entity.Property(x => x.AisleId).HasColumnName("AisleID");
+            entity.Property(x => x.ZoneId).HasColumnName("ZoneID");
+            entity.Property(x => x.AisleCode).HasColumnName("AisleCode").HasMaxLength(20).IsRequired();
+            entity.Property(x => x.AisleName).HasColumnName("AisleName").HasMaxLength(100);
             entity.HasOne(x => x.Zone)
                 .WithMany(z => z.Aisles)
-                .HasForeignKey(x => x.ZoneId);
+                .HasForeignKey(x => x.ZoneId)
+                .OnDelete(DeleteBehavior.Cascade);
         });
 
         modelBuilder.Entity<Shelf>(entity =>
         {
             entity.ToTable("SHELF");
             entity.HasKey(x => x.ShelfId);
-            entity.Property(x => x.ShelfId).HasColumnName("shelf_id");
-            entity.Property(x => x.AisleId).HasColumnName("aisle_id");
-            entity.Property(x => x.LevelNumber).HasColumnName("level_number");
+            entity.Property(x => x.ShelfId).HasColumnName("ShelfID");
+            entity.Property(x => x.AisleId).HasColumnName("AisleID");
+            entity.Property(x => x.LevelNumber).HasColumnName("LevelNumber").HasDefaultValue(1);
             entity.HasOne(x => x.Aisle)
                 .WithMany(a => a.Shelves)
-                .HasForeignKey(x => x.AisleId);
+                .HasForeignKey(x => x.AisleId)
+                .OnDelete(DeleteBehavior.Cascade);
         });
 
         modelBuilder.Entity<Slot>(entity =>
         {
             entity.ToTable("SLOT");
             entity.HasKey(x => x.SlotId);
-            entity.Property(x => x.SlotId).HasColumnName("slot_id");
-            entity.Property(x => x.ShelfId).HasColumnName("shelf_id");
-            entity.Property(x => x.SlotCode).HasColumnName("slot_code").HasMaxLength(10).IsRequired();
-            entity.Property(x => x.Quantity).HasColumnName("quantity").HasDefaultValue(0);
-            entity.Property(x => x.ExpiryDate).HasColumnName("expiry_date").HasColumnType("date");
-            entity.Property(x => x.Supplier).HasColumnName("supplier").HasMaxLength(200);
-            entity.Property(x => x.LastScannedAt).HasColumnName("last_scanned_at");
+            entity.Property(x => x.SlotId).HasColumnName("SlotID");
+            entity.Property(x => x.ShelfId).HasColumnName("ShelfID");
+            entity.Property(x => x.SlotCode).HasColumnName("SlotCode").HasMaxLength(20);
+            entity.Property(x => x.Quantity).HasColumnName("Quantity").HasDefaultValue(0);
+            entity.Property(x => x.LastScannedAt).HasColumnName("LastScannedAt");
             entity.HasOne(x => x.Shelf)
                 .WithMany(s => s.Slots)
-                .HasForeignKey(x => x.ShelfId);
+                .HasForeignKey(x => x.ShelfId)
+                .OnDelete(DeleteBehavior.Cascade);
         });
 
         modelBuilder.Entity<ProductSlot>(entity =>
         {
             entity.ToTable("PRODUCT_SLOT");
             entity.HasKey(x => x.ProductSlotId);
-            entity.Property(x => x.ProductSlotId).HasColumnName("product_slot_id");
-            entity.Property(x => x.SlotId).HasColumnName("slot_id");
-            entity.Property(x => x.ProductId).HasColumnName("product_id");
+            entity.Property(x => x.ProductSlotId).HasColumnName("ProductsSlotID");
+            entity.Property(x => x.SlotId).HasColumnName("SlotID");
+            entity.Property(x => x.ProductId).HasColumnName("ProductID");
             entity.HasOne(x => x.Slot)
                 .WithMany(s => s.ProductSlots)
                 .HasForeignKey(x => x.SlotId)
@@ -499,33 +480,37 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
         {
             entity.ToTable("BRAND");
             entity.HasKey(x => x.BrandId);
-            entity.Property(x => x.BrandId).HasColumnName("brand_id");
-            entity.Property(x => x.BrandName).HasColumnName("brand_name").HasMaxLength(100).IsRequired();
-            entity.Property(x => x.Description).HasColumnName("description").HasMaxLength(500);
+            entity.Property(x => x.BrandId).HasColumnName("BrandID");
+            entity.Property(x => x.BrandName).HasColumnName("BrandName").HasMaxLength(100).IsRequired();
+            entity.Property(x => x.Wallet).HasColumnName("Wallet").HasPrecision(18, 2).HasDefaultValue(0m);
+            entity.Property(x => x.Description).HasColumnName("Description").HasMaxLength(500);
         });
 
         modelBuilder.Entity<AdPackage>(entity =>
         {
             entity.ToTable("AD_PACKAGE");
             entity.HasKey(x => x.PackageId);
-            entity.Property(x => x.PackageId).HasColumnName("package_id");
-            entity.Property(x => x.PackageName).HasColumnName("package_name").HasMaxLength(100).IsRequired();
-            entity.Property(x => x.Price).HasColumnName("price").HasPrecision(18, 2);
-            entity.Property(x => x.AdScore).HasColumnName("ad_score").HasDefaultValue(0);
-            entity.Property(x => x.IsWeekendOnly).HasColumnName("is_weekend_only").HasDefaultValue(false);
+            entity.Property(x => x.PackageId).HasColumnName("PackageID");
+            entity.Property(x => x.PackageName).HasColumnName("PackageName").HasMaxLength(100).IsRequired();
+            entity.Property(x => x.PricePackage).HasColumnName("PricePackage").HasPrecision(18, 2).HasDefaultValue(0m);
+            entity.Property(x => x.PriceRoute).HasColumnName("PriceRoute").HasPrecision(18, 2).HasDefaultValue(0m);
+            entity.Property(x => x.BasePriceClick).HasColumnName("BasePriceClick").HasPrecision(18, 2).HasDefaultValue(0m);
+            entity.Property(x => x.AdScore).HasColumnName("AdScore").HasDefaultValue(0);
+            entity.Property(x => x.Status).HasColumnName("Status").HasMaxLength(50).IsRequired();
         });
 
         modelBuilder.Entity<AdCampaign>(entity =>
         {
             entity.ToTable("AD_CAMPAIGN");
             entity.HasKey(x => x.AdCampaignId);
-            entity.Property(x => x.AdCampaignId).HasColumnName("ad_campaign_id");
-            entity.Property(x => x.PackageId).HasColumnName("package_id");
-            entity.Property(x => x.BrandId).HasColumnName("brand_id");
-            entity.Property(x => x.CampaignName).HasColumnName("campaign_name").HasMaxLength(200).IsRequired();
-            entity.Property(x => x.StartDate).HasColumnName("start_date");
-            entity.Property(x => x.EndDate).HasColumnName("end_date");
-            entity.Property(x => x.IsActive).HasColumnName("is_active").HasDefaultValue(true);
+            entity.Property(x => x.AdCampaignId).HasColumnName("AdCampaignID");
+            entity.Property(x => x.PackageId).HasColumnName("PackageID");
+            entity.Property(x => x.BrandId).HasColumnName("BrandID");
+            entity.Property(x => x.RobotZoneId).HasColumnName("RobotZoneID");
+            entity.Property(x => x.CampaignName).HasColumnName("CampaignName").HasMaxLength(200).IsRequired();
+            entity.Property(x => x.StartDate).HasColumnName("StartDate");
+            entity.Property(x => x.EndDate).HasColumnName("EndDate");
+            entity.Property(x => x.Status).HasColumnName("Status").HasMaxLength(50).IsRequired();
             // NoAction: chống cascade cycle
             entity.HasOne(x => x.Package)
                 .WithMany(p => p.AdCampaigns)
@@ -535,18 +520,23 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
                 .WithMany(b => b.AdCampaigns)
                 .HasForeignKey(x => x.BrandId)
                 .OnDelete(DeleteBehavior.NoAction);
+            // Nullable FK → RobotZone (SET NULL khi zone bị xoá)
+            entity.HasOne(x => x.RobotZone)
+                .WithMany()
+                .HasForeignKey(x => x.RobotZoneId)
+                .IsRequired(false)
+                .OnDelete(DeleteBehavior.SetNull);
         });
 
         modelBuilder.Entity<SponsoredProduct>(entity =>
         {
             entity.ToTable("SPONSORED_PRODUCT");
             entity.HasKey(x => x.SponsoredId);
-            entity.Property(x => x.SponsoredId).HasColumnName("sponsored_id");
-            entity.Property(x => x.AdCampaignId).HasColumnName("ad_campaign_id");
-            entity.Property(x => x.ProductId).HasColumnName("product_id");
-            entity.Property(x => x.BrandId).HasColumnName("brand_id");
-            entity.Property(x => x.Priority).HasColumnName("priority").HasDefaultValue(0);
-            entity.Property(x => x.IsActive).HasColumnName("is_active").HasDefaultValue(true);
+            entity.Property(x => x.SponsoredId).HasColumnName("SponsoredID");
+            entity.Property(x => x.AdCampaignId).HasColumnName("AdCampaignID");
+            entity.Property(x => x.ProductId).HasColumnName("ProductID");
+            entity.Property(x => x.Priority).HasColumnName("Priority").HasDefaultValue(0);
+            entity.Property(x => x.Status).HasColumnName("status").HasMaxLength(50).IsRequired();
             entity.HasOne(x => x.AdCampaign)
                 .WithMany(ac => ac.SponsoredProducts)
                 .HasForeignKey(x => x.AdCampaignId)
@@ -555,21 +545,17 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
                 .WithMany(p => p.SponsoredProducts)
                 .HasForeignKey(x => x.ProductId)
                 .OnDelete(DeleteBehavior.Cascade);
-            // Brand: NoAction để bảo vệ brand
-            entity.HasOne(x => x.Brand)
-                .WithMany(b => b.SponsoredProducts)
-                .HasForeignKey(x => x.BrandId)
-                .OnDelete(DeleteBehavior.NoAction);
         });
 
         modelBuilder.Entity<AdCampaignLog>(entity =>
         {
             entity.ToTable("AD_CAMPAIGN_LOG");
             entity.HasKey(x => x.LogId);
-            entity.Property(x => x.LogId).HasColumnName("log_id");
-            entity.Property(x => x.AdCampaignId).HasColumnName("ad_campaign_id");
-            entity.Property(x => x.ActionType).HasColumnName("action_type").HasMaxLength(50).IsRequired();
-            entity.Property(x => x.Timestamp).HasColumnName("timestamp").HasDefaultValueSql("GETUTCDATE()");
+            entity.Property(x => x.LogId).HasColumnName("LogID");
+            entity.Property(x => x.AdCampaignId).HasColumnName("AdCampaignID");
+            entity.Property(x => x.ActionType).HasColumnName("ActionType").HasMaxLength(50).IsRequired();
+            entity.Property(x => x.ChargedAmount).HasColumnName("ChargedAmount").HasPrecision(18, 2).HasDefaultValue(0m);
+            entity.Property(x => x.Timestamp).HasColumnName("Timestamp").HasDefaultValueSql("DATEADD(hour, 7, GETUTCDATE())");
             entity.HasOne(x => x.AdCampaign)
                 .WithMany(ac => ac.AdCampaignLogs)
                 .HasForeignKey(x => x.AdCampaignId)
@@ -584,29 +570,29 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
         {
             entity.ToTable("ROBOT");
             entity.HasKey(x => x.RobotId);
-            entity.Property(x => x.RobotId).HasColumnName("robot_id");
-            entity.Property(x => x.RobotName).HasColumnName("robot_name").HasMaxLength(100).IsRequired();
-            entity.Property(x => x.RobotCode).HasColumnName("robot_code").HasMaxLength(50).IsRequired();
-            entity.Property(x => x.BatteryPct).HasColumnName("battery_pct").HasDefaultValue(100);
-            entity.Property(x => x.Mode).HasColumnName("mode").HasMaxLength(20).HasDefaultValue("idle");
-            entity.Property(x => x.IsOnline).HasColumnName("is_online").HasDefaultValue(false);
-            entity.Property(x => x.LastSeenAt).HasColumnName("last_seen_at");
-            entity.HasIndex(x => x.RobotCode).IsUnique().HasDatabaseName("IX_ROBOT_robot_code");
+            entity.Property(x => x.RobotId).HasColumnName("RobotID");
+            entity.Property(x => x.RobotName).HasColumnName("RobotName").HasMaxLength(100).IsRequired();
+            entity.Property(x => x.RobotCode).HasColumnName("RobotCode").HasMaxLength(50).IsRequired();
+            entity.Property(x => x.BatteryPct).HasColumnName("BatteryPct").HasDefaultValue(100);
+            entity.Property(x => x.Mode).HasColumnName("Mode").HasMaxLength(50).HasDefaultValue("idle");
+            entity.Property(x => x.Status).HasColumnName("Status").HasMaxLength(50).IsRequired();
+            entity.Property(x => x.LastSeenAt).HasColumnName("LastSeenAt");
+            entity.HasIndex(x => x.RobotCode).IsUnique().HasDatabaseName("IX_ROBOT_RobotCode");
         });
 
         modelBuilder.Entity<RobotLog>(entity =>
         {
             entity.ToTable("ROBOT_LOG");
             entity.HasKey(x => x.LogId);
-            entity.Property(x => x.LogId).HasColumnName("log_id");
-            entity.Property(x => x.RobotId).HasColumnName("robot_id");
+            entity.Property(x => x.LogId).HasColumnName("LogID");
+            entity.Property(x => x.RobotId).HasColumnName("RobotID");
             entity.Property(x => x.Battery).HasColumnName("battery");
-            entity.Property(x => x.Location).HasColumnName("location").HasMaxLength(255);
-            entity.Property(x => x.Status).HasColumnName("status").HasMaxLength(100);
-            entity.Property(x => x.Timestamp).HasColumnName("timestamp").HasDefaultValueSql("SYSUTCDATETIME()");
-            entity.Property(x => x.XCoord).HasColumnName("x_coord");
-            entity.Property(x => x.YCoord).HasColumnName("y_coord");
-            entity.Property(x => x.HeadingRad).HasColumnName("heading_rad");
+            entity.Property(x => x.Location).HasColumnName("location").HasMaxLength(200);
+            entity.Property(x => x.Status).HasColumnName("status").HasMaxLength(50).IsRequired();
+            entity.Property(x => x.Timestamp).HasColumnName("timestamp").HasDefaultValueSql("DATEADD(hour, 7, GETUTCDATE())");
+            entity.Property(x => x.XCoord).HasColumnName("XCoord");
+            entity.Property(x => x.YCoord).HasColumnName("YCoord");
+            entity.Property(x => x.HeadingRad).HasColumnName("HeadingRad");
             entity.HasOne(x => x.Robot)
                 .WithMany(r => r.RobotLogs)
                 .HasForeignKey(x => x.RobotId)
@@ -618,9 +604,9 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
         {
             entity.ToTable("ROBOT_ZONE");
             entity.HasKey(x => x.RobotZoneId);
-            entity.Property(x => x.RobotZoneId).HasColumnName("robot_zone_id");
-            entity.Property(x => x.RobotId).HasColumnName("robot_id");
-            entity.Property(x => x.ZoneId).HasColumnName("zone_id");
+            entity.Property(x => x.RobotZoneId).HasColumnName("RobotZoneID");
+            entity.Property(x => x.RobotId).HasColumnName("RobotID");
+            entity.Property(x => x.ZoneId).HasColumnName("ZoneID");
             entity.HasOne(x => x.Robot)
                 .WithMany(r => r.RobotZones)
                 .HasForeignKey(x => x.RobotId)
@@ -634,11 +620,11 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
         {
             entity.ToTable("MAP");
             entity.HasKey(x => x.MapId);
-            entity.Property(x => x.MapId).HasColumnName("map_id");
-            entity.Property(x => x.FloorId).HasColumnName("floor_id");
-            entity.Property(x => x.MapName).HasColumnName("map_name").HasMaxLength(100).IsRequired();
-            entity.Property(x => x.MapData).HasColumnName("map_data").HasColumnType("nvarchar(max)");
-            entity.Property(x => x.CreatedAt).HasColumnName("created_at").HasDefaultValueSql("GETUTCDATE()");
+            entity.Property(x => x.MapId).HasColumnName("MapID");
+            entity.Property(x => x.FloorId).HasColumnName("FloorID");
+            entity.Property(x => x.MapName).HasColumnName("MapName").HasMaxLength(100).IsRequired();
+            entity.Property(x => x.MapData).HasColumnName("MapData").HasColumnType("nvarchar(max)");
+            entity.Property(x => x.CreatedAt).HasColumnName("CreatedAt").HasDefaultValueSql("DATEADD(hour, 7, GETUTCDATE())");
             entity.HasOne(x => x.Floor)
                 .WithMany(f => f.Maps)
                 .HasForeignKey(x => x.FloorId);
@@ -648,13 +634,13 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
         {
             entity.ToTable("NAVIGATION_NODE");
             entity.HasKey(x => x.NodeId);
-            entity.Property(x => x.NodeId).HasColumnName("node_id");
-            entity.Property(x => x.MapId).HasColumnName("map_id");
-            entity.Property(x => x.NodeName).HasColumnName("node_name").HasMaxLength(100).IsRequired();
-            entity.Property(x => x.XCoord).HasColumnName("x_coord");
-            entity.Property(x => x.YCoord).HasColumnName("y_coord");
-            entity.Property(x => x.NodeType).HasColumnName("node_type").HasMaxLength(20).IsRequired();
-            entity.Property(x => x.IsBlocked).HasColumnName("is_blocked").HasDefaultValue(false);
+            entity.Property(x => x.NodeId).HasColumnName("NodeID");
+            entity.Property(x => x.MapId).HasColumnName("MapID");
+            entity.Property(x => x.NodeName).HasColumnName("NodeName").HasMaxLength(100);
+            entity.Property(x => x.XCoord).HasColumnName("XCoord").HasDefaultValue(0);
+            entity.Property(x => x.YCoord).HasColumnName("YCoord").HasDefaultValue(0);
+            entity.Property(x => x.NodeType).HasColumnName("NodeType").HasMaxLength(50);
+            entity.Property(x => x.IsBlocked).HasColumnName("IsBlocked").HasDefaultValue(false);
             entity.HasOne(x => x.Map)
                 .WithMany(m => m.NavigationNodes)
                 .HasForeignKey(x => x.MapId)
@@ -665,11 +651,11 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
         {
             entity.ToTable("NAVIGATION_EDGE");
             entity.HasKey(x => x.EdgeId);
-            entity.Property(x => x.EdgeId).HasColumnName("edge_id");
-            entity.Property(x => x.FromNodeId).HasColumnName("from_node_id");
-            entity.Property(x => x.ToNodeId).HasColumnName("to_node_id");
-            entity.Property(x => x.Distance).HasColumnName("distance");
-            entity.Property(x => x.IsBidirectional).HasColumnName("is_bidirectional").HasDefaultValue(true);
+            entity.Property(x => x.EdgeId).HasColumnName("EdgeID");
+            entity.Property(x => x.FromNodeId).HasColumnName("FromNodeID");
+            entity.Property(x => x.ToNodeId).HasColumnName("ToNodeID");
+            entity.Property(x => x.Distance).HasColumnName("Distance").HasDefaultValue(0);
+            entity.Property(x => x.IsBidirectional).HasColumnName("IsBidirectional").HasDefaultValue(true);
             // NoAction cả 2 chiều chống cascade cycle
             entity.HasOne(x => x.FromNode)
                 .WithMany(n => n.OutgoingEdges)
@@ -685,9 +671,9 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
         {
             entity.ToTable("AISLE_NODE");
             entity.HasKey(x => x.AisleNodeId);
-            entity.Property(x => x.AisleNodeId).HasColumnName("aisle_node_id");
-            entity.Property(x => x.AisleId).HasColumnName("aisle_id");
-            entity.Property(x => x.NodeId).HasColumnName("node_id");
+            entity.Property(x => x.AisleNodeId).HasColumnName("AisleNodeID");
+            entity.Property(x => x.AisleId).HasColumnName("AisleID");
+            entity.Property(x => x.NodeId).HasColumnName("NodeID");
             entity.HasOne(x => x.Aisle)
                 .WithMany(a => a.AisleNodes)
                 .HasForeignKey(x => x.AisleId)
@@ -702,11 +688,11 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
         {
             entity.ToTable("ROBOT_ROUTE");
             entity.HasKey(x => x.RobotRouteId);
-            entity.Property(x => x.RobotRouteId).HasColumnName("robot_route_id");
-            entity.Property(x => x.RobotId).HasColumnName("robot_id");
-            entity.Property(x => x.MapId).HasColumnName("map_id");
-            entity.Property(x => x.RouteName).HasColumnName("route_name").HasMaxLength(200).IsRequired();
-            entity.Property(x => x.CreatedAt).HasColumnName("created_at").HasDefaultValueSql("GETUTCDATE()");
+            entity.Property(x => x.RobotRouteId).HasColumnName("RobotRouteID");
+            entity.Property(x => x.RobotId).HasColumnName("RobotID");
+            entity.Property(x => x.MapId).HasColumnName("MapID");
+            entity.Property(x => x.RouteName).HasColumnName("RouteName").HasMaxLength(200);
+            entity.Property(x => x.CreatedAt).HasColumnName("CreatedAt").HasDefaultValueSql("DATEADD(hour, 7, GETUTCDATE())");
             entity.HasOne(x => x.Robot)
                 .WithMany(r => r.RobotRoutes)
                 .HasForeignKey(x => x.RobotId)
@@ -720,10 +706,10 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
         {
             entity.ToTable("ROUTE_NODE_MAPPING");
             entity.HasKey(x => x.RouteNodeMappingId);
-            entity.Property(x => x.RouteNodeMappingId).HasColumnName("route_node_mapping_id");
-            entity.Property(x => x.RobotRouteId).HasColumnName("robot_route_id");
-            entity.Property(x => x.NodeId).HasColumnName("node_id");
-            entity.Property(x => x.SequenceOrder).HasColumnName("sequence_order");
+            entity.Property(x => x.RouteNodeMappingId).HasColumnName("RouteNodeMappingID");
+            entity.Property(x => x.RobotRouteId).HasColumnName("RobotRouteID");
+            entity.Property(x => x.NodeId).HasColumnName("NodeID");
+            entity.Property(x => x.SequenceOrder).HasColumnName("SequenceOrder").HasDefaultValue(0);
             entity.HasOne(x => x.RobotRoute)
                 .WithMany(rr => rr.RouteNodeMappings)
                 .HasForeignKey(x => x.RobotRouteId)
@@ -738,11 +724,11 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
         {
             entity.ToTable("ROUTE_ASSIGNMENT");
             entity.HasKey(x => x.RouteAssignmentId);
-            entity.Property(x => x.RouteAssignmentId).HasColumnName("route_assignment_id");
-            entity.Property(x => x.RobotId).HasColumnName("robot_id");
-            entity.Property(x => x.RobotRouteId).HasColumnName("robot_route_id");
-            entity.Property(x => x.AssignedAt).HasColumnName("assigned_at").HasDefaultValueSql("GETUTCDATE()");
-            entity.Property(x => x.Status).HasColumnName("status").HasMaxLength(50).IsRequired();
+            entity.Property(x => x.RouteAssignmentId).HasColumnName("RouteAssignmentID");
+            entity.Property(x => x.RobotId).HasColumnName("RobotID");
+            entity.Property(x => x.RobotRouteId).HasColumnName("RobotRouteID");
+            entity.Property(x => x.AssignedAt).HasColumnName("AssignedAt").HasDefaultValueSql("DATEADD(hour, 7, GETUTCDATE())");
+            entity.Property(x => x.Status).HasColumnName("Status").HasMaxLength(50).IsRequired().HasDefaultValue("Pending");
             entity.HasOne(x => x.Robot)
                 .WithMany(r => r.RouteAssignments)
                 .HasForeignKey(x => x.RobotId)
@@ -758,17 +744,13 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
         {
             entity.ToTable("AISLE_SCAN");
             entity.HasKey(x => x.ScanId);
-            entity.Property(x => x.ScanId).HasColumnName("scan_id");
-            entity.Property(x => x.AisleId).HasColumnName("aisle_id");
-            entity.Property(x => x.RobotId).HasColumnName("robot_id");
-            entity.Property(x => x.ScannedAt).HasColumnName("scanned_at").HasDefaultValueSql("GETUTCDATE()");
-            entity.Property(x => x.ImageUrl).HasColumnName("image_url").HasMaxLength(500);
-            entity.Property(x => x.EmptyPercentage).HasColumnName("empty_percentage").HasPrecision(5, 2);
-            // Computed column: AS CASE WHEN empty_percentage > 30 THEN 1 ELSE 0
-            entity.Property(x => x.NeedsRestock)
-                .HasColumnName("needs_restock")
-                .HasComputedColumnSql("CASE WHEN [empty_percentage] > 30.0 THEN CAST(1 AS BIT) ELSE CAST(0 AS BIT) END", stored: true);
-            entity.Property(x => x.AiResponseRaw).HasColumnName("ai_response_raw").HasColumnType("nvarchar(max)");
+            entity.Property(x => x.ScanId).HasColumnName("ScanID");
+            entity.Property(x => x.AisleId).HasColumnName("AisleID");
+            entity.Property(x => x.RobotId).HasColumnName("RobotID");
+            entity.Property(x => x.ScannedAt).HasColumnName("ScannedAt").HasDefaultValueSql("DATEADD(hour, 7, GETUTCDATE())");
+            entity.Property(x => x.EmptyPercentage).HasColumnName("EmptyPercentage").HasPrecision(5, 2).HasDefaultValue(0m);
+            entity.Property(x => x.NeedsRestock).HasColumnName("NeedsRestock").HasDefaultValue(false);
+            entity.Property(x => x.ImageUrl).HasColumnName("ImageUrl").HasMaxLength(500);
             entity.HasOne(x => x.Aisle)
                 .WithMany(a => a.AisleScans)
                 .HasForeignKey(x => x.AisleId);
@@ -781,17 +763,17 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
         {
             entity.ToTable("SEMANTIC_OBJECT");
             entity.HasKey(x => x.ObjectId);
-            entity.Property(x => x.ObjectId).HasColumnName("object_id");
-            entity.Property(x => x.MapId).HasColumnName("map_id");
-            entity.Property(x => x.ObjectType).HasColumnName("object_type").HasMaxLength(50).IsRequired();
-            entity.Property(x => x.XMin).HasColumnName("x_min");
-            entity.Property(x => x.YMin).HasColumnName("y_min");
-            entity.Property(x => x.XMax).HasColumnName("x_max");
-            entity.Property(x => x.YMax).HasColumnName("y_max");
-            entity.Property(x => x.Label).HasColumnName("label").HasMaxLength(100);
-            entity.Property(x => x.Confidence).HasColumnName("confidence").HasPrecision(5, 2);
-            entity.Property(x => x.DetectedAt).HasColumnName("detected_at");
-            entity.Property(x => x.ImageUrl).HasColumnName("image_url").HasMaxLength(500);
+            entity.Property(x => x.ObjectId).HasColumnName("ObjectID");
+            entity.Property(x => x.MapId).HasColumnName("MapID");
+            entity.Property(x => x.ObjectType).HasColumnName("ObjectType").HasMaxLength(100).IsRequired();
+            entity.Property(x => x.XMin).HasColumnName("XMin").HasDefaultValue(0);
+            entity.Property(x => x.YMin).HasColumnName("YMin").HasDefaultValue(0);
+            entity.Property(x => x.XMax).HasColumnName("XMax").HasDefaultValue(0);
+            entity.Property(x => x.YMax).HasColumnName("YMax").HasDefaultValue(0);
+            entity.Property(x => x.Label).HasColumnName("Label").HasMaxLength(100);
+            entity.Property(x => x.Confidence).HasColumnName("Confidence");
+            entity.Property(x => x.DetectedAt).HasColumnName("DetectedAt");
+            entity.Property(x => x.ImageUrl).HasColumnName("ImageUrl").HasMaxLength(500);
             entity.HasOne(x => x.Map)
                 .WithMany(m => m.SemanticObjects)
                 .HasForeignKey(x => x.MapId)

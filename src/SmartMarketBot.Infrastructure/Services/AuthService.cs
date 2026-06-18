@@ -27,6 +27,9 @@ public sealed class AuthService(
     private readonly EmailOptions _emailOpts = emailOptions.Value;
     private readonly JwtOptions _jwtOpts = jwtOptions.Value;
 
+    private const string OtpTypeRegistration = "Registration";
+    private const string OtpTypePasswordReset = "PasswordReset";
+
     // ────────────────────── REGISTER FLOW ──────────────────────────
 
     public async Task RegisterRequestOtpAsync(RegisterRequestOtpDto request, CancellationToken ct = default)
@@ -37,33 +40,47 @@ public sealed class AuthService(
         if (existingAccount)
             throw new InvalidOperationException(localizer.Get("EmailInUse"));
 
-        var recentOtp = await db.EmailOtps
-            .Where(o => o.Email == email && o.OtpType == "Registration" && !o.IsUsed)
-            .OrderByDescending(o => o.CreatedAt)
-            .FirstOrDefaultAsync(ct);
+        // Lưu tạm thông tin đăng ký + OTP vào Account (Status = "Pending").
+        // Schema mới (ERD V4.0) gộp EMAIL_OTP vào ACCOUNT - không còn bảng riêng.
+        var account = await db.Accounts.FirstOrDefaultAsync(a => a.Email == email, ct);
+        var otpCode = GenerateOtp();
 
-        if (recentOtp != null)
+        if (account == null)
         {
-            var cooldown = TimeSpan.FromSeconds(_emailOpts.OtpResendCooldownSeconds);
-            if (VnDateTime.Now - recentOtp.CreatedAt < cooldown)
-                throw new InvalidOperationException(localizer.Get("OtpResendCooldown", _emailOpts.OtpResendCooldownSeconds));
+            account = new Account
+            {
+                Username = email,
+                Email = email,
+                PasswordHash = HashPassword(request.Password),
+                FullName = request.FullName,
+                Phone = request.Phone,
+                Status = "Pending",
+                Role = AccountRole.Member.ToString(),
+                OtpCode = otpCode,
+                OtpType = OtpTypeRegistration,
+                OtpExpiredAt = VnDateTime.Now.AddMinutes(_emailOpts.OtpExpiryMinutes)
+            };
+            db.Accounts.Add(account);
+        }
+        else
+        {
+            // Cooldown check
+            if (account.OtpCode != null && account.OtpType == OtpTypeRegistration)
+            {
+                var cooldown = TimeSpan.FromSeconds(_emailOpts.OtpResendCooldownSeconds);
+                if (VnDateTime.Now - account.CreatedAt < cooldown)
+                    throw new InvalidOperationException(localizer.Get("OtpResendCooldown", _emailOpts.OtpResendCooldownSeconds));
+            }
+
+            account.PasswordHash = HashPassword(request.Password);
+            account.FullName = request.FullName;
+            account.Phone = request.Phone;
+            account.OtpCode = otpCode;
+            account.OtpType = OtpTypeRegistration;
+            account.OtpExpiredAt = VnDateTime.Now.AddMinutes(_emailOpts.OtpExpiryMinutes);
         }
 
-        var otpCode = GenerateOtp();
-        var otp = new EmailOtp
-        {
-            Email = email,
-            OtpCode = otpCode,
-            OtpType = "Registration",
-            ExpiredAt = VnDateTime.Now.AddMinutes(_emailOpts.OtpExpiryMinutes),
-            TemporaryPasswordHash = HashPassword(request.Password),
-            TemporaryFullName = request.FullName,
-            TemporaryPhone = request.Phone
-        };
-
-        db.EmailOtps.Add(otp);
         await db.SaveChangesAsync(ct);
-
         await emailService.SendRegistrationOtpAsync(email, request.FullName, otpCode, ct);
         logger.LogInformation("[Auth] Registration OTP sent → {Email}", email);
     }
@@ -72,28 +89,15 @@ public sealed class AuthService(
     {
         var email = request.Email.Trim().ToLowerInvariant();
 
-        var otp = await db.EmailOtps
-            .Where(o => o.Email == email && o.OtpType == "Registration" && !o.IsUsed)
-            .OrderByDescending(o => o.CreatedAt)
-            .FirstOrDefaultAsync(ct);
+        var account = await db.Accounts.FirstOrDefaultAsync(a => a.Email == email, ct);
+        ValidateAccountOtp(account, request.OtpCode, OtpTypeRegistration);
 
-        ValidateOtp(otp, request.OtpCode);
+        // Kích hoạt tài khoản
+        account!.Status = "Active";
+        account.OtpCode = null;
+        account.OtpType = null;
+        account.OtpExpiredAt = null;
 
-        var account = new Account
-        {
-            Username = email,
-            Email = email,
-            PasswordHash = otp!.TemporaryPasswordHash!,
-            FullName = otp.TemporaryFullName,
-            Phone = otp.TemporaryPhone,
-            EmailConfirmed = true,
-            IsActive = true,
-            CreatedAt = VnDateTime.Now,
-            Role = AccountRole.Member.ToString()
-        };
-
-        otp.IsUsed = true;
-        db.Accounts.Add(account);
         await db.SaveChangesAsync(ct);
 
         logger.LogInformation("[Auth] Account registered: {Email}", email);
@@ -104,37 +108,26 @@ public sealed class AuthService(
     {
         var email = request.Email.Trim().ToLowerInvariant();
 
-        var lastOtp = await db.EmailOtps
-            .Where(o => o.Email == email && !o.IsUsed)
-            .OrderByDescending(o => o.CreatedAt)
-            .FirstOrDefaultAsync(ct);
+        var account = await db.Accounts.FirstOrDefaultAsync(a => a.Email == email, ct)
+                   ?? throw new InvalidOperationException(localizer.Get("OtpRequestNotFound"));
 
-        if (lastOtp == null)
+        if (account.OtpCode == null)
             throw new InvalidOperationException(localizer.Get("OtpRequestNotFound"));
 
         var cooldown = TimeSpan.FromSeconds(_emailOpts.OtpResendCooldownSeconds);
-        if (VnDateTime.Now - lastOtp.CreatedAt < cooldown)
+        if (VnDateTime.Now - account.CreatedAt < cooldown)
             throw new InvalidOperationException(localizer.Get("OtpResendCooldown", _emailOpts.OtpResendCooldownSeconds));
 
-        lastOtp.IsUsed = true;
         var newCode = GenerateOtp();
-        var newOtp = new EmailOtp
-        {
-            Email = email,
-            OtpCode = newCode,
-            OtpType = lastOtp.OtpType,
-            ExpiredAt = VnDateTime.Now.AddMinutes(_emailOpts.OtpExpiryMinutes),
-            TemporaryPasswordHash = lastOtp.TemporaryPasswordHash,
-            TemporaryFullName = lastOtp.TemporaryFullName,
-            TemporaryPhone = lastOtp.TemporaryPhone
-        };
-        db.EmailOtps.Add(newOtp);
+        account.OtpCode = newCode;
+        account.OtpExpiredAt = VnDateTime.Now.AddMinutes(_emailOpts.OtpExpiryMinutes);
+
         await db.SaveChangesAsync(ct);
 
-        if (lastOtp.OtpType == "PasswordReset")
+        if (account.OtpType == OtpTypePasswordReset)
             await emailService.SendPasswordResetOtpAsync(email, newCode, ct);
         else
-            await emailService.SendRegistrationOtpAsync(email, lastOtp.TemporaryFullName ?? email, newCode, ct);
+            await emailService.SendRegistrationOtpAsync(email, account.FullName ?? email, newCode, ct);
     }
 
     // ────────────────────── LOGIN / TOKEN ──────────────────────────
@@ -149,11 +142,8 @@ public sealed class AuthService(
         if (account is null || !VerifyPassword(request.Password, account.PasswordHash))
             throw new UnauthorizedAccessException(localizer.Get("LoginInvalid"));
 
-        if (!account.IsActive)
+        if (account.Status != "Active")
             throw new UnauthorizedAccessException(localizer.Get("AccountLocked"));
-
-        if (!account.EmailConfirmed)
-            throw new UnauthorizedAccessException(localizer.Get("EmailNotConfirmed"));
 
         return await BuildAuthResponseAsync(account, ct);
     }
@@ -200,11 +190,17 @@ public sealed class AuthService(
             tokenDto = await BuildAuthResponseAsync(member.Account, ct);
         }
 
+        var memberTier = await db.Memberships
+            .Where(mp => mp.MemberId == member.MemberId)
+            .OrderByDescending(mp => mp.MembershipId)
+            .Select(mp => mp.TierName)
+            .FirstOrDefaultAsync(ct);
+
         var memberDto = new FaceLoginMemberDto(
             member.MemberId,
             member.FullName,
             member.Account?.Phone ?? "",
-            member.Tier,
+            memberTier ?? "Bronze",
             member.TotalPoints
         );
 
@@ -252,7 +248,7 @@ public sealed class AuthService(
             // 4. Cập nhật thông tin FacePath và FaceVector trong Database
             member.FacePath = filePath;
             member.FaceVector = JsonSerializer.Serialize(vector);
-            
+
             db.Members.Update(member);
             await db.SaveChangesAsync(ct);
 
@@ -301,26 +297,15 @@ public sealed class AuthService(
         var account = await db.Accounts.FirstOrDefaultAsync(a => a.Email == email, ct);
         if (account is null) return; // không tiết lộ email có tồn tại hay không
 
-        var recent = await db.EmailOtps
-            .Where(o => o.Email == email && o.OtpType == "PasswordReset" && !o.IsUsed)
-            .OrderByDescending(o => o.CreatedAt)
-            .FirstOrDefaultAsync(ct);
-
-        if (recent != null)
-        {
-            var cooldown = TimeSpan.FromSeconds(_emailOpts.OtpResendCooldownSeconds);
-            if (VnDateTime.Now - recent.CreatedAt < cooldown)
-                throw new InvalidOperationException(localizer.Get("OtpResendCooldown", _emailOpts.OtpResendCooldownSeconds));
-        }
+        var cooldown = TimeSpan.FromSeconds(_emailOpts.OtpResendCooldownSeconds);
+        if (account.OtpCode != null && VnDateTime.Now - account.CreatedAt < cooldown)
+            throw new InvalidOperationException(localizer.Get("OtpResendCooldown", _emailOpts.OtpResendCooldownSeconds));
 
         var code = GenerateOtp();
-        db.EmailOtps.Add(new EmailOtp
-        {
-            Email = email,
-            OtpCode = code,
-            OtpType = "PasswordReset",
-            ExpiredAt = VnDateTime.Now.AddMinutes(_emailOpts.OtpExpiryMinutes)
-        });
+        account.OtpCode = code;
+        account.OtpType = OtpTypePasswordReset;
+        account.OtpExpiredAt = VnDateTime.Now.AddMinutes(_emailOpts.OtpExpiryMinutes);
+
         await db.SaveChangesAsync(ct);
         await emailService.SendPasswordResetOtpAsync(email, code, ct);
     }
@@ -329,19 +314,15 @@ public sealed class AuthService(
     {
         var email = request.Email.Trim().ToLowerInvariant();
 
-        var otp = await db.EmailOtps
-            .Where(o => o.Email == email && o.OtpType == "PasswordReset" && !o.IsUsed)
-            .OrderByDescending(o => o.CreatedAt)
-            .FirstOrDefaultAsync(ct);
-
-        ValidateOtp(otp, request.OtpCode);
-
         var account = await db.Accounts.FirstOrDefaultAsync(a => a.Email == email, ct)
                    ?? throw new KeyNotFoundException(localizer.Get("AccountNotFound"));
 
+        ValidateAccountOtp(account, request.OtpCode, OtpTypePasswordReset);
+
         account.PasswordHash = HashPassword(request.NewPassword);
-        account.UpdatedAt = VnDateTime.Now;
-        otp!.IsUsed = true;
+        account.OtpCode = null;
+        account.OtpType = null;
+        account.OtpExpiredAt = null;
 
         // Revoke tất cả refresh token của account này
         var tokens = db.UserTokens.Where(t => t.AccountId == account.AccountId && !t.IsRevoked);
@@ -354,7 +335,7 @@ public sealed class AuthService(
 
     private async Task<AuthResponseDto> BuildAuthResponseAsync(Account account, CancellationToken ct)
     {
-        var roles = new List<string> { account.Role.ToString() };
+        var roles = new List<string> { account.Role };
         var (accessToken, expiresAt) = tokenService.CreateAccessToken(account, roles);
         var refreshToken = tokenService.GenerateRefreshToken();
 
@@ -371,18 +352,22 @@ public sealed class AuthService(
             refreshToken,
             expiresAt,
             account.AccountId,
-            account.Email ?? string.Empty,
+            account.Email,
             account.FullName,
             roles);
     }
 
-    private void ValidateOtp(EmailOtp? otp, string code)
+    /// <summary>
+    /// Validate OTP dựa trên các trường OtpCode/OtpExpiredAt/OtpType trên Account
+    /// (sau khi ERD V4.0 gộp EMAIL_OTP vào ACCOUNT).
+    /// </summary>
+    private void ValidateAccountOtp(Account? account, string code, string expectedType)
     {
-        if (otp is null || otp.OtpCode != code)
+        if (account is null || account.OtpCode == null || account.OtpCode != code)
             throw new InvalidOperationException(localizer.Get("OtpInvalid"));
-        if (otp.IsUsed)
-            throw new InvalidOperationException(localizer.Get("OtpUsed"));
-        if (otp.ExpiredAt < VnDateTime.Now)
+        if (account.OtpType != expectedType)
+            throw new InvalidOperationException(localizer.Get("OtpInvalid"));
+        if (account.OtpExpiredAt < VnDateTime.Now)
             throw new InvalidOperationException(localizer.Get("OtpExpired"));
     }
 

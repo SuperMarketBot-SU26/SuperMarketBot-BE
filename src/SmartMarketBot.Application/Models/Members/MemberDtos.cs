@@ -15,9 +15,9 @@ public sealed record SetBudgetResponseDto(
     string Message);
 
 public sealed record ScanItemRequestDto(
-    [Required(ErrorMessage = "Barcode không được để trống.")]
-    [MinLength(1, ErrorMessage = "Barcode không hợp lệ.")]
-    string Barcode,
+    [Required(ErrorMessage = "ProductId không được để trống.")]
+    [Range(1, int.MaxValue, ErrorMessage = "ProductId không hợp lệ.")]
+    int ProductId,
 
     [Range(0, 999_999_999, ErrorMessage = "Tổng giỏ hàng hiện tại phải >= 0.")]
     decimal CurrentCartTotal,

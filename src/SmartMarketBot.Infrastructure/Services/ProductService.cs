@@ -16,8 +16,7 @@ public sealed class ProductService(AppDbContext dbContext) : IProductService
                 x.ProductId,
                 x.ProductName,
                 x.UnitPrice,
-                x.IsActive,
-                x.Barcode,
+                x.Status,
                 x.ImageUrl,
                 x.ProductTypeId))
             .ToListAsync(cancellationToken);
@@ -32,8 +31,7 @@ public sealed class ProductService(AppDbContext dbContext) : IProductService
                 x.ProductId,
                 x.ProductName,
                 x.UnitPrice,
-                x.IsActive,
-                x.Barcode,
+                x.Status,
                 x.ImageUrl,
                 x.ProductTypeId))
             .FirstOrDefaultAsync(cancellationToken);
@@ -57,7 +55,7 @@ public sealed class ProductService(AppDbContext dbContext) : IProductService
         {
             allergyTagIds = (await dbContext.MemberHealthPreferences
                 .AsNoTracking()
-                .Where(mhp => mhp.MemberId == memberId.Value && mhp.IsAllergy)
+                .Where(mhp => mhp.MemberId == memberId.Value && mhp.Status == "Allergy")
                 .Select(mhp => mhp.HealthTagId)
                 .ToListAsync(cancellationToken))
                 .ToHashSet();
@@ -83,7 +81,7 @@ public sealed class ProductService(AppDbContext dbContext) : IProductService
             .AsNoTracking()
             .Where(x => x.ProductTypeId == source.ProductTypeId
                 && x.ProductId != productId
-                && x.IsActive
+                && x.Status == "Available"
                 && !allergenProductIds.Contains(x.ProductId)
                 && x.UnitPrice >= minPrice
                 && x.UnitPrice <= maxPrice)
@@ -93,8 +91,7 @@ public sealed class ProductService(AppDbContext dbContext) : IProductService
                 x.ProductId,
                 x.ProductName,
                 x.UnitPrice,
-                x.IsActive,
-                x.Barcode,
+                x.Status,
                 x.ImageUrl,
                 x.ProductTypeId))
             .ToListAsync(cancellationToken);

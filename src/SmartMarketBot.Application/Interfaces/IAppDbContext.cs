@@ -12,7 +12,6 @@ public interface IAppDbContext
     DbSet<Membership> Memberships { get; }
     DbSet<HealthTag> HealthTags { get; }
     DbSet<MemberHealthPreference> MemberHealthPreferences { get; }
-    DbSet<EmailOtp> EmailOtps { get; }
     DbSet<UserToken> UserTokens { get; }
     DbSet<MemberAlert> MemberAlerts { get; }
     DbSet<MemberEvent> MemberEvents { get; }

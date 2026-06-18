@@ -14,7 +14,6 @@ public sealed record SponsoredRecommendationDto(
     string ProductName,
     decimal UnitPrice,
     string? ImageUrl,
-    string? Barcode,
     /// <summary>Điểm ưu tiên tổng = AdScore + CustomerMatchScore + PromotionScore</summary>
     int PriorityScore,
     int AdScore,

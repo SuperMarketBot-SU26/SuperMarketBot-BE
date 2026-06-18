@@ -6,7 +6,6 @@ public class Aisle
     public int ZoneId { get; set; }
     public string AisleCode { get; set; } = string.Empty;
     public string? AisleName { get; set; }
-    public bool IsBlocked { get; set; } = false;
 
     public virtual Zone? Zone { get; set; }
     public virtual ICollection<Shelf> Shelves { get; set; } = new List<Shelf>();

@@ -5,23 +5,23 @@ public class Account
     public int AccountId { get; set; }
     public string Username { get; set; } = string.Empty;
     public string PasswordHash { get; set; } = string.Empty;
-    public string? Email { get; set; }
-
-    /// <summary>Email đã xác minh qua OTP (giữ lại cho tương thích code cũ).</summary>
-    public bool EmailConfirmed { get; set; } = false;
-
-    public string? FullName { get; set; }
+    public string Email { get; set; } = string.Empty;
     public string? Phone { get; set; }
-    public string? AvatarUrl { get; set; }
+    public string? FullName { get; set; }
 
-    public bool IsActive { get; set; } = true;
-    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
-    public DateTime? UpdatedAt { get; set; }
+    /// <summary>Enum dạng string: 'Active' | 'Inactive' | 'Pending' | 'Blocked'.</summary>
+    public string Status { get; set; } = "Pending";
 
-    /// <summary>Phân quyền: 'Admin' | 'Staff' | 'Member' (string để tương thích ERD V4.0).</summary>
+    /// <summary>Enum dạng string: 'Admin' | 'Staff' | 'Member'.</summary>
     public string Role { get; set; } = "Member";
+
+    // OTP fields - gộp từ bảng EMAIL_OTP cũ
+    public string? OtpCode { get; set; }
+    public DateTime? OtpExpiredAt { get; set; }
+    public string? OtpType { get; set; }
+
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
     // Navigation
     public virtual Member? Member { get; set; }
-    // Không khai báo UserTokens collection ở Account để tránh EF shadow FK 'AccountId1'
 }

@@ -7,7 +7,10 @@ public class Robot
     public string RobotCode { get; set; } = string.Empty;
     public int BatteryPct { get; set; } = 100;
     public string Mode { get; set; } = "idle";
-    public bool IsOnline { get; set; } = false;
+
+    /// <summary>Enum dạng string: 'Online' | 'Offline' | 'Maintenance' | 'Error'.</summary>
+    public string Status { get; set; } = "Offline";
+
     public DateTime? LastSeenAt { get; set; }
 
     public virtual ICollection<RobotLog> RobotLogs { get; set; } = new List<RobotLog>();

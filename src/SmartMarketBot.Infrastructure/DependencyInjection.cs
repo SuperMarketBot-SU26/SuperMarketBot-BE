@@ -54,6 +54,10 @@ public static class DependencyInjection
         services.AddScoped<IAdRecommendationService, AdRecommendationService>();
         services.AddScoped<IAdAnalyticsService, AdAnalyticsService>();
 
+        // Realtime (skeleton — 3 bạn fill logic)
+        services.AddScoped<IStaffRealtimeService, StaffRealtimeService>();
+        services.AddScoped<IMemberRealtimeService, MemberRealtimeService>();
+
         services.AddHttpClient<IAiVisionProxy, AiVisionProxy>();
         services.AddHttpClient<IFaceAiService, FaceAiService>();
         services.AddHttpClient<IGeminiService, GeminiService>();

@@ -71,6 +71,11 @@ public sealed class LocalizationService : ILocalizationService
                 ["AdNoRoutePricing"] = "AdPackage {0} chưa cấu hình giá Route (PriceRoute=0).",
                 ["AdRobotNotFoundByCode"] = "Không tìm thấy robot với mã '{0}'.",
 
+                // Realtime skeleton
+                ["StaffAlertMissingContext"] = "Staff alert thiếu context (SlotId hoặc ZoneId).",
+                ["MemberUpdateMissingId"] = "Member update thiếu MemberId.",
+                ["HealthDegraded"] = "Hệ thống đang suy giảm (DB mất kết nối).",
+
                 // Navigation & Robot
                 ["StartEndNodeNotExist"] = "Node bắt đầu hoặc kết thúc không tồn tại trên sơ đồ.",
                 ["StartEndNodeBlocked"] = "Node bắt đầu hoặc kết thúc đã bị chặn.",
@@ -137,6 +142,11 @@ public sealed class LocalizationService : ILocalizationService
                 ["AdZoneNotFound"] = "Zone {0} not found for Slot {1}.",
                 ["AdNoRoutePricing"] = "AdPackage {0} has no route pricing configured (PriceRoute=0).",
                 ["AdRobotNotFoundByCode"] = "Robot with code '{0}' not found.",
+
+                // Realtime skeleton
+                ["StaffAlertMissingContext"] = "Staff alert missing context (SlotId or ZoneId).",
+                ["MemberUpdateMissingId"] = "Member update missing MemberId.",
+                ["HealthDegraded"] = "System degraded (DB unreachable).",
 
                 // Navigation & Robot
                 ["StartEndNodeNotExist"] = "Start or end node does not exist on map.",

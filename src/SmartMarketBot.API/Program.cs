@@ -27,6 +27,8 @@ builder.Services.AddCors(options =>
 builder.Services.AddApplication();
 builder.Services.AddInfrastructure(builder.Configuration);
 builder.Services.AddScoped<IRobotHubNotifier, SignalRRobotHubNotifier>();
+builder.Services.AddSingleton<IStaffRealtimeNotifier, SignalRStaffHubNotifier>();
+builder.Services.AddSingleton<IMemberRealtimeNotifier, SignalRMemberHubNotifier>();
 
 var jwtOptions = builder.Configuration.GetSection(JwtOptions.SectionName).Get<JwtOptions>() ?? new JwtOptions();
 var secretKey = Encoding.UTF8.GetBytes(jwtOptions.SecretKey);
@@ -70,5 +72,7 @@ app.UseAuthorization();
 
 app.MapControllers();
 app.MapHub<RobotHub>("/hubs/robot");
+app.MapHub<StaffHub>("/hubs/staff");
+app.MapHub<MemberHub>("/hubs/member");
 
 app.Run();

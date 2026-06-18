@@ -534,10 +534,50 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
             entity.Property(x => x.ActionType).HasColumnName("ActionType").HasMaxLength(50).IsRequired();
             entity.Property(x => x.ChargedAmount).HasColumnName("ChargedAmount").HasPrecision(18, 2).HasDefaultValue(0m);
             entity.Property(x => x.Timestamp).HasColumnName("Timestamp").HasDefaultValueSql("DATEADD(hour, 7, GETUTCDATE())");
+
+            // Phase B: RoutePass columns (nullable cho dữ liệu Click/View cũ)
+            entity.Property(x => x.SponsoredId).HasColumnName("SponsoredID");
+            entity.Property(x => x.ProductId).HasColumnName("ProductID");
+            entity.Property(x => x.RobotId).HasColumnName("RobotID");
+            entity.Property(x => x.RobotZoneId).HasColumnName("RobotZoneID");
+            entity.Property(x => x.ZoneId).HasColumnName("ZoneID");
+            entity.Property(x => x.SlotId).HasColumnName("SlotID");
+            entity.Property(x => x.MemberId).HasColumnName("MemberID");
+            entity.Property(x => x.XCoord).HasColumnName("XCoord");
+            entity.Property(x => x.YCoord).HasColumnName("YCoord");
+
             entity.HasOne(x => x.AdCampaign)
                 .WithMany(ac => ac.AdCampaignLogs)
                 .HasForeignKey(x => x.AdCampaignId)
                 .OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne(x => x.SponsoredProduct)
+                .WithMany()
+                .HasForeignKey(x => x.SponsoredId)
+                .OnDelete(DeleteBehavior.SetNull);
+            entity.HasOne(x => x.Product)
+                .WithMany()
+                .HasForeignKey(x => x.ProductId)
+                .OnDelete(DeleteBehavior.NoAction);
+            entity.HasOne(x => x.Robot)
+                .WithMany()
+                .HasForeignKey(x => x.RobotId)
+                .OnDelete(DeleteBehavior.SetNull);
+            entity.HasOne(x => x.RobotZone)
+                .WithMany()
+                .HasForeignKey(x => x.RobotZoneId)
+                .OnDelete(DeleteBehavior.SetNull);
+            entity.HasOne(x => x.Zone)
+                .WithMany()
+                .HasForeignKey(x => x.ZoneId)
+                .OnDelete(DeleteBehavior.NoAction);
+            entity.HasOne(x => x.Slot)
+                .WithMany()
+                .HasForeignKey(x => x.SlotId)
+                .OnDelete(DeleteBehavior.NoAction);
+            entity.HasOne(x => x.Member)
+                .WithMany()
+                .HasForeignKey(x => x.MemberId)
+                .OnDelete(DeleteBehavior.SetNull);
         });
 
         // ─────────────────────────────────────────────

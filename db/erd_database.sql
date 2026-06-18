@@ -387,10 +387,22 @@ CREATE TABLE dbo.AD_CAMPAIGN (
 CREATE TABLE dbo.AD_CAMPAIGN_LOG (
     LogID           INT IDENTITY(1,1) PRIMARY KEY,
     AdCampaignID    INT            NOT NULL REFERENCES dbo.AD_CAMPAIGN(AdCampaignID) ON DELETE CASCADE,
-    ActionType      NVARCHAR(50)   NOT NULL,  -- Click / View
-    ChargedAmount   DECIMAL(18,2)  NOT NULL DEFAULT 0, -- Số tiền bị trừ của lượt click/view này (Đã thêm)
-    Timestamp       DATETIME2      NOT NULL DEFAULT DATEADD(hour, 7, GETUTCDATE()) -- Múi giờ Việt Nam (UTC+7)
+    ActionType      NVARCHAR(50)   NOT NULL,  -- Click / View / RoutePass
+    ChargedAmount   DECIMAL(18,2)  NOT NULL DEFAULT 0, -- Số tiền bị trừ của lượt click/view/route
+    Timestamp       DATETIME2      NOT NULL DEFAULT DATEADD(hour, 7, GETUTCDATE()), -- Múi giờ Việt Nam (UTC+7)
+    -- Phase B: chi tiết cho ActionType = 'RoutePass' (nullable, không phá dữ liệu Click/View cũ)
+    SponsoredID     INT            NULL REFERENCES dbo.SPONSORED_PRODUCT(SponsoredID) ON DELETE SET NULL,
+    ProductID       INT            NULL REFERENCES dbo.PRODUCT(ProductID),
+    RobotID         INT            NULL REFERENCES dbo.ROBOT(RobotID),
+    RobotZoneID     INT            NULL REFERENCES dbo.ROBOT_ZONE(RobotZoneID) ON DELETE SET NULL,
+    ZoneID          INT            NULL REFERENCES dbo.ZONE(ZoneID),
+    SlotID          INT            NULL REFERENCES dbo.SLOT(SlotID),
+    MemberID        INT            NULL REFERENCES dbo.MEMBER(MemberID) ON DELETE SET NULL,
+    XCoord          INT            NULL,
+    YCoord          INT            NULL
 );
+CREATE INDEX IX_AD_CAMPAIGN_LOG_CAMPAIGN ON dbo.AD_CAMPAIGN_LOG(AdCampaignID);
+CREATE INDEX IX_AD_CAMPAIGN_LOG_ZONE     ON dbo.AD_CAMPAIGN_LOG(ZoneID, Timestamp DESC);
 
 CREATE TABLE dbo.SPONSORED_PRODUCT (
     SponsoredID     INT IDENTITY(1,1) PRIMARY KEY,
@@ -446,6 +458,6 @@ GO
 -- 33. BRAND
 -- 34. AD_PACKAGE
 -- 35. AD_CAMPAIGN
--- 36. AD_CAMPAIGN_LOG
+-- 36. AD_CAMPAIGN_LOG (mở rộng Phase B: RoutePass columns)
 -- 37. SPONSORED_PRODUCT
 -- ============================================================

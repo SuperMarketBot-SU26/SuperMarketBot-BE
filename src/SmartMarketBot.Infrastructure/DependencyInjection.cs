@@ -50,6 +50,10 @@ public static class DependencyInjection
         services.AddScoped<IAdminAdCampaignService, AdminAdCampaignService>();
         services.AddScoped<IAdminSponsoredProductService, AdminSponsoredProductService>();
 
+        // Phase B - Ads Sponsored Recommendations (Flow 1)
+        services.AddScoped<IAdRecommendationService, AdRecommendationService>();
+        services.AddScoped<IAdAnalyticsService, AdAnalyticsService>();
+
         services.AddHttpClient<IAiVisionProxy, AiVisionProxy>();
         services.AddHttpClient<IFaceAiService, FaceAiService>();
         services.AddHttpClient<IGeminiService, GeminiService>();

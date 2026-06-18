@@ -63,6 +63,14 @@ public sealed class LocalizationService : ILocalizationService
                 ["SponsoredMappingExists"] = "Mapping AdCampaign ↔ Product đã tồn tại.",
                 ["ProductNotFoundById"] = "Không tìm thấy sản phẩm {0}.",
 
+                // Phase B - Ads Sponsored Recommendations
+                ["AdImpressionRecorded"] = "Đã ghi nhận {0} impression cho AdCampaign {1} (Route-based).",
+                ["AdNoActiveCampaign"] = "Hiện không có chiến dịch quảng cáo nào đang chạy tại Zone {0}.",
+                ["AdSlotNotFound"] = "Không tìm thấy Slot {0} khi ghi nhận impression.",
+                ["AdZoneNotFound"] = "Không tìm thấy Zone {0} cho Slot {1}.",
+                ["AdNoRoutePricing"] = "AdPackage {0} chưa cấu hình giá Route (PriceRoute=0).",
+                ["AdRobotNotFoundByCode"] = "Không tìm thấy robot với mã '{0}'.",
+
                 // Navigation & Robot
                 ["StartEndNodeNotExist"] = "Node bắt đầu hoặc kết thúc không tồn tại trên sơ đồ.",
                 ["StartEndNodeBlocked"] = "Node bắt đầu hoặc kết thúc đã bị chặn.",
@@ -121,6 +129,14 @@ public sealed class LocalizationService : ILocalizationService
                 ["SponsoredProductNotFound"] = "SponsoredProduct {0} not found.",
                 ["SponsoredMappingExists"] = "AdCampaign ↔ Product mapping already exists.",
                 ["ProductNotFoundById"] = "Product {0} not found.",
+
+                // Phase B - Ads Sponsored Recommendations
+                ["AdImpressionRecorded"] = "Logged {0} impression(s) for AdCampaign {1} (Route-based).",
+                ["AdNoActiveCampaign"] = "No active ad campaigns in Zone {0} right now.",
+                ["AdSlotNotFound"] = "Slot {0} not found while recording impression.",
+                ["AdZoneNotFound"] = "Zone {0} not found for Slot {1}.",
+                ["AdNoRoutePricing"] = "AdPackage {0} has no route pricing configured (PriceRoute=0).",
+                ["AdRobotNotFoundByCode"] = "Robot with code '{0}' not found.",
 
                 // Navigation & Robot
                 ["StartEndNodeNotExist"] = "Start or end node does not exist on map.",

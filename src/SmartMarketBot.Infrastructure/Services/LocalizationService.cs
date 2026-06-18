@@ -52,6 +52,17 @@ public sealed class LocalizationService : ILocalizationService
                 ["OosEventWithStock"] = "Ghi nhận sự cố hết hàng (ScanID={0}). Đã gửi thông báo cho nhân viên.",
                 ["OosEventNoStock"] = "Ghi nhận sự cố hết hàng (ScanID={0}). Kho tổng hết hàng - đề xuất sản phẩm thay thế.",
 
+                // Admin
+                ["BrandNotFound"] = "Không tìm thấy Brand {0}.",
+                ["BrandHasActiveCampaign"] = "Brand đang có chiến dịch quảng cáo, không thể xóa.",
+                ["AdPackageNotFound"] = "Không tìm thấy AdPackage {0}.",
+                ["AdPackageInUse"] = "AdPackage đang được sử dụng bởi chiến dịch quảng cáo, không thể xóa.",
+                ["AdCampaignNotFound"] = "Không tìm thấy AdCampaign {0}.",
+                ["CampaignDateInvalid"] = "Ngày kết thúc phải sau ngày bắt đầu.",
+                ["SponsoredProductNotFound"] = "Không tìm thấy SponsoredProduct {0}.",
+                ["SponsoredMappingExists"] = "Mapping AdCampaign ↔ Product đã tồn tại.",
+                ["ProductNotFoundById"] = "Không tìm thấy sản phẩm {0}.",
+
                 // Navigation & Robot
                 ["StartEndNodeNotExist"] = "Node bắt đầu hoặc kết thúc không tồn tại trên sơ đồ.",
                 ["StartEndNodeBlocked"] = "Node bắt đầu hoặc kết thúc đã bị chặn.",
@@ -99,6 +110,17 @@ public sealed class LocalizationService : ILocalizationService
                 ["SlotNotFound"] = "Shelf slot {0} not found.",
                 ["OosEventWithStock"] = "Out-of-stock event logged (ScanID={0}). Staff notification sent.",
                 ["OosEventNoStock"] = "Out-of-stock event logged (ScanID={0}). No warehouse stock - product substitution recommended.",
+
+                // Admin (English)
+                ["BrandNotFound"] = "Brand {0} not found.",
+                ["BrandHasActiveCampaign"] = "Brand has active ad campaigns and cannot be deleted.",
+                ["AdPackageNotFound"] = "AdPackage {0} not found.",
+                ["AdPackageInUse"] = "AdPackage is in use by an ad campaign and cannot be deleted.",
+                ["AdCampaignNotFound"] = "AdCampaign {0} not found.",
+                ["CampaignDateInvalid"] = "End date must be after start date.",
+                ["SponsoredProductNotFound"] = "SponsoredProduct {0} not found.",
+                ["SponsoredMappingExists"] = "AdCampaign ↔ Product mapping already exists.",
+                ["ProductNotFoundById"] = "Product {0} not found.",
 
                 // Navigation & Robot
                 ["StartEndNodeNotExist"] = "Start or end node does not exist on map.",

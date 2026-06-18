@@ -75,7 +75,10 @@ CREATE TABLE dbo.ACCOUNT (
     OtpCode         NVARCHAR(6)    NULL,      -- Mã OTP xác thực email/quên mật khẩu (Gộp từ EMAIL_OTP)
     OtpExpiredAt    DATETIME2      NULL,      -- Thời gian hết hạn của OTP (Gộp từ EMAIL_OTP)
     OtpType         NVARCHAR(50)   NULL,      -- Loại OTP (e.g. Registration, PasswordReset)
-    CreatedAt       DATETIME2      NOT NULL DEFAULT DATEADD(hour, 7, GETUTCDATE()) -- Múi giờ Việt Nam (UTC+7)
+    CreatedAt       DATETIME2      NOT NULL DEFAULT DATEADD(hour, 7, GETUTCDATE()), -- Múi giờ Việt Nam (UTC+7)
+    RefreshToken    NVARCHAR(500)  NULL,      -- JWT refresh token hiện tại (chỉ giữ 1 token/Account)
+    RefreshExpiry   DATETIME2      NULL,      -- Thời gian hết hạn refresh token
+    IsTokenRevoked  BIT            NOT NULL DEFAULT 0  -- Cờ revoke (logout / reset password)
 );
 
 -- ============================================================

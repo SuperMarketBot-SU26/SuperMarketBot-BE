@@ -44,6 +44,12 @@ public static class DependencyInjection
         services.AddScoped<IMemberService, MemberService>();
         services.AddScoped<IStaffService, StaffService>();
 
+        // Flow 6 - Admin CRUD
+        services.AddScoped<IAdminBrandService, AdminBrandService>();
+        services.AddScoped<IAdminAdPackageService, AdminAdPackageService>();
+        services.AddScoped<IAdminAdCampaignService, AdminAdCampaignService>();
+        services.AddScoped<IAdminSponsoredProductService, AdminSponsoredProductService>();
+
         services.AddHttpClient<IAiVisionProxy, AiVisionProxy>();
         services.AddHttpClient<IFaceAiService, FaceAiService>();
         services.AddHttpClient<IGeminiService, GeminiService>();

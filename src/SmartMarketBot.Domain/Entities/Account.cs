@@ -22,6 +22,11 @@ public class Account
 
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
+    // Refresh token (gộp từ bảng USER_TOKEN cũ - chỉ giữ 1 token/Account)
+    public string? RefreshToken { get; set; }
+    public DateTime? RefreshExpiry { get; set; }
+    public bool IsTokenRevoked { get; set; } = false;
+
     // Navigation
     public virtual Member? Member { get; set; }
 }

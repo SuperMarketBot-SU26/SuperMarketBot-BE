@@ -264,26 +264,27 @@ public sealed class AuthService(
 
     public async Task<AuthResponseDto> RefreshTokenAsync(RefreshTokenRequestDto request, CancellationToken ct = default)
     {
-        var tokenEntity = await db.UserTokens
-            .Include(t => t.Account)
-            .FirstOrDefaultAsync(t => t.RefreshToken == request.RefreshToken && !t.IsRevoked, ct);
+        var account = await db.Accounts
+            .FirstOrDefaultAsync(a => a.RefreshToken == request.RefreshToken
+                                   && !a.IsTokenRevoked
+                                   && a.RefreshExpiry > VnDateTime.Now, ct);
 
-        if (tokenEntity is null || tokenEntity.ExpiryDate < VnDateTime.Now)
+        if (account is null)
             throw new UnauthorizedAccessException(localizer.Get("RefreshTokenInvalid"));
 
-        var account = tokenEntity.Account;
-
-        tokenEntity.IsRevoked = true;
+        account.IsTokenRevoked = true; // Rotation: revoke token cũ trước khi cấp mới
         return await BuildAuthResponseAsync(account, ct);
     }
 
     public async Task LogoutAsync(int userId, string refreshToken, CancellationToken ct = default)
     {
-        var token = await db.UserTokens
-            .FirstOrDefaultAsync(t => t.AccountId == userId && t.RefreshToken == refreshToken, ct);
-        if (token != null)
+        var account = await db.Accounts
+            .FirstOrDefaultAsync(a => a.AccountId == userId && a.RefreshToken == refreshToken, ct);
+        if (account != null)
         {
-            token.IsRevoked = true;
+            account.RefreshToken = null;
+            account.RefreshExpiry = null;
+            account.IsTokenRevoked = true;
             await db.SaveChangesAsync(ct);
         }
     }
@@ -324,9 +325,10 @@ public sealed class AuthService(
         account.OtpType = null;
         account.OtpExpiredAt = null;
 
-        // Revoke tất cả refresh token của account này
-        var tokens = db.UserTokens.Where(t => t.AccountId == account.AccountId && !t.IsRevoked);
-        await tokens.ForEachAsync(t => t.IsRevoked = true, ct);
+        // Revoke refresh token hiện tại (chỉ 1 token/Account)
+        account.RefreshToken = null;
+        account.RefreshExpiry = null;
+        account.IsTokenRevoked = true;
 
         await db.SaveChangesAsync(ct);
     }
@@ -339,12 +341,10 @@ public sealed class AuthService(
         var (accessToken, expiresAt) = tokenService.CreateAccessToken(account, roles);
         var refreshToken = tokenService.GenerateRefreshToken();
 
-        db.UserTokens.Add(new UserToken
-        {
-            AccountId = account.AccountId,
-            RefreshToken = refreshToken,
-            ExpiryDate = VnDateTime.Now.AddDays(_jwtOpts.RefreshTokenExpiryDays)
-        });
+        // Refresh token giữ trực tiếp trên Account (1 token/Account, revoke = 1 flag).
+        account.RefreshToken = refreshToken;
+        account.RefreshExpiry = VnDateTime.Now.AddDays(_jwtOpts.RefreshTokenExpiryDays);
+        account.IsTokenRevoked = false;
         await db.SaveChangesAsync(ct);
 
         return new AuthResponseDto(

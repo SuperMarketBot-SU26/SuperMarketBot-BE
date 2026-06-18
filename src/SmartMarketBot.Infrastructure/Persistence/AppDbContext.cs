@@ -12,7 +12,6 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
     public DbSet<Membership> Memberships => Set<Membership>();
     public DbSet<HealthTag> HealthTags => Set<HealthTag>();
     public DbSet<MemberHealthPreference> MemberHealthPreferences => Set<MemberHealthPreference>();
-    public DbSet<UserToken> UserTokens => Set<UserToken>();
     public DbSet<MemberAlert> MemberAlerts => Set<MemberAlert>();
     public DbSet<MemberEvent> MemberEvents => Set<MemberEvent>();
 
@@ -92,6 +91,9 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
             entity.Property(x => x.OtpExpiredAt).HasColumnName("OtpExpiredAt");
             entity.Property(x => x.OtpType).HasColumnName("OtpType").HasMaxLength(50);
             entity.Property(x => x.CreatedAt).HasColumnName("CreatedAt").HasDefaultValueSql("DATEADD(hour, 7, GETUTCDATE())");
+            entity.Property(x => x.RefreshToken).HasColumnName("RefreshToken").HasMaxLength(500);
+            entity.Property(x => x.RefreshExpiry).HasColumnName("RefreshExpiry");
+            entity.Property(x => x.IsTokenRevoked).HasColumnName("IsTokenRevoked").HasDefaultValue(false);
             entity.HasIndex(x => x.Username).IsUnique().HasDatabaseName("IX_ACCOUNT_Username");
             entity.HasIndex(x => x.Email).IsUnique().HasDatabaseName("IX_ACCOUNT_Email");
         });
@@ -155,24 +157,7 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
                 .OnDelete(DeleteBehavior.Cascade);
         });
 
-        // UserToken - refresh token (giữ nguyên convention cũ, không thuộc ERD V4.0 core)
-        modelBuilder.Entity<UserToken>(entity =>
-        {
-            entity.ToTable("USER_TOKEN");
-            entity.HasKey(x => x.TokenId);
-            entity.Property(x => x.TokenId).HasColumnName("token_id").HasDefaultValueSql("NEWID()");
-            entity.Property(x => x.AccountId).HasColumnName("account_id");
-            entity.Property(x => x.RefreshToken).HasColumnName("refresh_token").HasMaxLength(512).IsRequired();
-            entity.Property(x => x.ExpiryDate).HasColumnName("expiry_date");
-            entity.Property(x => x.IsRevoked).HasColumnName("is_revoked").HasDefaultValue(false);
-            entity.Property(x => x.DeviceInfo).HasColumnName("device_info").HasMaxLength(256);
-            entity.Property(x => x.IpAddress).HasColumnName("ip_address").HasMaxLength(64);
-            entity.Property(x => x.CreatedAt).HasColumnName("created_at").HasDefaultValueSql("GETUTCDATE()");
-            entity.HasOne(x => x.Account)
-                .WithMany()
-                .HasForeignKey(x => x.AccountId)
-                .OnDelete(DeleteBehavior.Cascade);
-        });
+        // Refresh token đã gộp vào bảng ACCOUNT (37 bảng — không có USER_TOKEN).
 
         // MemberAlert
         modelBuilder.Entity<MemberAlert>(entity =>

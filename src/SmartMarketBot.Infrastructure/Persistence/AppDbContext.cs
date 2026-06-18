@@ -1,7 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using SmartMarketBot.Application.Interfaces;
 using SmartMarketBot.Domain.Entities;
-using SmartMarketBot.Domain.Entities.Views;
 
 namespace SmartMarketBot.Infrastructure.Persistence;
 
@@ -62,12 +61,6 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
     public DbSet<RouteAssignment> RouteAssignments => Set<RouteAssignment>();
     public DbSet<AisleScan> AisleScans => Set<AisleScan>();
     public DbSet<SemanticObject> SemanticObjects => Set<SemanticObject>();
-
-    // ── Views (keyless) ───────────────────────────────────────────────────────
-    public DbSet<BlockedAisleView> BlockedAisleViews => Set<BlockedAisleView>();
-    public DbSet<PurchaseHistoryView> PurchaseHistoryViews => Set<PurchaseHistoryView>();
-    public DbSet<RealTimeStockView> RealTimeStockViews => Set<RealTimeStockView>();
-    public DbSet<StoreMapView> StoreMapViews => Set<StoreMapView>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -778,34 +771,6 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
                 .WithMany(m => m.SemanticObjects)
                 .HasForeignKey(x => x.MapId)
                 .OnDelete(DeleteBehavior.Cascade);
-        });
-
-        // ─────────────────────────────────────────────
-        // VIEWS (keyless)
-        // ─────────────────────────────────────────────
-
-        modelBuilder.Entity<BlockedAisleView>(entity =>
-        {
-            entity.HasNoKey();
-            entity.ToView("Blocked_Aisles");
-        });
-
-        modelBuilder.Entity<PurchaseHistoryView>(entity =>
-        {
-            entity.HasNoKey();
-            entity.ToView("PurchaseHistory");
-        });
-
-        modelBuilder.Entity<RealTimeStockView>(entity =>
-        {
-            entity.HasNoKey();
-            entity.ToView("Real_Time_Stock");
-        });
-
-        modelBuilder.Entity<StoreMapView>(entity =>
-        {
-            entity.HasNoKey();
-            entity.ToView("Store_Map");
         });
     }
 }

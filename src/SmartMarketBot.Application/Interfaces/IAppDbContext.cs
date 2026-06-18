@@ -1,6 +1,5 @@
 using Microsoft.EntityFrameworkCore;
 using SmartMarketBot.Domain.Entities;
-using SmartMarketBot.Domain.Entities.Views;
 
 namespace SmartMarketBot.Application.Interfaces;
 
@@ -61,12 +60,6 @@ public interface IAppDbContext
     DbSet<RouteAssignment> RouteAssignments { get; }
     DbSet<AisleScan> AisleScans { get; }
     DbSet<SemanticObject> SemanticObjects { get; }
-
-    // Views (keyless)
-    DbSet<BlockedAisleView> BlockedAisleViews { get; }
-    DbSet<PurchaseHistoryView> PurchaseHistoryViews { get; }
-    DbSet<RealTimeStockView> RealTimeStockViews { get; }
-    DbSet<StoreMapView> StoreMapViews { get; }
 
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
 }

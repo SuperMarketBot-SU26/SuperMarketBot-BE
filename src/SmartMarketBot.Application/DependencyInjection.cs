@@ -10,7 +10,7 @@ public static class DependencyInjection
     {
         services.AddScoped<INavigationService, NavigationService>();
         services.AddScoped<NavigationCommandService>();
-        // IAuthService, IEmailService, ITokenService, ISePayService đăng ký trong Infrastructure
+        // IAuthService, IEmailService, ITokenService đăng ký trong Infrastructure
         return services;
     }
 }

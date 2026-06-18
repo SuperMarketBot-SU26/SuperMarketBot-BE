@@ -420,3 +420,13 @@ FodyWeavers.xsd
 # Local Storage for Member Faces
 storage/member_faces/*
 
+# ==== Project-specific ignores ====
+# SQL run logs
+db/last_run.log
+db/*.log
+
+# Local app settings (override secrets per-machine)
+**/appsettings.*.local.json
+
+# Cursor workspace artifacts
+.cursor/

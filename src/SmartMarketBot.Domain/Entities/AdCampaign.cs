@@ -1,6 +1,6 @@
 namespace SmartMarketBot.Domain.Entities;
 
-public class AdCampaign
+public sealed class AdCampaign
 {
     public int AdCampaignId { get; set; }
     public int PackageId { get; set; }
@@ -9,13 +9,20 @@ public class AdCampaign
     public string CampaignName { get; set; } = string.Empty;
     public DateTime StartDate { get; set; }
     public DateTime EndDate { get; set; }
+    public string Status { get; set; } = CampaignStatus.Inactive;
 
-    /// <summary>Enum dạng string: 'Scheduled' | 'Running' | 'Paused' | 'Completed' | 'Cancelled'.</summary>
-    public string Status { get; set; } = "Scheduled";
+    public AdPackage? Package { get; set; }
+    public Brand? Brand { get; set; }
+    public RobotZone? RobotZone { get; set; }
+    public ICollection<AdCampaignLog> AdCampaignLogs { get; set; } = new List<AdCampaignLog>();
+    public ICollection<SponsoredProduct> SponsoredProducts { get; set; } = new List<SponsoredProduct>();
+}
 
-    public virtual AdPackage? Package { get; set; }
-    public virtual Brand? Brand { get; set; }
-    public virtual RobotZone? RobotZone { get; set; }
-    public virtual ICollection<SponsoredProduct> SponsoredProducts { get; set; } = new List<SponsoredProduct>();
-    public virtual ICollection<AdCampaignLog> AdCampaignLogs { get; set; } = new List<AdCampaignLog>();
+public static class CampaignStatus
+{
+    public const string Inactive = "Inactive";
+    public const string Active = "Active";
+    public const string Paused = "Paused";
+    public const string Completed = "Completed";
+    public const string Canceled = "Canceled";
 }

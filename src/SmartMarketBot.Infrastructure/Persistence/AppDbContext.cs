@@ -487,6 +487,7 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
             entity.Property(x => x.MemberId).HasColumnName("MemberID");
             entity.Property(x => x.XCoord).HasColumnName("XCoord");
             entity.Property(x => x.YCoord).HasColumnName("YCoord");
+            entity.Property(x => x.SessionId).HasColumnName("SessionId").HasMaxLength(100);
 
             entity.HasOne(x => x.AdCampaign)
                 .WithMany(ac => ac.AdCampaignLogs)

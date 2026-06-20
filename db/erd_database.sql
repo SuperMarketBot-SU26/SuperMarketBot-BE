@@ -187,7 +187,9 @@ CREATE TABLE dbo.MEAL_SUGGESTION (
     Description             NVARCHAR(MAX)  NULL,
     YieldPortions           INT            NOT NULL DEFAULT 1,
     ImageUrl                NVARCHAR(500)  NULL,
-    Calories                INT            NULL
+    Calories                INT            NULL,
+    healthy_score           INT            NULL,
+    alternative_suggestion  NVARCHAR(500)  NULL
 );
 
 CREATE TABLE dbo.MEAL_ITEM (

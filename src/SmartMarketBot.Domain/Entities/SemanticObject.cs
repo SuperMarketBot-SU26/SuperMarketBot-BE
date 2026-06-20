@@ -10,7 +10,7 @@ public class SemanticObject
     public double XMax { get; set; }
     public double YMax { get; set; }
     public string? Label { get; set; }
-    public decimal? Confidence { get; set; }
+    public double? Confidence { get; set; }
     public DateTime? DetectedAt { get; set; }
     public string? ImageUrl { get; set; }
 

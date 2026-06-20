@@ -17,8 +17,12 @@ GO
 USE SuperMarketBot;
 GO
 
--- ===================== DROP (nếu cần tạo lại) =====================
--- Thứ tự drop ngược lại thứ tự tạo để tránh lỗi khóa ngoại (FK)
+-- Drop FK constraint first to avoid drop cycle blocks
+IF EXISTS (SELECT * FROM sys.foreign_keys WHERE name = 'FK_PRODUCT_AD_CAMPAIGN' AND parent_object_id = OBJECT_ID('dbo.PRODUCT'))
+BEGIN
+    ALTER TABLE dbo.PRODUCT DROP CONSTRAINT FK_PRODUCT_AD_CAMPAIGN;
+END
+GO
 
 IF OBJECT_ID('dbo.AD_CAMPAIGN_LOG', 'U') IS NOT NULL DROP TABLE dbo.AD_CAMPAIGN_LOG;
 IF OBJECT_ID('dbo.SPONSORED_PRODUCT', 'U') IS NOT NULL DROP TABLE dbo.SPONSORED_PRODUCT;
@@ -52,8 +56,8 @@ IF OBJECT_ID('dbo.PRODUCT', 'U') IS NOT NULL DROP TABLE dbo.PRODUCT;
 IF OBJECT_ID('dbo.PRODUCT_TYPE', 'U') IS NOT NULL DROP TABLE dbo.PRODUCT_TYPE;
 IF OBJECT_ID('dbo.SUBCATEGORY', 'U') IS NOT NULL DROP TABLE dbo.SUBCATEGORY;
 IF OBJECT_ID('dbo.CATEGORY', 'U') IS NOT NULL DROP TABLE dbo.CATEGORY;
-IF OBJECT_ID('dbo.HEALTH_TAG', 'U') IS NOT NULL DROP TABLE dbo.HEALTH_TAG;
 IF OBJECT_ID('dbo.MEMBERHEALTH_PREFERENCE', 'U') IS NOT NULL DROP TABLE dbo.MEMBERHEALTH_PREFERENCE;
+IF OBJECT_ID('dbo.HEALTH_TAG', 'U') IS NOT NULL DROP TABLE dbo.HEALTH_TAG;
 IF OBJECT_ID('dbo.MEMBERSHIP', 'U') IS NOT NULL DROP TABLE dbo.MEMBERSHIP;
 IF OBJECT_ID('dbo.MEMBER', 'U') IS NOT NULL DROP TABLE dbo.MEMBER;
 IF OBJECT_ID('dbo.ACCOUNT', 'U') IS NOT NULL DROP TABLE dbo.ACCOUNT;
@@ -393,7 +397,7 @@ CREATE TABLE dbo.AD_CAMPAIGN_LOG (
     ChargedAmount   DECIMAL(18,2)  NOT NULL DEFAULT 0, -- Số tiền bị trừ của lượt click/view/route
     Timestamp       DATETIME2      NOT NULL DEFAULT DATEADD(hour, 7, GETUTCDATE()), -- Múi giờ Việt Nam (UTC+7)
     -- Phase B: chi tiết cho ActionType = 'RoutePass' (nullable, không phá dữ liệu Click/View cũ)
-    SponsoredID     INT            NULL REFERENCES dbo.SPONSORED_PRODUCT(SponsoredID) ON DELETE SET NULL,
+    SponsoredID     INT            NULL,
     ProductID       INT            NULL REFERENCES dbo.PRODUCT(ProductID),
     RobotID         INT            NULL REFERENCES dbo.ROBOT(RobotID),
     RobotZoneID     INT            NULL REFERENCES dbo.ROBOT_ZONE(RobotZoneID) ON DELETE SET NULL,
@@ -420,6 +424,11 @@ GO
 -- Nối sau cùng để tránh lỗi vòng lặp phụ thuộc khi tạo bảng (Dependency Cycle)
 ALTER TABLE dbo.PRODUCT ADD CONSTRAINT FK_PRODUCT_AD_CAMPAIGN 
     FOREIGN KEY (AdCampaignID) REFERENCES dbo.AD_CAMPAIGN(AdCampaignID) ON DELETE SET NULL;
+GO
+
+-- Nối sau cùng để tránh lỗi vòng lặp phụ thuộc (SPONSORED_PRODUCT tạo sau AD_CAMPAIGN_LOG)
+ALTER TABLE dbo.AD_CAMPAIGN_LOG ADD CONSTRAINT FK_AD_CAMPAIGN_LOG_SPONSORED 
+    FOREIGN KEY (SponsoredID) REFERENCES dbo.SPONSORED_PRODUCT(SponsoredID) ON DELETE SET NULL;
 GO
 
 -- ============================================================

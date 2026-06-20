@@ -3,7 +3,6 @@ using SmartMarketBot.Application.Interfaces;
 using SmartMarketBot.Application.Models.Members;
 using SmartMarketBot.Application.Models.Products;
 using SmartMarketBot.Domain.Common;
-using SmartMarketBot.Domain.Entities;
 using SmartMarketBot.Infrastructure.Persistence;
 
 namespace SmartMarketBot.Infrastructure.Services;
@@ -66,9 +65,11 @@ public sealed class MemberService(AppDbContext db, ILocalizationService localize
         var sevenDaysAgo = VnDateTime.Now.AddDays(-7);
         bool isDuplicate = await db.InvoiceHistoryItems
             .AsNoTracking()
-            .AnyAsync(hi => hi.ProductId == product.ProductId
+            .Where(hi => hi.ProductId == product.ProductId
+                && hi.InvoiceHistory != null
                 && hi.InvoiceHistory.MemberId == memberId
-                && hi.InvoiceHistory.PurchaseDate >= sevenDaysAgo, ct);
+                && hi.InvoiceHistory.PurchaseDate >= sevenDaysAgo)
+            .AnyAsync(ct);
 
         // Xác định cảnh báo (ưu tiên dị ứng > ngân sách > trùng)
         string? alertType = null;
@@ -88,18 +89,6 @@ public sealed class MemberService(AppDbContext db, ILocalizationService localize
         {
             alertType = "DuplicatePurchase";
             alertMessage = localizer.Get("DuplicatePurchaseAlert", product.ProductName);
-        }
-
-        // Lưu alert nếu có
-        if (alertType != null)
-        {
-            db.MemberAlerts.Add(new MemberAlert
-            {
-                MemberId = memberId,
-                AlertType = alertType,
-                AlertMessage = alertMessage!
-            });
-            await db.SaveChangesAsync(ct);
         }
 
         // Lấy sản phẩm thay thế nếu bị block
@@ -144,37 +133,46 @@ public sealed class MemberService(AppDbContext db, ILocalizationService localize
         var today = DateOnly.FromDateTime(VnDateTime.Now);
         var deals = new List<MemberDealDto>();
 
-        // 1. Khuyến mãi đang active
-        var promos = await db.PromotionProducts
+        // 1. Khuyến mãi: sản phẩm có PromotionPrice < UnitPrice (schema mới dùng PromotionPrice thay vì bảng PROMOTION/PROMOTION_PRODUCT)
+        var promoProducts = await db.Products
             .AsNoTracking()
-            .Join(db.Promotions.Where(pr => pr.IsActive && DateOnly.FromDateTime(pr.StartDate) <= today && DateOnly.FromDateTime(pr.EndDate) >= today),
-                pp => pp.PromotionId, pr => pr.PromotionId,
-                (pp, pr) => new { pp.ProductId, pr.DiscountValue, pr.PromotionName })
-            .Join(db.Products, x => x.ProductId, p => p.ProductId,
-                (x, p) => new { p.ProductId, p.ProductName, p.UnitPrice, p.ImageUrl, x.DiscountValue, x.PromotionName })
+            .Where(p => p.PromotionPrice.HasValue
+                && p.PromotionPrice.Value < p.UnitPrice
+                && p.Status == "Available")
             .Take(5)
             .ToListAsync(ct);
 
-        foreach (var p in promos)
+        foreach (var p in promoProducts)
         {
+            var discountPct = (p.UnitPrice - p.PromotionPrice!.Value) / p.UnitPrice * 100m;
             deals.Add(new MemberDealDto(
                 p.ProductId, p.ProductName, p.UnitPrice,
-                p.UnitPrice * (1 - p.DiscountValue / 100m),
-                p.DiscountValue, "Promotion", p.PromotionName, p.ImageUrl));
+                p.PromotionPrice.Value,
+                discountPct, "Promotion",
+                localizer.Get("PromotionDeal", discountPct), p.ImageUrl));
         }
 
-        // 2. Birthday/Anniversary deal
-        var events = await db.MemberEvents
+        // 2. Sponsored: sản phẩm tài trợ đang chạy
+        var sponsoredProducts = await db.SponsoredProducts
             .AsNoTracking()
-            .Where(me => me.MemberId == memberId && !me.IsProcessed && me.DiscountPct.HasValue
-                && DateOnly.FromDateTime(me.EventDate) >= today && DateOnly.FromDateTime(me.EventDate) <= today.AddDays(7))
+            .Include(sp => sp.AdCampaign)
+            .Where(sp => sp.Status == "Active"
+                && sp.AdCampaign != null
+                && sp.AdCampaign.Status == "Active"
+                && sp.AdCampaign.StartDate.Date <= DateTime.UtcNow.Date
+                && sp.AdCampaign.EndDate.Date >= DateTime.UtcNow.Date)
+            .Take(5)
             .ToListAsync(ct);
 
-        foreach (var ev in events)
+        foreach (var sp in sponsoredProducts)
         {
-            deals.Add(new MemberDealDto(0, ev.EventName == "Birthday" ? localizer.Get("BdayDeal") : localizer.Get("AnniversaryDeal"),
-                0, 0, ev.DiscountPct!.Value, ev.EventName,
-                localizer.Get("EventDealReason", ev.DiscountPct!.Value, ev.EventName), null));
+            if (sp.Product is null) continue;
+            var p = sp.Product;
+            deals.Add(new MemberDealDto(
+                p.ProductId, p.ProductName, p.UnitPrice,
+                p.PromotionPrice ?? p.UnitPrice,
+                0, "Sponsored",
+                localizer.Get("SponsoredDeal", sp.AdCampaign?.CampaignName ?? "Brand"), p.ImageUrl));
         }
 
         return new MemberDealsResponseDto(memberId, deals, deals.Count);
@@ -182,23 +180,15 @@ public sealed class MemberService(AppDbContext db, ILocalizationService localize
 
     // ── Alerts ───────────────────────────────────────────────────────────────
 
-    public async Task<MemberAlertsResponseDto> GetAlertsAsync(int memberId, CancellationToken ct = default)
+    public Task<MemberAlertsResponseDto> GetAlertsAsync(int memberId, CancellationToken ct = default)
     {
-        var alerts = await db.MemberAlerts
-            .AsNoTracking()
-            .Where(a => a.MemberId == memberId)
-            .OrderByDescending(a => a.CreatedAt)
-            .Take(50)
-            .Select(a => new MemberAlertDto(a.AlertId, a.AlertType, a.AlertMessage, a.CreatedAt, a.IsRead))
-            .ToListAsync(ct);
-
-        return new MemberAlertsResponseDto(memberId, alerts.Count(a => !a.IsRead), alerts);
+        // Bảng MEMBER_ALERT không còn trong schema mới — trả về danh sách trống
+        return Task.FromResult(new MemberAlertsResponseDto(memberId, 0, []));
     }
 
-    public async Task MarkAlertsReadAsync(int memberId, MarkAlertsReadRequestDto request, CancellationToken ct = default)
+    public Task MarkAlertsReadAsync(int memberId, MarkAlertsReadRequestDto request, CancellationToken ct = default)
     {
-        await db.MemberAlerts
-            .Where(a => a.MemberId == memberId && request.AlertIds.Contains(a.AlertId))
-            .ExecuteUpdateAsync(s => s.SetProperty(a => a.IsRead, true), ct);
+        // Bảng MEMBER_ALERT không còn trong schema mới — no-op
+        return Task.CompletedTask;
     }
 }

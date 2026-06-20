@@ -1,5 +1,6 @@
 using System.Text;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Http.Json;
 using Microsoft.IdentityModel.Tokens;
 using SmartMarketBot.API.Hubs;
 using SmartMarketBot.API.Middleware;
@@ -14,7 +15,23 @@ using SmartMarketBot.Infrastructure.Options;
 
 var builder = WebApplication.CreateBuilder(args);
 
-builder.Services.AddControllers();
+builder.Services.AddControllers()
+    .AddJsonOptions(options =>
+    {
+        options.JsonSerializerOptions.PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase;
+        options.JsonSerializerOptions.Converters.Add(new System.Text.Json.Serialization.JsonStringEnumConverter());
+        options.JsonSerializerOptions.Converters.Add(new SmartMarketBot.API.Converters.DateTimeConverter());
+        options.JsonSerializerOptions.Converters.Add(new SmartMarketBot.API.Converters.DateTimeNullableConverter());
+    });
+
+// ConfigureHttpJsonOptions affects Minimal APIs AND OpenAPI schema generation (JsonSchemaExporter).
+// Without this, DateTime converters are not picked up by the OpenAPI pipeline.
+builder.Services.Configure<JsonOptions>(options =>
+{
+    options.SerializerOptions.Converters.Add(new System.Text.Json.Serialization.JsonStringEnumConverter());
+    options.SerializerOptions.Converters.Add(new SmartMarketBot.API.Converters.DateTimeConverter());
+    options.SerializerOptions.Converters.Add(new SmartMarketBot.API.Converters.DateTimeNullableConverter());
+});
 builder.Services.AddOpenApi();
 builder.Services.AddSignalR();
 

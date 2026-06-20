@@ -11,8 +11,6 @@ public interface IAppDbContext
     DbSet<Membership> Memberships { get; }
     DbSet<HealthTag> HealthTags { get; }
     DbSet<MemberHealthPreference> MemberHealthPreferences { get; }
-    DbSet<MemberAlert> MemberAlerts { get; }
-    DbSet<MemberEvent> MemberEvents { get; }
 
     // Region 2: Product Catalog
     DbSet<Category> Categories { get; }
@@ -20,10 +18,6 @@ public interface IAppDbContext
     DbSet<ProductType> ProductTypes { get; }
     DbSet<Product> Products { get; }
     DbSet<ProductHealthTag> ProductHealthTags { get; }
-
-    // Region 3 (legacy): Ads & Promotions
-    DbSet<Promotion> Promotions { get; }
-    DbSet<PromotionProduct> PromotionProducts { get; }
 
     // Region 3: Shopping & Meal (4)
     DbSet<InvoiceHistory> InvoiceHistories { get; }

@@ -17,13 +17,13 @@ public sealed record CreateAdCampaignRequestDto(
     [Range(1, int.MaxValue)] int BrandId,
     [Range(1, int.MaxValue)] int? RobotZoneId = null,
     [Required, MinLength(1), MaxLength(200)] string CampaignName = "",
-    [Required] DateTime StartDate = default,
-    [Required] DateTime EndDate = default,
+    [Required] DateTime? StartDate = null,
+    [Required] DateTime? EndDate = null,
     [MaxLength(50)] string Status = "Scheduled");
 
 public sealed record UpdateAdCampaignRequestDto(
     [Range(1, int.MaxValue)] int? RobotZoneId = null,
     [Required, MinLength(1), MaxLength(200)] string CampaignName = "",
-    [Required] DateTime StartDate = default,
-    [Required] DateTime EndDate = default,
+    [Required] DateTime? StartDate = null,
+    [Required] DateTime? EndDate = null,
     [MaxLength(50)] string Status = "Scheduled");

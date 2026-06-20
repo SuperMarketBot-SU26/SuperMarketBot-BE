@@ -33,7 +33,10 @@ public sealed class AdminAdCampaignService(AppDbContext db, ILocalizationService
 
     public async Task<AdCampaignDto> CreateAsync(CreateAdCampaignRequestDto request, CancellationToken ct = default)
     {
-        if (request.EndDate <= request.StartDate)
+        var startDate = request.StartDate.GetValueOrDefault();
+        var endDate = request.EndDate.GetValueOrDefault();
+
+        if (endDate <= startDate)
             throw new ArgumentException(localizer.Get("CampaignDateInvalid"));
 
         // Validate FK exists
@@ -48,8 +51,8 @@ public sealed class AdminAdCampaignService(AppDbContext db, ILocalizationService
             BrandId = request.BrandId,
             RobotZoneId = request.RobotZoneId,
             CampaignName = request.CampaignName.Trim(),
-            StartDate = request.StartDate,
-            EndDate = request.EndDate,
+            StartDate = startDate,
+            EndDate = endDate,
             Status = request.Status
         };
         db.AdCampaigns.Add(campaign);
@@ -63,13 +66,16 @@ public sealed class AdminAdCampaignService(AppDbContext db, ILocalizationService
         var campaign = await db.AdCampaigns.FindAsync([campaignId], ct)
             ?? throw new KeyNotFoundException(localizer.Get("AdCampaignNotFound", campaignId));
 
-        if (request.EndDate <= request.StartDate)
+        var startDate = request.StartDate.GetValueOrDefault();
+        var endDate = request.EndDate.GetValueOrDefault();
+
+        if (endDate <= startDate)
             throw new ArgumentException(localizer.Get("CampaignDateInvalid"));
 
         campaign.RobotZoneId = request.RobotZoneId;
         campaign.CampaignName = request.CampaignName.Trim();
-        campaign.StartDate = request.StartDate;
-        campaign.EndDate = request.EndDate;
+        campaign.StartDate = startDate;
+        campaign.EndDate = endDate;
         campaign.Status = request.Status;
         await db.SaveChangesAsync(ct);
         return new AdCampaignDto(campaign.AdCampaignId, campaign.PackageId, campaign.BrandId,

@@ -34,6 +34,29 @@ public sealed class GlobalExceptionMiddleware(RequestDelegate next, ILogger<Glob
         }
         catch (Exception ex)
         {
+            // OpenAPI/Swagger endpoints generate JSON schemas for DTOs using JsonSchemaExporter.
+            // This can throw on DateTime/DateTime? properties in .NET 10 due to the numeric
+            // roundtrip issue — catch it gracefully so API remains functional.
+            bool isSwaggerPath =
+                context.Request.Path.StartsWithSegments("/swagger", StringComparison.OrdinalIgnoreCase) ||
+                context.Request.Path.StartsWithSegments("/scalar", StringComparison.OrdinalIgnoreCase) ||
+                context.Request.Path.StartsWithSegments("/openapi", StringComparison.OrdinalIgnoreCase) ||
+                context.Request.Path.StartsWithSegments("/docs", StringComparison.OrdinalIgnoreCase);
+
+            if (isSwaggerPath)
+            {
+                logger.LogWarning(ex,
+                    "OpenAPI/Swagger schema generation threw {ExType}. API endpoints are fully functional.",
+                    ex.GetType().Name);
+                if (!context.Response.HasStarted)
+                {
+                    context.Response.StatusCode = 500;
+                    context.Response.ContentType = "application/json";
+                    await context.Response.WriteAsync(
+                        "{\"error\":\"Swagger schema generation failed — all API endpoints remain operational.\"}");
+                }
+                return;
+            }
             logger.LogError(ex, "Unhandled server exception.");
             await WriteErrorAsync(context, HttpStatusCode.InternalServerError, localizer.Get("UnexpectedError"));
         }

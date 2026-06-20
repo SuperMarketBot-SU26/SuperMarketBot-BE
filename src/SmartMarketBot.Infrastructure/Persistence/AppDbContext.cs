@@ -12,8 +12,6 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
     public DbSet<Membership> Memberships => Set<Membership>();
     public DbSet<HealthTag> HealthTags => Set<HealthTag>();
     public DbSet<MemberHealthPreference> MemberHealthPreferences => Set<MemberHealthPreference>();
-    public DbSet<MemberAlert> MemberAlerts => Set<MemberAlert>();
-    public DbSet<MemberEvent> MemberEvents => Set<MemberEvent>();
 
     // ── Region 2: Product Catalog ────────────────────────────────────────────
     public DbSet<Category> Categories => Set<Category>();
@@ -21,10 +19,6 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
     public DbSet<ProductType> ProductTypes => Set<ProductType>();
     public DbSet<Product> Products => Set<Product>();
     public DbSet<ProductHealthTag> ProductHealthTags => Set<ProductHealthTag>();
-
-    // Legacy (không thuộc ERD V4.0 cốt lõi - dùng cho service cũ)
-    public DbSet<Promotion> Promotions => Set<Promotion>();
-    public DbSet<PromotionProduct> PromotionProducts => Set<PromotionProduct>();
 
     // ── Region 3: Shopping & Meal ────────────────────────────────────────────
     public DbSet<InvoiceHistory> InvoiceHistories => Set<InvoiceHistory>();
@@ -159,59 +153,7 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
 
         // Refresh token đã gộp vào bảng ACCOUNT (37 bảng — không có USER_TOKEN).
 
-        // MemberAlert
-        modelBuilder.Entity<MemberAlert>(entity =>
-        {
-            entity.ToTable("MEMBER_ALERT");
-            entity.HasKey(x => x.AlertId);
-            entity.Property(x => x.AlertId).HasColumnName("alert_id");
-            entity.Property(x => x.MemberId).HasColumnName("member_id");
-            entity.Property(x => x.AlertType).HasColumnName("alert_type").HasMaxLength(50);
-            entity.Property(x => x.AlertMessage).HasColumnName("alert_message").HasMaxLength(1000);
-            entity.Property(x => x.CreatedAt).HasColumnName("created_at").HasDefaultValueSql("GETUTCDATE()");
-            entity.Property(x => x.IsRead).HasColumnName("is_read").HasDefaultValue(false);
-            entity.HasOne(x => x.Member)
-                .WithMany()
-                .HasForeignKey(x => x.MemberId)
-                .OnDelete(DeleteBehavior.Cascade);
-        });
-
-        // MemberEvent
-        modelBuilder.Entity<MemberEvent>(entity =>
-        {
-            entity.ToTable("MEMBER_EVENT");
-            entity.HasKey(x => x.EventId);
-            entity.Property(x => x.EventId).HasColumnName("event_id");
-            entity.Property(x => x.MemberId).HasColumnName("member_id");
-            entity.Property(x => x.EventName).HasColumnName("event_name").HasMaxLength(50);
-            entity.Property(x => x.EventDate).HasColumnName("event_date");
-            entity.Property(x => x.DiscountPct).HasColumnName("discount_pct").HasPrecision(18, 2);
-            entity.Property(x => x.IsProcessed).HasColumnName("is_processed").HasDefaultValue(false);
-        });
-
-        // Promotion (legacy - không thuộc ERD V4.0)
-        modelBuilder.Entity<Promotion>(entity =>
-        {
-            entity.ToTable("PROMOTION");
-            entity.HasKey(x => x.PromotionId);
-            entity.Property(x => x.PromotionId).HasColumnName("promotion_id");
-            entity.Property(x => x.PromotionName).HasColumnName("promotion_name").HasMaxLength(200);
-            entity.Property(x => x.Description).HasColumnName("description");
-            entity.Property(x => x.DiscountValue).HasColumnName("discount_value").HasPrecision(18, 2);
-            entity.Property(x => x.StartDate).HasColumnName("start_date");
-            entity.Property(x => x.EndDate).HasColumnName("end_date");
-            entity.Property(x => x.IsActive).HasColumnName("is_active").HasDefaultValue(true);
-        });
-
-        // PromotionProduct (legacy)
-        modelBuilder.Entity<PromotionProduct>(entity =>
-        {
-            entity.ToTable("PROMOTION_PRODUCT");
-            entity.HasKey(x => new { x.PromotionId, x.ProductId });
-            entity.Property(x => x.PromotionId).HasColumnName("promotion_id");
-            entity.Property(x => x.ProductId).HasColumnName("product_id");
-            entity.Property(x => x.Priority).HasColumnName("priority").HasDefaultValue(0);
-        });
+        // MemberHealthPreference đã cấu hình ở trên
 
         // ─────────────────────────────────────────────
         // REGION 2: Product Catalog

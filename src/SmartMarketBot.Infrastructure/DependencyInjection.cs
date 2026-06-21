@@ -38,23 +38,12 @@ public static class DependencyInjection
         services.AddScoped<IRobotService, RobotService>();
         services.AddScoped<IAisleScanService, AisleScanService>();
 
-        // Capstone 5-flow services
-        services.AddScoped<IPromotionService, PromotionService>();
+        // Member & Staff services
         services.AddScoped<IMealSuggestionService, MealSuggestionService>();
         services.AddScoped<IMemberService, MemberService>();
         services.AddScoped<IStaffService, StaffService>();
 
-        // Flow 6 - Admin CRUD
-        services.AddScoped<IAdminBrandService, AdminBrandService>();
-        services.AddScoped<IAdminAdPackageService, AdminAdPackageService>();
-        services.AddScoped<IAdminAdCampaignService, AdminAdCampaignService>();
-        services.AddScoped<IAdminSponsoredProductService, AdminSponsoredProductService>();
-
-        // Phase B - Ads Sponsored Recommendations (Flow 1)
-        services.AddScoped<IAdRecommendationService, AdRecommendationService>();
-        services.AddScoped<IAdAnalyticsService, AdAnalyticsService>();
-
-        // Brand & Ad Campaign Services (Flow 7)
+        // Brand & Ad Campaign Services
         services.AddScoped<IBrandService, BrandService>();
         services.AddScoped<IAdPackageService, AdPackageService>();
         services.AddScoped<IAdCampaignService, AdCampaignService>();

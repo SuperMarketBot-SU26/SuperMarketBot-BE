@@ -1,6 +1,5 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
-using SmartMarketBot.Application.Models.Admin;
 using SmartMarketBot.Application.Models.AisleScans;
 using SmartMarketBot.Application.Models.Auth;
 using SmartMarketBot.Application.Models.Members;
@@ -52,9 +51,6 @@ namespace SmartMarketBot.Application;
 [JsonSerializable(typeof(ReportOosResponseDto))]
 [JsonSerializable(typeof(MemberRealtimeUpdateDto))]
 [JsonSerializable(typeof(StaffRealtimeAlertDto))]
-[JsonSerializable(typeof(AdCampaignDto))]
-[JsonSerializable(typeof(CreateAdCampaignRequestDto))]
-[JsonSerializable(typeof(UpdateAdCampaignRequestDto))]
 [JsonSerializable(typeof(DateTime))]
 [JsonSerializable(typeof(DateTime?))]
 [JsonSerializable(typeof(JsonSerializerContext))]

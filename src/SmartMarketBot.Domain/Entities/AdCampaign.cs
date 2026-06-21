@@ -16,6 +16,7 @@ public sealed class AdCampaign
     public RobotZone? RobotZone { get; set; }
     public ICollection<AdCampaignLog> AdCampaignLogs { get; set; } = new List<AdCampaignLog>();
     public ICollection<SponsoredProduct> SponsoredProducts { get; set; } = new List<SponsoredProduct>();
+    public ICollection<AdResource> AdResources { get; set; } = new List<AdResource>();
 }
 
 public static class CampaignStatus

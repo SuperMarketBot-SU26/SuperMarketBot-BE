@@ -16,41 +16,48 @@ public sealed record CampaignResponseDto(
     int SponsoredProductCount,
     decimal TotalSpent);
 
-public sealed record CreateCampaignRequestDto(
+public sealed record CreateCampaignRequestDto
+{
     [Required(ErrorMessage = "PackageId là bắt buộc.")]
     [Range(1, int.MaxValue, ErrorMessage = "PackageId không hợp lệ.")]
-    int PackageId,
-    
+    public required int PackageId { get; init; }
+
     [Required(ErrorMessage = "BrandId là bắt buộc.")]
     [Range(1, int.MaxValue, ErrorMessage = "BrandId không hợp lệ.")]
-    int BrandId,
-    
-    [Range(1, int.MaxValue, ErrorMessage = "RobotZoneId không hợp lệ.")]
-    int? RobotZoneId,
-    
-    [Required(ErrorMessage = "CampaignName không được để trống.")]
-    [MaxLength(200, ErrorMessage = "CampaignName không được vượt quá 200 ký tự.")]
-    string CampaignName,
-    
-    [Required(ErrorMessage = "StartDate là bắt buộc.")]
-    DateTime StartDate,
-    
-    [Required(ErrorMessage = "EndDate là bắt buộc.")]
-    DateTime EndDate);
+    public required int BrandId { get; init; }
 
-public sealed record UpdateCampaignRequestDto(
+    [Range(1, int.MaxValue, ErrorMessage = "RobotZoneId không hợp lệ.")]
+    public int? RobotZoneId { get; init; }
+
     [Required(ErrorMessage = "CampaignName không được để trống.")]
     [MaxLength(200, ErrorMessage = "CampaignName không được vượt quá 200 ký tự.")]
-    string CampaignName,
-    
+    public required string CampaignName { get; init; }
+
     [Required(ErrorMessage = "StartDate là bắt buộc.")]
-    DateTime StartDate,
-    
+    public required DateTime StartDate { get; init; }
+
     [Required(ErrorMessage = "EndDate là bắt buộc.")]
-    DateTime EndDate,
-    
+    public required DateTime EndDate { get; init; }
+
+    [MinLength(1, ErrorMessage = "Phải có ít nhất 1 sản phẩm trong chiến dịch.")]
+    public List<int>? ProductIds { get; init; }
+}
+
+public sealed record UpdateCampaignRequestDto
+{
+    [Required(ErrorMessage = "CampaignName không được để trống.")]
+    [MaxLength(200, ErrorMessage = "CampaignName không được vượt quá 200 ký tự.")]
+    public required string CampaignName { get; init; }
+
+    [Required(ErrorMessage = "StartDate là bắt buộc.")]
+    public required DateTime StartDate { get; init; }
+
+    [Required(ErrorMessage = "EndDate là bắt buộc.")]
+    public required DateTime EndDate { get; init; }
+
     [Range(1, int.MaxValue, ErrorMessage = "RobotZoneId không hợp lệ.")]
-    int? RobotZoneId);
+    public int? RobotZoneId { get; init; }
+}
 
 public sealed record ActivateCampaignResponseDto(
     int AdCampaignId,

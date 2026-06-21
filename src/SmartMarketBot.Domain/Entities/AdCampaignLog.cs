@@ -14,10 +14,10 @@ public sealed class AdCampaignLog
     public int? ZoneId { get; set; }
     public int? SlotId { get; set; }
     public int? MemberId { get; set; }
+    public string? SessionId { get; set; }
     public decimal? XCoord { get; set; }
     public decimal? YCoord { get; set; }
-    public string? SessionId { get; set; }
-    
+
     public AdCampaign? AdCampaign { get; set; }
     public SponsoredProduct? SponsoredProduct { get; set; }
     public Product? Product { get; set; }

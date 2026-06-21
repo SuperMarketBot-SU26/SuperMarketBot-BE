@@ -8,7 +8,8 @@ namespace SmartMarketBot.API.Controllers;
 
 [ApiController]
 [Route("api/v1/ad-campaign")]
-public sealed class AdCampaignController(IAdCampaignService adCampaignService) : ControllerBase
+public sealed class AdCampaignController(
+    IAdCampaignService adCampaignService) : ControllerBase
 {
     [HttpGet("robot-playlist/{robotId:int}")]
     [AllowAnonymous]
@@ -27,6 +28,16 @@ public sealed class AdCampaignController(IAdCampaignService adCampaignService) :
         CancellationToken cancellationToken)
     {
         var result = await adCampaignService.LogInteractionAsync(request, cancellationToken);
+        return Ok(result);
+    }
+
+    [HttpPut("session/bind")]
+    [AllowAnonymous]
+    public async Task<ActionResult<SessionBindResponseDto>> BindSession(
+        [FromBody] SessionBindRequestDto request,
+        CancellationToken cancellationToken)
+    {
+        var result = await adCampaignService.BindSessionAsync(request, cancellationToken);
         return Ok(result);
     }
 }

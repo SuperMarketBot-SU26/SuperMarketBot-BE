@@ -2,35 +2,30 @@ using System.ComponentModel.DataAnnotations;
 
 namespace SmartMarketBot.Application.Models.Ads;
 
-public sealed record LogInteractionRequestDto(
+public sealed record LogInteractionRequestDto
+{
     [Required(ErrorMessage = "AdCampaignId là bắt buộc.")]
     [Range(1, int.MaxValue, ErrorMessage = "AdCampaignId không hợp lệ.")]
-    int AdCampaignId,
-    
+    public required int AdCampaignId { get; init; }
+
     [Required(ErrorMessage = "ActionType là bắt buộc.")]
     [RegularExpression("^(Click|Navigation|Impression)$", ErrorMessage = "ActionType chỉ nhận giá trị 'Click', 'Navigation', hoặc 'Impression'.")]
-    string ActionType,
-    
-    int? SponsoredId,
-    
-    int? ProductId,
-    
-    int? RobotId,
-    
-    int? RobotZoneId,
-    
-    int? ZoneId,
-    
-    int? SlotId,
-    
-    int? MemberId,
-    
-    [MaxLength(100, ErrorMessage = "SessionId không được vượt quá 100 ký tự.")]
-    string? SessionId,
-    
-    decimal? XCoord,
-    
-    decimal? YCoord);
+    public required string ActionType { get; init; }
+
+    public int? SponsoredId { get; init; }
+    public int? ProductId { get; init; }
+    public int? RobotId { get; init; }
+    public int? RobotZoneId { get; init; }
+    public int? ZoneId { get; init; }
+    public int? SlotId { get; init; }
+    public int? MemberId { get; init; }
+
+    [MaxLength(100, ErrorMessage = "SessionID không được vượt quá 100 ký tự.")]
+    public string? SessionId { get; init; }
+
+    public decimal? XCoord { get; init; }
+    public decimal? YCoord { get; init; }
+}
 
 public sealed record LogInteractionResponseDto(
     bool Success,
@@ -39,26 +34,6 @@ public sealed record LogInteractionResponseDto(
     bool IsFraud,
     string? FraudReason,
     string Message);
-
-public sealed record RobotPlaylistItemDto(
-    int SponsoredId,
-    int AdCampaignId,
-    string CampaignName,
-    int ProductId,
-    string ProductName,
-    decimal? ProductPrice,
-    int Priority,
-    int AdScore,
-    DateTime EndDate,
-    string MediaUrl,
-    string MediaType,
-    int DisplayDurationSeconds);
-
-public sealed record RobotPlaylistResponseDto(
-    int RobotId,
-    int? CurrentZoneId,
-    IReadOnlyList<RobotPlaylistItemDto> Playlist,
-    DateTime GeneratedAt);
 
 public sealed record AdCampaignLogDto(
     int LogId,
@@ -73,4 +48,5 @@ public sealed record AdCampaignLogDto(
     int? RobotId,
     int? ZoneId,
     int? MemberId,
+    string? SessionId,
     bool IsFraud);

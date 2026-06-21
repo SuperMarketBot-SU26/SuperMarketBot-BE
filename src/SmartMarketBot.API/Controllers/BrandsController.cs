@@ -1,4 +1,4 @@
-using Microsoft.AspNetCore.Authorization;
+﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using SmartMarketBot.Application.Interfaces;
 using SmartMarketBot.Application.Models.Ads;
@@ -53,13 +53,22 @@ public sealed class BrandsController(IBrandService brandService) : ControllerBas
     }
 
     [HttpPost("{brandId:int}/wallet/topup")]
-    [Authorize(Roles = Roles.Admin)]
     public async Task<ActionResult<TopUpWalletResponseDto>> TopUpWallet(
         int brandId,
         [FromBody] TopUpWalletRequestDto request,
         CancellationToken cancellationToken)
     {
         var result = await brandService.TopUpWalletAsync(brandId, request, cancellationToken);
+        return Ok(result);
+    }
+
+    [HttpPost("{brandId:int}/deposit")]
+    public async Task<ActionResult<AdminDepositResponseDto>> AdminDeposit(
+        int brandId,
+        [FromBody] AdminDepositRequestDto request,
+        CancellationToken cancellationToken)
+    {
+        var result = await brandService.AdminDepositAsync(brandId, request, cancellationToken);
         return Ok(result);
     }
 }

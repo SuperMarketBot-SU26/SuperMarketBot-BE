@@ -10,4 +10,5 @@ public interface IBrandService
     Task<BrandDto> UpdateAsync(int brandId, UpdateBrandRequestDto request, CancellationToken cancellationToken = default);
     Task<bool> DeleteAsync(int brandId, CancellationToken cancellationToken = default);
     Task<TopUpWalletResponseDto> TopUpWalletAsync(int brandId, TopUpWalletRequestDto request, CancellationToken cancellationToken = default);
+    Task<AdminDepositResponseDto> AdminDepositAsync(int brandId, AdminDepositRequestDto request, CancellationToken cancellationToken = default);
 }

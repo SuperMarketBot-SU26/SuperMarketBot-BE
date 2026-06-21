@@ -394,9 +394,9 @@ CREATE TABLE dbo.AD_CAMPAIGN_LOG (
     LogID           INT IDENTITY(1,1) PRIMARY KEY,
     AdCampaignID    INT            NOT NULL REFERENCES dbo.AD_CAMPAIGN(AdCampaignID) ON DELETE CASCADE,
     ActionType      NVARCHAR(50)   NOT NULL,  -- Click / View / RoutePass
-    ChargedAmount   DECIMAL(18,2)  NOT NULL DEFAULT 0, -- Số tiền bị trừ của lượt click/view/route
+    ChargedAmount   DECIMAL(18,2)  NOT NULL DEFAULT 0, -- Số tiền thực tế bị trừ của lượt tương tác
     Timestamp       DATETIME2      NOT NULL DEFAULT DATEADD(hour, 7, GETUTCDATE()), -- Múi giờ Việt Nam (UTC+7)
-    -- Phase B: chi tiết cho ActionType = 'RoutePass' (nullable, không phá dữ liệu Click/View cũ)
+    -- Phase B+: chi tiết cho ActionType = 'RoutePass' (nullable, không phá dữ liệu Click/View cũ)
     SponsoredID     INT            NULL,
     ProductID       INT            NULL REFERENCES dbo.PRODUCT(ProductID),
     RobotID         INT            NULL REFERENCES dbo.ROBOT(RobotID),
@@ -404,30 +404,44 @@ CREATE TABLE dbo.AD_CAMPAIGN_LOG (
     ZoneID          INT            NULL REFERENCES dbo.ZONE(ZoneID),
     SlotID          INT            NULL REFERENCES dbo.SLOT(SlotID),
     MemberID        INT            NULL REFERENCES dbo.MEMBER(MemberID) ON DELETE SET NULL,
+    SessionID       NVARCHAR(100)  NULL, -- Mã phiên tự sinh từ Robot để chống click-tặc ẩn danh
     XCoord          INT            NULL,
     YCoord          INT            NULL
 );
 CREATE INDEX IX_AD_CAMPAIGN_LOG_CAMPAIGN ON dbo.AD_CAMPAIGN_LOG(AdCampaignID);
 CREATE INDEX IX_AD_CAMPAIGN_LOG_ZONE     ON dbo.AD_CAMPAIGN_LOG(ZoneID, Timestamp DESC);
+CREATE INDEX IX_AD_CAMPAIGN_LOG_SESSION  ON dbo.AD_CAMPAIGN_LOG(SessionID, Timestamp DESC);
+
+CREATE TABLE dbo.AD_RESOURCE (
+    ResourceID      INT IDENTITY(1,1) PRIMARY KEY,
+    AdCampaignID    INT            NOT NULL REFERENCES dbo.AD_CAMPAIGN(AdCampaignID) ON DELETE CASCADE,
+    ResourceType    NVARCHAR(20)   NOT NULL,  -- IMAGE | VIDEO | VOICE_TEXT
+    ResourceURL     NVARCHAR(500)  NOT NULL,
+    ContentText     NVARCHAR(MAX)  NULL,      -- Văn bản cho VOICE_TEXT hoặc caption
+    Resolution      NVARCHAR(20)   NULL,      -- ví dụ: 1920x1080
+    Status          NVARCHAR(50)   NOT NULL DEFAULT 'Active' -- Active | Inactive
+);
+CREATE INDEX IX_AD_RESOURCE_CAMPAIGN ON dbo.AD_RESOURCE(AdCampaignID);
 
 CREATE TABLE dbo.SPONSORED_PRODUCT (
     SponsoredID     INT IDENTITY(1,1) PRIMARY KEY,
     AdCampaignID    INT            NOT NULL REFERENCES dbo.AD_CAMPAIGN(AdCampaignID),
     ProductID       INT            NOT NULL REFERENCES dbo.PRODUCT(ProductID) ON DELETE CASCADE,
     Priority        INT            NOT NULL DEFAULT 0,
-    status          NVARCHAR(50)   NOT NULL  -- enum (Đã xóa cột BrandID thừa)
+    status          NVARCHAR(50)   NOT NULL  -- enum
 );
+CREATE INDEX IX_SPONSORED_PRODUCT_CAMPAIGN ON dbo.SPONSORED_PRODUCT(AdCampaignID);
 
 GO
 
--- ===================== RÀNG BUỘC KHÓA NGOẠI PRODUCT -> AD_CAMPAIGN =====================
--- Nối sau cùng để tránh lỗi vòng lặp phụ thuộc khi tạo bảng (Dependency Cycle)
-ALTER TABLE dbo.PRODUCT ADD CONSTRAINT FK_PRODUCT_AD_CAMPAIGN 
-    FOREIGN KEY (AdCampaignID) REFERENCES dbo.AD_CAMPAIGN(AdCampaignID) ON DELETE SET NULL;
+-- Xóa ràng buộc FK_PRODUCT_AD_CAMPAIGN vì Product không còn liên kết trực tiếp đến AdCampaign
+-- Việc tài trợ sản phẩm được quản lý qua bảng trung gian SPONSORED_PRODUCT
+IF OBJECT_ID('dbo.FK_PRODUCT_AD_CAMPAIGN', 'F') IS NOT NULL
+    ALTER TABLE dbo.PRODUCT DROP CONSTRAINT FK_PRODUCT_AD_CAMPAIGN;
 GO
 
 -- Nối sau cùng để tránh lỗi vòng lặp phụ thuộc (SPONSORED_PRODUCT tạo sau AD_CAMPAIGN_LOG)
-ALTER TABLE dbo.AD_CAMPAIGN_LOG ADD CONSTRAINT FK_AD_CAMPAIGN_LOG_SPONSORED 
+ALTER TABLE dbo.AD_CAMPAIGN_LOG ADD CONSTRAINT FK_AD_CAMPAIGN_LOG_SPONSORED
     FOREIGN KEY (SponsoredID) REFERENCES dbo.SPONSORED_PRODUCT(SponsoredID) ON DELETE SET NULL;
 GO
 
@@ -469,6 +483,7 @@ GO
 -- 33. BRAND
 -- 34. AD_PACKAGE
 -- 35. AD_CAMPAIGN
--- 36. AD_CAMPAIGN_LOG (mở rộng Phase B: RoutePass columns)
+-- 36. AD_CAMPAIGN_LOG (mở rộng Phase B+: SessionID, ChargedAmount, MemberID)
 -- 37. SPONSORED_PRODUCT
+-- 38. AD_RESOURCE (lưu trữ nội dung đa phương tiện: IMAGE/VIDEO/VOICE_TEXT)
 -- ============================================================

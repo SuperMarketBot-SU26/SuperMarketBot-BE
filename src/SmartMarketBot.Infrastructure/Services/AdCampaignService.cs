@@ -14,15 +14,19 @@ public sealed class AdCampaignService(
     ILogger<AdCampaignService> logger) : IAdCampaignService
 {
     private static readonly Lock WalletLock = new();
+
     private const int PeakHourStart1 = 11;
     private const int PeakHourEnd1 = 13;
     private const int PeakHourStart2 = 17;
     private const int PeakHourEnd2 = 20;
     private const decimal PeakHourMultiplier = 1.5m;
+
     private const int FraudDetectionWindowSeconds = 30;
     private const int MaxClicksPerWindow = 3;
 
-    public async Task<PaginatedResponse<CampaignResponseDto>> GetListAsync(CampaignListRequestDto request, CancellationToken cancellationToken = default)
+    public async Task<PaginatedResponse<CampaignResponseDto>> GetListAsync(
+        CampaignListRequestDto request,
+        CancellationToken cancellationToken = default)
     {
         var query = db.AdCampaigns
             .AsNoTracking()
@@ -58,13 +62,7 @@ public sealed class AdCampaignService(
 
         var items = campaigns.Select(MapCampaignToDto).ToList();
 
-        return new PaginatedResponse<CampaignResponseDto>(
-            items,
-            totalCount,
-            request.PageNumber,
-            request.PageSize,
-            totalPages
-        );
+        return new PaginatedResponse<CampaignResponseDto>(items, totalCount, request.PageNumber, request.PageSize, totalPages);
     }
 
     public async Task<CampaignResponseDto?> GetByIdAsync(int campaignId, CancellationToken cancellationToken = default)
@@ -80,7 +78,9 @@ public sealed class AdCampaignService(
         return campaign is null ? null : MapCampaignToDto(campaign);
     }
 
-    public async Task<CampaignResponseDto> CreateAsync(CreateCampaignRequestDto request, CancellationToken cancellationToken = default)
+    public async Task<CampaignResponseDto> CreateAsync(
+        CreateCampaignRequestDto request,
+        CancellationToken cancellationToken = default)
     {
         var package = await db.AdPackages.FindAsync([request.PackageId], cancellationToken)
             ?? throw new KeyNotFoundException(localizer.Get("AdPackageNotFound", request.PackageId));
@@ -112,6 +112,11 @@ public sealed class AdCampaignService(
         db.AdCampaigns.Add(campaign);
         await db.SaveChangesAsync(cancellationToken);
 
+        if (request.ProductIds is { Count: > 0 })
+        {
+            await AddSponsoredProductsAsync(campaign.AdCampaignId, request.ProductIds, cancellationToken);
+        }
+
         var result = await db.AdCampaigns
             .AsNoTracking()
             .Include(c => c.Package)
@@ -122,7 +127,87 @@ public sealed class AdCampaignService(
         return MapCampaignToDto(result);
     }
 
-    public async Task<CampaignResponseDto> UpdateAsync(int campaignId, UpdateCampaignRequestDto request, CancellationToken cancellationToken = default)
+    public async Task<CampaignResponseDto> CreateWithProductsAsync(
+        CreateCampaignWithProductsRequestDto request,
+        CancellationToken cancellationToken = default)
+    {
+        var package = await db.AdPackages.FindAsync([request.PackageId], cancellationToken)
+            ?? throw new KeyNotFoundException(localizer.Get("AdPackageNotFound", request.PackageId));
+
+        var brand = await db.Brands.FindAsync([request.BrandId], cancellationToken)
+            ?? throw new KeyNotFoundException(localizer.Get("BrandNotFound", request.BrandId));
+
+        if (request.RobotZoneId.HasValue)
+        {
+            var zoneExists = await db.RobotZones.AnyAsync(z => z.RobotZoneId == request.RobotZoneId.Value, cancellationToken);
+            if (!zoneExists)
+                throw new KeyNotFoundException(localizer.Get("RobotZoneNotFound", request.RobotZoneId.Value));
+        }
+
+        if (request.EndDate <= request.StartDate)
+            throw new ArgumentException(localizer.Get("EndDateMustBeAfterStartDate"));
+
+        if (request.ProductIds.Count == 0)
+            throw new ArgumentException(localizer.Get("ProductIdsRequired"));
+
+        await ValidateProductsExistAsync(request.ProductIds, cancellationToken);
+
+        await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
+        try
+        {
+            var campaign = new AdCampaign
+            {
+                PackageId = request.PackageId,
+                BrandId = request.BrandId,
+                RobotZoneId = request.RobotZoneId,
+                CampaignName = request.CampaignName,
+                StartDate = request.StartDate,
+                EndDate = request.EndDate,
+                Status = CampaignStatus.Inactive
+            };
+
+            db.AdCampaigns.Add(campaign);
+            await db.SaveChangesAsync(cancellationToken);
+
+            var sponsoredProducts = request.ProductIds
+                .Distinct()
+                .Select(productId => new SponsoredProduct
+                {
+                    AdCampaignId = campaign.AdCampaignId,
+                    ProductId = productId,
+                    Priority = 0,
+                    Status = SponsoredProductStatus.Active
+                })
+                .ToList();
+
+            db.SponsoredProducts.AddRange(sponsoredProducts);
+            await db.SaveChangesAsync(cancellationToken);
+            await transaction.CommitAsync(cancellationToken);
+
+            logger.LogInformation(
+                "Campaign {CampaignId} created with {Count} sponsored products for Brand {BrandId}",
+                campaign.AdCampaignId, sponsoredProducts.Count, campaign.BrandId);
+
+            var result = await db.AdCampaigns
+                .AsNoTracking()
+                .Include(c => c.Package)
+                .Include(c => c.Brand)
+                .Include(c => c.SponsoredProducts)
+                .FirstAsync(c => c.AdCampaignId == campaign.AdCampaignId, cancellationToken);
+
+            return MapCampaignToDto(result);
+        }
+        catch
+        {
+            await transaction.RollbackAsync(cancellationToken);
+            throw;
+        }
+    }
+
+    public async Task<CampaignResponseDto> UpdateAsync(
+        int campaignId,
+        UpdateCampaignRequestDto request,
+        CancellationToken cancellationToken = default)
     {
         var campaign = await db.AdCampaigns
             .Include(c => c.Package)
@@ -181,8 +266,6 @@ public sealed class AdCampaignService(
 
         if (isInMemory)
         {
-            // InMemory provider does not support transactions.
-            // The WalletLock (in-process) provides sufficient atomicity.
             lock (WalletLock)
             {
                 if (campaign.Brand!.Wallet < totalCost)
@@ -204,38 +287,27 @@ public sealed class AdCampaignService(
 
             await db.SaveChangesAsync(cancellationToken);
 
-            logger.LogInformation("Campaign {CampaignId} activated (InMemory). Charged {Amount}. Remaining: {Balance}",
+            logger.LogInformation(
+                "Campaign {CampaignId} activated (InMemory). Charged {Amount}. Remaining: {Balance}",
                 campaignId, totalCost, campaign.Brand.Wallet);
 
             return new ActivateCampaignResponseDto(
-                campaign.AdCampaignId,
-                campaign.CampaignName,
-                CampaignStatus.Inactive,
-                CampaignStatus.Active,
-                totalCost,
-                campaign.Brand.Wallet
-            );
+                campaign.AdCampaignId, campaign.CampaignName,
+                CampaignStatus.Inactive, CampaignStatus.Active,
+                totalCost, campaign.Brand.Wallet);
         }
 
-        // Real DB with transaction support
-        Microsoft.EntityFrameworkCore.Storage.IDbContextTransaction? transaction = null;
+        await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
         try
         {
-            transaction = await db.Database.BeginTransactionAsync(cancellationToken);
-
-            bool walletDeducted;
+            decimal newBalance;
             lock (WalletLock)
             {
                 if (campaign.Brand!.Wallet < totalCost)
                     throw new InvalidOperationException(localizer.Get("InsufficientWalletBalance", totalCost, campaign.Brand.Wallet));
 
                 campaign.Brand.Wallet -= totalCost;
-                walletDeducted = true;
-            }
-
-            if (!walletDeducted)
-            {
-                throw new InvalidOperationException(localizer.Get("WalletDeductionFailed"));
+                newBalance = campaign.Brand.Wallet;
             }
 
             campaign.Status = CampaignStatus.Active;
@@ -252,22 +324,18 @@ public sealed class AdCampaignService(
             await db.SaveChangesAsync(cancellationToken);
             await transaction.CommitAsync(cancellationToken);
 
-            logger.LogInformation("Campaign {CampaignId} activated. Charged {Amount} from Brand {BrandId} wallet. Remaining: {Balance}",
-                campaignId, totalCost, campaign.BrandId, campaign.Brand.Wallet);
+            logger.LogInformation(
+                "Campaign {CampaignId} activated. Charged {Amount} from Brand {BrandId} wallet. Remaining: {Balance}",
+                campaignId, totalCost, campaign.BrandId, newBalance);
 
             return new ActivateCampaignResponseDto(
-                campaign.AdCampaignId,
-                campaign.CampaignName,
-                CampaignStatus.Inactive,
-                CampaignStatus.Active,
-                totalCost,
-                campaign.Brand.Wallet
-            );
+                campaign.AdCampaignId, campaign.CampaignName,
+                CampaignStatus.Inactive, CampaignStatus.Active,
+                totalCost, newBalance);
         }
         catch
         {
-            if (transaction != null)
-                await transaction.RollbackAsync(cancellationToken);
+            await transaction.RollbackAsync(cancellationToken);
             throw;
         }
     }
@@ -284,25 +352,20 @@ public sealed class AdCampaignService(
 
         campaign.Status = CampaignStatus.Paused;
 
-        var log = new AdCampaignLog
+        db.AdCampaignLogs.Add(new AdCampaignLog
         {
             AdCampaignId = campaign.AdCampaignId,
             ActionType = "Paused",
             ChargedAmount = 0,
             Timestamp = DateTime.UtcNow
-        };
-        db.AdCampaignLogs.Add(log);
+        });
 
         await db.SaveChangesAsync(cancellationToken);
 
         logger.LogInformation("Campaign {CampaignId} paused. Reason: {Reason}", campaignId, reason);
 
         return new PauseCampaignResponseDto(
-            campaign.AdCampaignId,
-            campaign.CampaignName,
-            reason,
-            CampaignStatus.Paused
-        );
+            campaign.AdCampaignId, campaign.CampaignName, reason, CampaignStatus.Paused);
     }
 
     public async Task<CancelCampaignResponseDto> CancelAsync(int campaignId, CancellationToken cancellationToken = default)
@@ -336,52 +399,84 @@ public sealed class AdCampaignService(
 
         campaign.Status = CampaignStatus.Canceled;
 
-        var log = new AdCampaignLog
+        db.AdCampaignLogs.Add(new AdCampaignLog
         {
             AdCampaignId = campaign.AdCampaignId,
             ActionType = "Canceled",
             ChargedAmount = -refundedAmount,
             Timestamp = DateTime.UtcNow
-        };
-        db.AdCampaignLogs.Add(log);
+        });
 
         await db.SaveChangesAsync(cancellationToken);
 
         logger.LogInformation("Campaign {CampaignId} canceled. Refunded: {RefundedAmount}", campaignId, refundedAmount);
 
         return new CancelCampaignResponseDto(
-            campaign.AdCampaignId,
-            campaign.CampaignName,
-            CampaignStatus.Canceled,
-            refundedAmount
-        );
+            campaign.AdCampaignId, campaign.CampaignName, CampaignStatus.Canceled, refundedAmount);
+    }
+
+    public async Task<SessionBindResponseDto> BindSessionAsync(
+        SessionBindRequestDto request,
+        CancellationToken cancellationToken = default)
+    {
+        var memberExists = await db.Members.AnyAsync(m => m.MemberId == request.MemberId, cancellationToken);
+        if (!memberExists)
+            throw new KeyNotFoundException(localizer.Get("MemberNotFound", request.MemberId));
+
+        var now = DateTime.UtcNow;
+        var windowStart = now.AddSeconds(-FraudDetectionWindowSeconds);
+
+        var activeSessionLogs = await db.AdCampaignLogs
+            .Where(l => l.SessionId == request.SessionId
+                        && l.Timestamp >= windowStart
+                        && l.MemberId == null)
+            .ToListAsync(cancellationToken);
+
+        if (activeSessionLogs.Count == 0)
+            return new SessionBindResponseDto(
+                0, request.MemberId, request.SessionId,
+                localizer.Get("SessionBindNoMatch", request.SessionId));
+
+        foreach (var log in activeSessionLogs)
+        {
+            log.MemberId = request.MemberId;
+        }
+
+        await db.SaveChangesAsync(cancellationToken);
+
+        logger.LogInformation(
+            "Session {SessionId} bound to Member {MemberId}. Updated {Count} logs.",
+            request.SessionId, request.MemberId, activeSessionLogs.Count);
+
+        return new SessionBindResponseDto(
+            activeSessionLogs.Count, request.MemberId, request.SessionId,
+            localizer.Get("SessionBindSuccess", activeSessionLogs.Count));
     }
 
     public async Task ProcessExpiredCampaignsAsync(CancellationToken cancellationToken = default)
     {
         var now = DateTime.UtcNow;
         var expiredCampaigns = await db.AdCampaigns
-            .Where(c => c.Status == CampaignStatus.Active || c.Status == CampaignStatus.Paused)
-            .Where(c => c.EndDate < now)
+            .Where(c => (c.Status == CampaignStatus.Active || c.Status == CampaignStatus.Paused)
+                        && c.EndDate < now)
             .ToListAsync(cancellationToken);
 
         foreach (var campaign in expiredCampaigns)
         {
             campaign.Status = CampaignStatus.Completed;
 
-            var log = new AdCampaignLog
+            db.AdCampaignLogs.Add(new AdCampaignLog
             {
                 AdCampaignId = campaign.AdCampaignId,
                 ActionType = "Completed",
                 ChargedAmount = 0,
                 Timestamp = DateTime.UtcNow
-            };
-            db.AdCampaignLogs.Add(log);
+            });
 
             logger.LogInformation("Campaign {CampaignId} auto-completed due to EndDate expiry", campaign.AdCampaignId);
         }
 
-        if (expiredCampaigns.Any())
+        if (expiredCampaigns.Count != 0)
             await db.SaveChangesAsync(cancellationToken);
     }
 
@@ -429,6 +524,7 @@ public sealed class AdCampaignService(
     public async Task<RobotPlaylistResponseDto> GetRobotPlaylistAsync(int robotId, CancellationToken cancellationToken = default)
     {
         var robot = await db.Robots
+            .AsNoTracking()
             .Include(r => r.RobotZones)
             .FirstOrDefaultAsync(r => r.RobotId == robotId, cancellationToken)
             ?? throw new KeyNotFoundException(localizer.Get("RobotNotFound", robotId));
@@ -436,60 +532,67 @@ public sealed class AdCampaignService(
         var currentZone = robot.RobotZones.FirstOrDefault();
         var currentZoneId = currentZone?.ZoneId;
 
-        var productSlotQuery = db.ProductSlots
+        var productSlotsQuery = db.ProductSlots
             .AsNoTracking()
             .Include(ps => ps.Product!)
             .ThenInclude(p => p.SponsoredProducts)
-            .ThenInclude(sp => sp.AdCampaign)
-            .ThenInclude(c => c!.Package)
+            .ThenInclude(sp => sp.AdCampaign!)
+            .ThenInclude(ac => ac.Package)
+            .Include(ps => ps.Product!)
+            .ThenInclude(p => p.SponsoredProducts)
+            .ThenInclude(sp => sp.AdCampaign!)
+            .ThenInclude(ac => ac.AdResources)
             .Include(ps => ps.Slot!)
             .ThenInclude(s => s.Shelf!)
             .ThenInclude(sh => sh.Aisle!)
             .Where(ps => ps.Slot.Quantity > 0);
 
         if (currentZoneId.HasValue)
-        {
-            productSlotQuery = productSlotQuery
+            productSlotsQuery = productSlotsQuery
                 .Where(ps => ps.Slot.Shelf.Aisle.ZoneId == currentZoneId.Value);
-        }
 
-        var productSlots = await productSlotQuery.ToListAsync(cancellationToken);
+        var productSlots = await productSlotsQuery.ToListAsync(cancellationToken);
 
-        var activeCampaignProducts = productSlots
+        var now = DateTime.UtcNow;
+        var playlistItems = productSlots
             .SelectMany(ps => ps.Product!.SponsoredProducts)
-            .Where(sp => sp.AdCampaign?.Status == CampaignStatus.Active)
-            .Where(sp => sp.Status == SponsoredProductStatus.Active)
-            .ToList();
-
-        var playlist = activeCampaignProducts
-            .Select(sp => new RobotPlaylistItemDto(
-                sp.SponsoredId,
-                sp.AdCampaignId,
-                sp.AdCampaign!.CampaignName,
-                sp.ProductId,
-                sp.Product!.ProductName,
-                sp.Product.UnitPrice,
-                sp.Priority,
-                sp.AdCampaign.Package?.AdScore ?? 0,
-                sp.AdCampaign.EndDate,
-                sp.Product.ImageUrl ?? string.Empty,
-                "image",
-                30
-            ))
+            .Where(sp => sp.AdCampaign is { Status: CampaignStatus.Active }
+                        && sp.AdCampaign.StartDate <= now
+                        && sp.AdCampaign.EndDate >= now
+                        && sp.Status == SponsoredProductStatus.Active)
+            .Select(sp => new RobotPlaylistItemDto
+            {
+                SponsoredId = sp.SponsoredId,
+                AdCampaignId = sp.AdCampaignId,
+                CampaignName = sp.AdCampaign!.CampaignName,
+                ProductId = sp.ProductId,
+                ProductName = sp.Product!.ProductName,
+                ProductPrice = sp.Product!.UnitPrice,
+                Priority = sp.Priority,
+                AdScore = sp.AdCampaign!.Package?.AdScore ?? 0,
+                EndDate = sp.AdCampaign!.EndDate,
+                ImageUrl = sp.Product!.ImageUrl ?? string.Empty,
+                DisplayDurationSeconds = 30,
+                MediaContents = sp.AdCampaign!.AdResources
+                    .Where(r => r.Status == AdResourceStatus.Active)
+                    .Select(r => new MediaContentDto(
+                        r.ResourceType,
+                        r.ResourceUrl,
+                        r.ContentText,
+                        r.Resolution))
+                    .ToList()
+            })
             .OrderByDescending(item => item.AdScore)
             .ThenByDescending(item => item.Priority)
             .ThenBy(item => item.EndDate)
             .ToList();
 
-        return new RobotPlaylistResponseDto(
-            robotId,
-            currentZoneId,
-            playlist,
-            DateTime.UtcNow
-        );
+        return new RobotPlaylistResponseDto(robotId, currentZoneId, playlistItems, DateTime.UtcNow);
     }
 
-    public async Task<LogInteractionResponseDto> LogInteractionAsync(LogInteractionRequestDto request, CancellationToken cancellationToken = default)
+    public async Task<LogInteractionResponseDto> LogInteractionAsync(
+        LogInteractionRequestDto request,
+        CancellationToken cancellationToken = default)
     {
         var campaign = await db.AdCampaigns
             .Include(c => c.Package)
@@ -500,13 +603,7 @@ public sealed class AdCampaignService(
         if (campaign.Status != CampaignStatus.Active)
         {
             return new LogInteractionResponseDto(
-                true,
-                0,
-                0,
-                false,
-                null,
-                localizer.Get("CampaignNotActive")
-            );
+                true, 0, 0, false, null, localizer.Get("CampaignNotActive"));
         }
 
         bool isFraud = false;
@@ -515,30 +612,64 @@ public sealed class AdCampaignService(
 
         if (request.ActionType == AdActionType.Click || request.ActionType == AdActionType.Navigation)
         {
-            var interactionResult = await CheckAndDetectFraudAsync(request, cancellationToken);
-            isFraud = interactionResult.IsFraud;
-            fraudReason = interactionResult.FraudReason;
+            var fraudResult = await CheckAndDetectFraudAsync(request, cancellationToken);
+            isFraud = fraudResult.IsFraud;
+            fraudReason = fraudResult.FraudReason;
 
             if (!isFraud)
             {
                 var now = DateTime.UtcNow;
-                var currentHour = now.Hour;
-                var isPeakHour = (currentHour >= PeakHourStart1 && currentHour < PeakHourEnd1) ||
-                                 (currentHour >= PeakHourStart2 && currentHour < PeakHourEnd2);
+                var hour = now.Hour;
+                var isPeakHour = (hour >= PeakHourStart1 && hour < PeakHourEnd1) ||
+                                 (hour >= PeakHourStart2 && hour < PeakHourEnd2);
 
                 var basePrice = campaign.Package?.BasePriceClick ?? 0;
-                chargedAmount = isPeakHour ? basePrice * PeakHourMultiplier : basePrice;
+                chargedAmount = isPeakHour
+                    ? Math.Round(basePrice * PeakHourMultiplier, 2)
+                    : basePrice;
 
-                lock (WalletLock)
+                var isInMemory = db.Database.ProviderName?.Contains("InMemory", StringComparison.OrdinalIgnoreCase) == true;
+
+                if (isInMemory)
                 {
-                    if (campaign.Brand!.Wallet >= chargedAmount)
+                    lock (WalletLock)
                     {
-                        campaign.Brand.Wallet -= chargedAmount;
+                        if (campaign.Brand!.Wallet >= chargedAmount)
+                        {
+                            campaign.Brand.Wallet -= chargedAmount;
+                        }
+                        else
+                        {
+                            chargedAmount = campaign.Brand.Wallet;
+                            campaign.Brand.Wallet = 0;
+                        }
                     }
-                    else
+                }
+                else
+                {
+                    await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
+                    try
                     {
-                        chargedAmount = campaign.Brand.Wallet;
-                        campaign.Brand.Wallet = 0;
+                        lock (WalletLock)
+                        {
+                            if (campaign.Brand!.Wallet >= chargedAmount)
+                            {
+                                campaign.Brand.Wallet -= chargedAmount;
+                            }
+                            else
+                            {
+                                chargedAmount = campaign.Brand.Wallet;
+                                campaign.Brand.Wallet = 0;
+                            }
+                        }
+
+                        await db.SaveChangesAsync(cancellationToken);
+                        await transaction.CommitAsync(cancellationToken);
+                    }
+                    catch
+                    {
+                        await transaction.RollbackAsync(cancellationToken);
+                        throw;
                     }
                 }
 
@@ -562,11 +693,11 @@ public sealed class AdCampaignService(
             ZoneId = request.ZoneId,
             SlotId = request.SlotId,
             MemberId = request.MemberId,
+            SessionId = request.SessionId,
             XCoord = request.XCoord,
             YCoord = request.YCoord
         };
 
-        logEntry.SessionId = request.SessionId;
         db.AdCampaignLogs.Add(logEntry);
         await db.SaveChangesAsync(cancellationToken);
 
@@ -575,19 +706,16 @@ public sealed class AdCampaignService(
             request.AdCampaignId, request.ActionType, chargedAmount, isFraud);
 
         return new LogInteractionResponseDto(
-            true,
-            logEntry.LogId,
-            chargedAmount,
-            isFraud,
-            fraudReason,
-            isFraud ? localizer.Get("FraudDetected") : localizer.Get("InteractionLogged")
-        );
+            true, logEntry.LogId, chargedAmount, isFraud, fraudReason,
+            isFraud ? localizer.Get("FraudDetected") : localizer.Get("InteractionLogged"));
     }
 
-    public async Task<PaginatedResponse<AdCampaignLogDto>> GetCampaignLogsAsync(int campaignId, int pageNumber, int pageSize, CancellationToken cancellationToken = default)
+    public async Task<PaginatedResponse<AdCampaignLogDto>> GetCampaignLogsAsync(
+        int campaignId, int pageNumber, int pageSize,
+        CancellationToken cancellationToken = default)
     {
-        var campaign = await db.AdCampaigns.AnyAsync(c => c.AdCampaignId == campaignId, cancellationToken);
-        if (!campaign)
+        var exists = await db.AdCampaigns.AnyAsync(c => c.AdCampaignId == campaignId, cancellationToken);
+        if (!exists)
             throw new KeyNotFoundException(localizer.Get("CampaignNotFound", campaignId));
 
         var query = db.AdCampaignLogs
@@ -605,29 +733,16 @@ public sealed class AdCampaignService(
             .Take(pageSize)
             .ToListAsync(cancellationToken);
 
-        var items = logs.Select(l => new AdCampaignLogDto(
-            l.LogId,
-            l.AdCampaignId,
-            l.AdCampaign?.CampaignName,
-            l.ActionType,
-            l.ChargedAmount,
-            l.Timestamp,
-            l.SponsoredId,
-            l.ProductId,
-            l.Product?.ProductName,
-            l.RobotId,
-            l.ZoneId,
-            l.MemberId,
-            l.ActionType == AdActionType.FraudDetected
-        )).ToList();
+        var items = logs
+            .Select(l => new AdCampaignLogDto(
+                l.LogId, l.AdCampaignId, l.AdCampaign?.CampaignName,
+                l.ActionType, l.ChargedAmount, l.Timestamp,
+                l.SponsoredId, l.ProductId, l.Product?.ProductName,
+                l.RobotId, l.ZoneId, l.MemberId, l.SessionId,
+                l.ActionType == AdActionType.FraudDetected))
+            .ToList();
 
-        return new PaginatedResponse<AdCampaignLogDto>(
-            items,
-            totalCount,
-            pageNumber,
-            pageSize,
-            totalPages
-        );
+        return new PaginatedResponse<AdCampaignLogDto>(items, totalCount, pageNumber, pageSize, totalPages);
     }
 
     private async Task<(bool IsFraud, string? FraudReason)> CheckAndDetectFraudAsync(
@@ -639,24 +754,27 @@ public sealed class AdCampaignService(
 
         var windowStart = DateTime.UtcNow.AddSeconds(-FraudDetectionWindowSeconds);
 
-        // InMemory-compatible: count all qualifying logs, then compare.
-        // GroupBy + Select(g => g.Count()) is not supported by InMemory provider.
-        IQueryable<AdCampaignLog> query = db.AdCampaignLogs
+        IQueryable<AdCampaignLog> baseQuery = db.AdCampaignLogs
             .Where(l => l.AdCampaignId == request.AdCampaignId)
             .Where(l => l.ActionType == AdActionType.Click)
             .Where(l => l.Timestamp >= windowStart);
 
         if (!string.IsNullOrEmpty(request.SessionId))
-            query = query.Where(l => l.SessionId == request.SessionId);
+            baseQuery = baseQuery.Where(l => l.SessionId == request.SessionId);
         else if (request.MemberId.HasValue)
-            query = query.Where(l => l.MemberId == request.MemberId);
+            baseQuery = baseQuery.Where(l => l.MemberId == request.MemberId);
 
-        var recentClicks = await query.CountAsync(cancellationToken);
+        var recentClicks = await baseQuery.CountAsync(cancellationToken);
 
         if (recentClicks >= MaxClicksPerWindow)
         {
-            logger.LogWarning("Fraud detected: Session/Member exceeded max clicks. CampaignId={CampaignId}, SessionId={SessionId}, MemberId={MemberId}",
-                request.AdCampaignId, request.SessionId, request.MemberId);
+            var identifier = !string.IsNullOrEmpty(request.SessionId)
+                ? $"SessionID={request.SessionId}"
+                : $"MemberID={request.MemberId}";
+
+            logger.LogWarning(
+                "Fraud detected: {Identifier} exceeded max clicks ({Max}) in {Window}s. CampaignId={CampaignId}",
+                identifier, MaxClicksPerWindow, FraudDetectionWindowSeconds, request.AdCampaignId);
 
             return (true, localizer.Get("FraudExcessiveClicks", MaxClicksPerWindow, FraudDetectionWindowSeconds));
         }
@@ -664,21 +782,43 @@ public sealed class AdCampaignService(
         return (false, null);
     }
 
+    private async Task AddSponsoredProductsAsync(int campaignId, List<int> productIds, CancellationToken cancellationToken)
+    {
+        var sponsoredProducts = productIds
+            .Distinct()
+            .Select(productId => new SponsoredProduct
+            {
+                AdCampaignId = campaignId,
+                ProductId = productId,
+                Priority = 0,
+                Status = SponsoredProductStatus.Active
+            })
+            .ToList();
+
+        db.SponsoredProducts.AddRange(sponsoredProducts);
+        await db.SaveChangesAsync(cancellationToken);
+    }
+
+    private async Task ValidateProductsExistAsync(List<int> productIds, CancellationToken cancellationToken)
+    {
+        var existingIds = await db.Products
+            .Where(p => productIds.Contains(p.ProductId))
+            .Select(p => p.ProductId)
+            .ToListAsync(cancellationToken);
+
+        var missingIds = productIds.Except(existingIds).ToList();
+        if (missingIds.Count != 0)
+            throw new KeyNotFoundException(localizer.Get("ProductsNotFound", string.Join(", ", missingIds)));
+    }
+
     private static CampaignResponseDto MapCampaignToDto(AdCampaign c)
     {
         return new CampaignResponseDto(
-            c.AdCampaignId,
-            c.CampaignName,
-            c.PackageId,
-            c.Package?.PackageName ?? string.Empty,
-            c.BrandId,
-            c.Brand?.BrandName ?? string.Empty,
-            c.RobotZoneId,
-            c.StartDate,
-            c.EndDate,
-            c.Status,
+            c.AdCampaignId, c.CampaignName,
+            c.PackageId, c.Package?.PackageName ?? string.Empty,
+            c.BrandId, c.Brand?.BrandName ?? string.Empty,
+            c.RobotZoneId, c.StartDate, c.EndDate, c.Status,
             c.SponsoredProducts?.Count ?? 0,
-            c.AdCampaignLogs?.Sum(l => l.ChargedAmount) ?? 0
-        );
+            c.AdCampaignLogs?.Sum(l => l.ChargedAmount) ?? 0);
     }
 }

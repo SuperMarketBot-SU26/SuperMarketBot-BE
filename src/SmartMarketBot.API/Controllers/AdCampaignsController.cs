@@ -6,7 +6,8 @@ namespace SmartMarketBot.API.Controllers;
 
 [ApiController]
 [Route("api/v1/ad-campaigns")]
-public sealed class AdCampaignsController(IAdCampaignService adCampaignService) : ControllerBase
+public sealed class AdCampaignsController(
+    IAdCampaignService adCampaignService) : ControllerBase
 {
     [HttpGet]
     public async Task<ActionResult<PaginatedResponse<CampaignResponseDto>>> GetList(
@@ -32,6 +33,15 @@ public sealed class AdCampaignsController(IAdCampaignService adCampaignService) 
         CancellationToken cancellationToken)
     {
         var campaign = await adCampaignService.CreateAsync(request, cancellationToken);
+        return CreatedAtAction(nameof(GetById), new { campaignId = campaign.AdCampaignId }, campaign);
+    }
+
+    [HttpPost("with-products")]
+    public async Task<ActionResult<CampaignResponseDto>> CreateWithProducts(
+        [FromBody] CreateCampaignWithProductsRequestDto request,
+        CancellationToken cancellationToken)
+    {
+        var campaign = await adCampaignService.CreateWithProductsAsync(request, cancellationToken);
         return CreatedAtAction(nameof(GetById), new { campaignId = campaign.AdCampaignId }, campaign);
     }
 

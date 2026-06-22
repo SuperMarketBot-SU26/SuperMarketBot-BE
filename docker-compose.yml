@@ -31,4 +31,15 @@ services:
     depends_on:
       mosquitto:
         condition: service_started
+      ai-service:
+        condition: service_started
+    restart: unless-stopped
+
+  ai-service:
+    build:
+      context: ./ai-service
+      dockerfile: Dockerfile
+    container_name: smartmarketbot-ai
+    ports:
+      - "8000:8000"
     restart: unless-stopped

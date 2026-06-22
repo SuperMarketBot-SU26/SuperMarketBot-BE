@@ -1,8 +1,11 @@
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 using SmartMarketBot.Application.Interfaces;
 using SmartMarketBot.Application.Models.Navigation;
 using SmartMarketBot.Application.Models.Robots;
+using SmartMarketBot.Domain.Common;
+using SmartMarketBot.Domain.Enums;
 using SmartMarketBot.Infrastructure.Persistence;
 
 namespace SmartMarketBot.Infrastructure.Services;
@@ -11,7 +14,9 @@ public sealed class RobotService(
     AppDbContext dbContext,
     IRobotCommandPublisher commandPublisher,
     INavigationService navigationService,
-    ILocalizationService localizer) : IRobotService
+    IRobotHubNotifier hubNotifier,
+    ILocalizationService localizer,
+    ILogger<RobotService> logger) : IRobotService
 {
     public async Task<IReadOnlyList<RobotDto>> GetRobotsAsync(CancellationToken cancellationToken = default)
     {
@@ -99,5 +104,82 @@ public sealed class RobotService(
                 "navigate",
                 payloadWithCoords,
                 cancellationToken);
+    }
+
+    public async Task<RobotDto> UpdateStatusAsync(
+        string robotCode,
+        UpdateRobotStatusRequestDto request,
+        CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(robotCode))
+            throw new ArgumentException("robotCode is required", nameof(robotCode));
+
+        // 1. Validate status theo enum RobotStatus
+        if (!RobotStatusExtensions.TryParseDbString(request.Status, out var newStatus))
+        {
+            throw new ArgumentException(
+                $"Status không hợp lệ: '{request.Status}'. Hợp lệ: {string.Join(", ", RobotStatusExtensions.AllDbStrings)}");
+        }
+
+        if (request.BatteryPct is < 0 or > 100)
+            throw new ArgumentOutOfRangeException(nameof(request), "BatteryPct phải trong [0, 100].");
+
+        // 2. Tìm robot
+        var robot = await dbContext.Robots
+            .FirstOrDefaultAsync(r => r.RobotCode == robotCode, cancellationToken)
+            ?? throw new KeyNotFoundException(localizer.Get("RobotNotFound", robotCode));
+
+        // 3. Cập nhật field
+        var dbStatusString = newStatus.ToDbString();
+        robot.Status = dbStatusString;
+        if (request.BatteryPct.HasValue) robot.BatteryPct = request.BatteryPct.Value;
+        if (!string.IsNullOrWhiteSpace(request.Mode)) robot.Mode = request.Mode;
+        robot.LastSeenAt = DateTime.UtcNow;
+
+        // 4. Ghi Robot_Logs (audit + telemetry history)
+        var log = new Domain.Entities.RobotLog
+        {
+            RobotId = robot.RobotId,
+            Battery = robot.BatteryPct,
+            Status = dbStatusString,
+            Location = request.Mode ?? robot.Mode,
+            Timestamp = VnDateTime.Now,
+            XCoord = request.XCoord.HasValue ? (float)request.XCoord.Value : null,
+            YCoord = request.YCoord.HasValue ? (float)request.YCoord.Value : null
+        };
+        dbContext.RobotLogs.Add(log);
+
+        await dbContext.SaveChangesAsync(cancellationToken);
+
+        // 5. Broadcast SignalR telemetry tới group robot:{code} + All
+        try
+        {
+            var statusDto = new RobotStatusDto(
+                RobotCode: robot.RobotCode,
+                Battery: robot.BatteryPct,
+                Location: request.Mode ?? robot.Mode,
+                Status: dbStatusString,
+                Mode: robot.Mode,
+                IsOnline: newStatus != RobotStatus.Power_Off && newStatus != RobotStatus.Offline_Charging,
+                TimestampUtc: DateTime.UtcNow);
+            await hubNotifier.NotifyStatusAsync(statusDto, cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "[RobotService] Failed to broadcast status update");
+        }
+
+        logger.LogInformation(
+            "[RobotService] Status updated: {Code} → {Status} (battery={Battery}%, mode={Mode})",
+            robot.RobotCode, dbStatusString, robot.BatteryPct, robot.Mode);
+
+        return new RobotDto(
+            robot.RobotId,
+            robot.RobotName,
+            robot.RobotCode,
+            robot.BatteryPct,
+            robot.Mode,
+            robot.Status,
+            robot.LastSeenAt);
     }
 }

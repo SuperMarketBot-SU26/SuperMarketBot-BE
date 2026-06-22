@@ -14,4 +14,10 @@ public interface IRobotService
     /// Trả về pose mới nhất của robot từ log Dead Reckoning.
     /// </summary>
     Task<RobotPoseDto> GetPoseAsync(string robotCode, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Cập nhật trạng thái robot (Power_Off / Idle / Moving / Interacting / Offline_Charging).
+    /// Validate enum, cập nhật DB, ghi Robot_Logs, broadcast SignalR telemetry.
+    /// </summary>
+    Task<RobotDto> UpdateStatusAsync(string robotCode, UpdateRobotStatusRequestDto request, CancellationToken cancellationToken = default);
 }

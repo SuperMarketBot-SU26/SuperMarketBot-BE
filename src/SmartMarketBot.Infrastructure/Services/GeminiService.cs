@@ -63,4 +63,63 @@ public sealed class GeminiService(
             return defaultGreeting;
         }
     }
+
+    public async Task<string> RerankAndExplainAsync(string query, IReadOnlyList<string> productIdAndNames, CancellationToken ct = default)
+    {
+        // Fallback: nếu không có API key hoặc lỗi → trả nguyên thứ tự ban đầu
+        var fallback = string.Join(",", productIdAndNames.Select(s => s.Split(':')[0]));
+
+        if (string.IsNullOrEmpty(_options.GeminiApiKey) || productIdAndNames.Count == 0)
+            return fallback;
+
+        try
+        {
+            var listStr = string.Join("\n", productIdAndNames.Select((p, i) => $"{i + 1}. {p}"));
+            var prompt =
+                $"Bạn là hệ thống tìm kiếm sản phẩm siêu thị thông minh.\n" +
+                $"Người dùng tìm kiếm với từ khóa: \"{query}\"\n\n" +
+                $"Danh sách sản phẩm (id:tên):\n{listStr}\n\n" +
+                $"Hãy sắp xếp lại danh sách trên theo mức độ phù hợp giảm dần với từ khóa.\n" +
+                $"CHỈ trả về danh sách id theo thứ tự, phân tách bằng dấu phẩy, KHÔNG kèm giải thích.\n" +
+                $"Ví dụ: 12,5,8,1";
+
+            var requestBody = new
+            {
+                contents = new[]
+                {
+                    new { parts = new[] { new { text = prompt } } }
+                }
+            };
+
+            var url = $"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={_options.GeminiApiKey}";
+            using var response = await httpClient.PostAsJsonAsync(url, requestBody, ct);
+            if (!response.IsSuccessStatusCode)
+            {
+                logger.LogWarning("[GeminiService] Rerank returned {StatusCode}", response.StatusCode);
+                return fallback;
+            }
+
+            var json = await response.Content.ReadAsStringAsync(ct);
+            using var doc = JsonDocument.Parse(json);
+            var text = doc.RootElement
+                .GetProperty("candidates")[0]
+                .GetProperty("content")
+                .GetProperty("parts")[0]
+                .GetProperty("text")
+                .GetString();
+
+            var cleaned = (text ?? fallback).Trim();
+            // Validate: chỉ giữ số và dấu phẩy
+            var valid = string.Join(",",
+                cleaned.Split(new[] { ',', ' ', '\n' }, StringSplitOptions.RemoveEmptyEntries)
+                    .Where(s => int.TryParse(s.Trim(), out _)));
+
+            return string.IsNullOrEmpty(valid) ? fallback : valid;
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "[GeminiService] Rerank failed");
+            return fallback;
+        }
+    }
 }

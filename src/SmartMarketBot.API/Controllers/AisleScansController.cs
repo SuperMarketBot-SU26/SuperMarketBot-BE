@@ -21,13 +21,52 @@ public sealed class AisleScansController(
         return Ok(scans);
     }
 
-    /// <summary>Tạo bản ghi quét kệ mới (Robot gọi sau khi chụp ảnh AI Vision).</summary>
+    /// <summary>
+    /// Tạo bản ghi quét kệ mới.
+    /// Client có thể gửi kèm ImageBase64 (sẽ được upload Cloudinary)
+    /// hoặc gửi sẵn ImageUrl. EmptyPercentage có thể bỏ trống — BE tự tính từ Slot.Quantity.
+    /// </summary>
     [HttpPost]
     public async Task<ActionResult<ShelfScanDto>> Create(
         [FromBody] CreateAisleScanRequestDto request,
         CancellationToken cancellationToken = default)
     {
+        if (request == null)
+            return BadRequest(new { message = "Body không được rỗng." });
+        if (request.AisleId <= 0 || request.RobotId <= 0)
+            return BadRequest(new { message = "AisleId và RobotId phải > 0." });
+
         var scan = await AisleScanService.CreateScanAsync(request, cancellationToken);
+        return Ok(scan);
+    }
+
+    /// <summary>
+    /// Phase 2 — Robot chụp ảnh kệ rồi gửi về (chỉ cần AisleId + RobotId + ImageBase64).
+    /// BE tự upload Cloudinary, tự tính % trống trung bình từ Slot.Quantity của Aisle,
+    /// và tự broadcast SignalR staffAlert nếu vượt ngưỡng.
+    /// </summary>
+    [HttpPost("scan-with-photo")]
+    [Consumes("application/json")]
+    public async Task<ActionResult<ShelfScanDto>> ScanWithPhoto(
+        [FromBody] AisleScanWithPhotoRequestDto request,
+        CancellationToken cancellationToken = default)
+    {
+        if (request == null)
+            return BadRequest(new { message = "Body không được rỗng." });
+        if (request.AisleId <= 0 || request.RobotId <= 0)
+            return BadRequest(new { message = "AisleId và RobotId phải > 0." });
+        if (string.IsNullOrWhiteSpace(request.ImageBase64))
+            return BadRequest(new { message = "ImageBase64 không được rỗng." });
+
+        var create = new CreateAisleScanRequestDto(
+            request.AisleId,
+            ShelfLevelId: null,
+            request.RobotId,
+            EmptyPercentage: null,
+            ImageBase64: request.ImageBase64,
+            ImageUrl: null);
+
+        var scan = await AisleScanService.CreateScanAsync(create, cancellationToken);
         return Ok(scan);
     }
 

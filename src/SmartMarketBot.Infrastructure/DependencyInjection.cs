@@ -40,21 +40,17 @@ public static class DependencyInjection
         services.AddScoped<IAisleScanService, AisleScanService>();
         services.AddScoped<ISearchService, SearchService>();
 
-        // Capstone 5-flow services
-        services.AddScoped<IPromotionService, PromotionService>();
+        // Member & Staff services
         services.AddScoped<IMealSuggestionService, MealSuggestionService>();
         services.AddScoped<IMemberService, MemberService>();
         services.AddScoped<IStaffService, StaffService>();
 
-        // Flow 6 - Admin CRUD
-        services.AddScoped<IAdminBrandService, AdminBrandService>();
-        services.AddScoped<IAdminAdPackageService, AdminAdPackageService>();
-        services.AddScoped<IAdminAdCampaignService, AdminAdCampaignService>();
-        services.AddScoped<IAdminSponsoredProductService, AdminSponsoredProductService>();
-
-        // Phase B - Ads Sponsored Recommendations (Flow 1)
-        services.AddScoped<IAdRecommendationService, AdRecommendationService>();
-        services.AddScoped<IAdAnalyticsService, AdAnalyticsService>();
+        // Brand & Ad Campaign Services
+        services.AddScoped<IBrandService, BrandService>();
+        services.AddScoped<IAdPackageService, AdPackageService>();
+        services.AddScoped<IAdCampaignService, AdCampaignService>();
+        services.AddScoped<ISponsoredProductService, SponsoredProductService>();
+        services.AddScoped<IAdResourceService, AdResourceService>();
 
         // Realtime (skeleton — 3 bạn fill logic)
         services.AddScoped<IStaffRealtimeService, StaffRealtimeService>();

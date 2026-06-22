@@ -8,6 +8,7 @@ using SmartMarketBot.API.Realtime;
 using SmartMarketBot.Application;
 using SmartMarketBot.Application.Interfaces;
 using SmartMarketBot.Infrastructure;
+using SmartMarketBot.Infrastructure.Services;
 using Scalar.AspNetCore;
 using SmartMarketBot.Infrastructure.Options;
 
@@ -43,6 +44,7 @@ builder.Services.AddCors(options =>
 
 builder.Services.AddApplication();
 builder.Services.AddInfrastructure(builder.Configuration);
+builder.Services.AddScoped<IFileStorageService, FileStorageService>();
 builder.Services.AddScoped<IRobotHubNotifier, SignalRRobotHubNotifier>();
 builder.Services.AddSingleton<IStaffRealtimeNotifier, SignalRStaffHubNotifier>();
 builder.Services.AddSingleton<IMemberRealtimeNotifier, SignalRMemberHubNotifier>();
@@ -84,6 +86,7 @@ app.MapGet("/", () => Results.Redirect("/scalar/v1", permanent: false));
 
 app.UseMiddleware<GlobalExceptionMiddleware>();
 app.UseCors("AllowAll");
+app.UseStaticFiles();
 app.UseAuthentication();
 app.UseAuthorization();
 

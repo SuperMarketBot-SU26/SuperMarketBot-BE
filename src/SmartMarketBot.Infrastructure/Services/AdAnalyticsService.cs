@@ -59,7 +59,7 @@ public sealed class AdAnalyticsService(AppDbContext db, ILocalizationService loc
             activeCampaigns = await (
                 from ac in db.AdCampaigns.AsNoTracking()
                 join pkg in db.AdPackages.AsNoTracking() on ac.PackageId equals pkg.PackageId
-                where ac.Status == "Running"
+                where ac.Status == CampaignStatus.Active
                       && ac.StartDate <= nowUtc
                       && ac.EndDate >= nowUtc
                       && ac.RobotZoneId != null

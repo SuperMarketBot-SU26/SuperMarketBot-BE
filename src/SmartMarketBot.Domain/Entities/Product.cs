@@ -7,7 +7,6 @@ public class Product
     public string ProductName { get; set; } = string.Empty;
     public decimal UnitPrice { get; set; } = 0.00m;
     public decimal? PromotionPrice { get; set; }
-    public int? AdCampaignId { get; set; }
     public DateTime? ExpiredDate { get; set; }
     public string? ImageUrl { get; set; }
     public decimal? WeightOrVolume { get; set; }
@@ -21,7 +20,6 @@ public class Product
 
     public virtual ProductType? ProductType { get; set; }
     public virtual Product? SubstituteProduct { get; set; }
-    public virtual AdCampaign? AdCampaign { get; set; }
     public virtual ICollection<ProductHealthTag> ProductHealthTags { get; set; } = new List<ProductHealthTag>();
     public virtual ICollection<InvoiceHistoryItem> InvoiceHistoryItems { get; set; } = new List<InvoiceHistoryItem>();
     public virtual ICollection<MealItem> MealItems { get; set; } = new List<MealItem>();

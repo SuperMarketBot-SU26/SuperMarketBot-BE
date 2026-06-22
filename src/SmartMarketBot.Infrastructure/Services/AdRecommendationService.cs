@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using SmartMarketBot.Application.Interfaces;
 using SmartMarketBot.Application.Models.Ads;
+using SmartMarketBot.Domain.Entities;
 using SmartMarketBot.Infrastructure.Persistence;
 
 namespace SmartMarketBot.Infrastructure.Services;
@@ -44,7 +45,7 @@ public sealed class AdRecommendationService(AppDbContext db, ILocalizationServic
 
         // Bước 3a: lấy tất cả campaign active
         var activeCampaigns = await db.AdCampaigns.AsNoTracking()
-            .Where(ac => ac.Status == "Running"
+            .Where(ac => ac.Status == CampaignStatus.Active
                          && ac.StartDate <= nowUtc
                          && ac.EndDate >= nowUtc)
             .Select(ac => new { ac.AdCampaignId, ac.RobotZoneId })

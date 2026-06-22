@@ -40,6 +40,7 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
     public DbSet<AdCampaign> AdCampaigns => Set<AdCampaign>();
     public DbSet<SponsoredProduct> SponsoredProducts => Set<SponsoredProduct>();
     public DbSet<AdCampaignLog> AdCampaignLogs => Set<AdCampaignLog>();
+    public DbSet<AdResource> AdResources => Set<AdResource>();
 
     // ── Region 6: Robot & Navigation ─────────────────────────────────────────
     public DbSet<Robot> Robots => Set<Robot>();
@@ -200,7 +201,6 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
             entity.Property(x => x.ProductName).HasColumnName("ProductName").HasMaxLength(200).IsRequired();
             entity.Property(x => x.UnitPrice).HasColumnName("UnitPrice").HasPrecision(18, 2).HasDefaultValue(0m);
             entity.Property(x => x.PromotionPrice).HasColumnName("PromotionPrice").HasPrecision(18, 2);
-            entity.Property(x => x.AdCampaignId).HasColumnName("AdCampaignID");
             entity.Property(x => x.ExpiredDate).HasColumnName("ExpiredDate");
             entity.Property(x => x.ImageUrl).HasColumnName("ImageUrl").HasMaxLength(500);
             entity.Property(x => x.WeightOrVolume).HasColumnName("WeightOrVolume").HasPrecision(18, 3);
@@ -216,12 +216,6 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
                 .WithMany()
                 .HasForeignKey(x => x.SubstituteProductId)
                 .OnDelete(DeleteBehavior.NoAction);
-            // FK AdCampaign (nullable, SET NULL) - declared last to avoid dependency cycle
-            entity.HasOne(x => x.AdCampaign)
-                .WithMany()
-                .HasForeignKey(x => x.AdCampaignId)
-                .IsRequired(false)
-                .OnDelete(DeleteBehavior.SetNull);
         });
 
         modelBuilder.Entity<ProductHealthTag>(entity =>
@@ -467,6 +461,23 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
                 .OnDelete(DeleteBehavior.Cascade);
         });
 
+        modelBuilder.Entity<AdResource>(entity =>
+        {
+            entity.ToTable("AD_RESOURCE");
+            entity.HasKey(x => x.ResourceId);
+            entity.Property(x => x.ResourceId).HasColumnName("ResourceID");
+            entity.Property(x => x.AdCampaignId).HasColumnName("AdCampaignID");
+            entity.Property(x => x.ResourceType).HasColumnName("ResourceType").HasMaxLength(20).IsRequired();
+            entity.Property(x => x.ResourceUrl).HasColumnName("ResourceURL").HasMaxLength(500).IsRequired();
+            entity.Property(x => x.ContentText).HasColumnName("ContentText").HasColumnType("nvarchar(max)");
+            entity.Property(x => x.Resolution).HasColumnName("Resolution").HasMaxLength(20);
+            entity.Property(x => x.Status).HasColumnName("Status").HasMaxLength(50).HasDefaultValue("Active");
+            entity.HasOne(x => x.AdCampaign)
+                .WithMany(ac => ac.AdResources)
+                .HasForeignKey(x => x.AdCampaignId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
         modelBuilder.Entity<AdCampaignLog>(entity =>
         {
             entity.ToTable("AD_CAMPAIGN_LOG");
@@ -485,6 +496,7 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
             entity.Property(x => x.ZoneId).HasColumnName("ZoneID");
             entity.Property(x => x.SlotId).HasColumnName("SlotID");
             entity.Property(x => x.MemberId).HasColumnName("MemberID");
+            entity.Property(x => x.SessionId).HasColumnName("SessionID").HasMaxLength(100);
             entity.Property(x => x.XCoord).HasColumnName("XCoord");
             entity.Property(x => x.YCoord).HasColumnName("YCoord");
 

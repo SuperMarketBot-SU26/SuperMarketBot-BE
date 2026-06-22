@@ -20,6 +20,7 @@ public static class DependencyInjection
         services.Configure<MqttOptions>(configuration.GetSection(MqttOptions.SectionName));
         services.Configure<AiServiceOptions>(configuration.GetSection(AiServiceOptions.SectionName));
         services.Configure<EmailOptions>(configuration.GetSection(EmailOptions.SectionName));
+        services.Configure<CloudinaryOptions>(configuration.GetSection(CloudinaryOptions.SectionName));
 
         // Database
         services.AddDbContext<AppDbContext>(options =>
@@ -37,6 +38,7 @@ public static class DependencyInjection
         services.AddScoped<IProductService, ProductService>();
         services.AddScoped<IRobotService, RobotService>();
         services.AddScoped<IAisleScanService, AisleScanService>();
+        services.AddScoped<ISearchService, SearchService>();
 
         // Capstone 5-flow services
         services.AddScoped<IPromotionService, PromotionService>();
@@ -61,6 +63,7 @@ public static class DependencyInjection
         services.AddHttpClient<IAiVisionProxy, AiVisionProxy>();
         services.AddHttpClient<IFaceAiService, FaceAiService>();
         services.AddHttpClient<IGeminiService, GeminiService>();
+        services.AddHttpClient<ICloudStorageService, CloudinaryService>();
 
         // MQTT (Singleton + HostedService)
         services.AddSingleton<MqttClientService>();

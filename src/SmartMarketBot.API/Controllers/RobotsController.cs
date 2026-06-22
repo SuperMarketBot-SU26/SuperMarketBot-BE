@@ -15,6 +15,23 @@ public sealed class RobotsController(IRobotService robotService) : ControllerBas
         return Ok(robots);
     }
 
+    /// <summary>
+    /// Trả về danh sách trạng thái hợp lệ của robot (enum string).
+    /// </summary>
+    [HttpGet("status-values")]
+    public IActionResult GetStatusValues()
+    {
+        var values = new[]
+        {
+            "Power_Off",
+            "Idle",
+            "Moving",
+            "Interacting",
+            "Offline_Charging"
+        };
+        return Ok(values);
+    }
+
     [HttpPost("command")]
     public async Task<IActionResult> PublishCommand([FromBody] PublishRobotCommandRequestDto request, CancellationToken cancellationToken)
     {
@@ -40,5 +57,39 @@ public sealed class RobotsController(IRobotService robotService) : ControllerBas
     {
         var pose = await robotService.GetPoseAsync(robotCode, cancellationToken);
         return Ok(pose);
+    }
+
+    /// <summary>
+    /// Cập nhật trạng thái robot (Power_Off | Idle | Moving | Interacting | Offline_Charging).
+    /// Robot firmware (ESP32-S3) nên gọi endpoint này mỗi lần đổi trạng thái.
+    /// BE sẽ validate, lưu DB, ghi Robot_Logs và broadcast SignalR.
+    /// </summary>
+    [HttpPost("{robotCode}/status")]
+    public async Task<ActionResult<RobotDto>> UpdateStatus(
+        string robotCode,
+        [FromBody] UpdateRobotStatusRequestDto request,
+        CancellationToken cancellationToken = default)
+    {
+        if (request == null)
+            return BadRequest(new { message = "Body không được rỗng." });
+        if (string.IsNullOrWhiteSpace(request.Status))
+            return BadRequest(new
+            {
+                message = "Status bắt buộc. Hợp lệ: Power_Off, Idle, Moving, Interacting, Offline_Charging."
+            });
+
+        try
+        {
+            var updated = await robotService.UpdateStatusAsync(robotCode, request, cancellationToken);
+            return Ok(updated);
+        }
+        catch (KeyNotFoundException ex)
+        {
+            return NotFound(new { message = ex.Message });
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
     }
 }

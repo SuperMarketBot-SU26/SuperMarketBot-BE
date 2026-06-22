@@ -1,6 +1,5 @@
 using System.Security.Cryptography;
 using System.Text.Json;
-using System.IO;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -21,11 +20,14 @@ public sealed class AuthService(
     IOptions<JwtOptions> jwtOptions,
     IFaceAiService faceAiService,
     IGeminiService geminiService,
+    ICloudStorageService cloudStorage,
+    IOptions<CloudinaryOptions> cloudinaryOptions,
     ILogger<AuthService> logger,
     ILocalizationService localizer) : IAuthService
 {
     private readonly EmailOptions _emailOpts = emailOptions.Value;
     private readonly JwtOptions _jwtOpts = jwtOptions.Value;
+    private readonly CloudinaryOptions _cloudinaryOpts = cloudinaryOptions.Value;
 
     private const string OtpTypeRegistration = "Registration";
     private const string OtpTypePasswordReset = "PasswordReset";
@@ -150,21 +152,41 @@ public sealed class AuthService(
 
     public async Task<FaceLoginResponseDto> FaceLoginAsync(FaceLoginRequestDto request, CancellationToken ct = default)
     {
-        // 1. Gọi Python service để xác thực khuôn mặt từ Base64
+        // Strategy A: gọi Python AI service (chính xác cao, dùng Cloudinary Face API nếu có)
         var verifyResult = await faceAiService.VerifyFaceAsync(request.ImageBase64, ct);
-        if (verifyResult == null || verifyResult.Status != "success")
+
+        Member? member = null;
+        double confidence = 0;
+        if (verifyResult is { Status: "success" } && verifyResult.MemberId > 0)
         {
-            return new FaceLoginResponseDto(false, "Không nhận diện được khuôn mặt", null, null, null);
+            member = await db.Members
+                .Include(m => m.Account)
+                .FirstOrDefaultAsync(m => m.MemberId == verifyResult.MemberId, ct);
+            confidence = verifyResult.ConfidenceScore;
         }
 
-        // 2. Tìm thông tin Member trong DB
-        var member = await db.Members
-            .Include(m => m.Account)
-            .FirstOrDefaultAsync(m => m.MemberId == verifyResult.MemberId, ct);
+        // Strategy B: nếu Python không xác thực được → tự trích vector rồi so khớp với tất cả FaceVector trong DB
+        // (cosine similarity — fallback khi Python AI down)
+        if (member == null)
+        {
+            var probeVector = await faceAiService.ExtractFaceVectorAsync(request.ImageBase64, ct);
+            if (probeVector != null && probeVector.Count > 0)
+            {
+                var best = await FindBestFaceMatchAsync(probeVector, ct);
+                if (best is not null)
+                {
+                    member = best.Value.Member;
+                    confidence = best.Value.Similarity;
+                    logger.LogInformation(
+                        "[AuthService] Face matched via DB vector scan → MemberId={Id}, sim={Sim:F3}",
+                        member.MemberId, confidence);
+                }
+            }
+        }
 
         if (member == null)
         {
-            return new FaceLoginResponseDto(false, "Không tìm thấy thông tin hội viên", null, null, null);
+            return new FaceLoginResponseDto(false, "Không nhận diện được khuôn mặt", null, null, null);
         }
 
         // 3. Truy vấn các sản phẩm mua nhiều nhất từ lịch sử mua hàng
@@ -204,7 +226,67 @@ public sealed class AuthService(
             member.TotalPoints
         );
 
-        return new FaceLoginResponseDto(true, "Đăng nhập bằng khuôn mặt thành công", greeting, tokenDto, memberDto);
+        return new FaceLoginResponseDto(
+            true,
+            $"Đăng nhập bằng khuôn mặt thành công (confidence: {confidence:F2})",
+            greeting, tokenDto, memberDto);
+    }
+
+    /// <summary>
+    /// Duyệt tất cả Member có FaceVector trong DB, tính cosine similarity với vector đầu vào.
+    /// Ngưỡng chấp nhận: 0.85. Trả về match tốt nhất nếu vượt ngưỡng.
+    /// </summary>
+    private async Task<(Member Member, double Similarity)?> FindBestFaceMatchAsync(
+        List<double> probe, CancellationToken ct)
+    {
+        const double Threshold = 0.85;
+
+        var members = await db.Members
+            .Include(m => m.Account)
+            .Where(m => m.FaceVector != null && m.FaceVector != "")
+            .ToListAsync(ct);
+
+        Member? bestMember = null;
+        double bestSim = 0;
+
+        foreach (var m in members)
+        {
+            try
+            {
+                var stored = JsonSerializer.Deserialize<List<double>>(m.FaceVector!);
+                if (stored is null || stored.Count == 0 || stored.Count != probe.Count)
+                    continue;
+
+                var sim = CosineSimilarity(probe, stored);
+                if (sim > bestSim)
+                {
+                    bestSim = sim;
+                    bestMember = m;
+                }
+            }
+            catch (Exception ex)
+            {
+                logger.LogWarning(ex, "[AuthService] Bad FaceVector JSON for MemberId={Id}", m.MemberId);
+            }
+        }
+
+        if (bestMember != null && bestSim >= Threshold)
+            return (bestMember, bestSim);
+
+        return null;
+    }
+
+    private static double CosineSimilarity(List<double> a, List<double> b)
+    {
+        double dot = 0, na = 0, nb = 0;
+        for (int i = 0; i < a.Count; i++)
+        {
+            dot += a[i] * b[i];
+            na += a[i] * a[i];
+            nb += b[i] * b[i];
+        }
+        if (na == 0 || nb == 0) return 0;
+        return dot / (Math.Sqrt(na) * Math.Sqrt(nb));
     }
 
     public async Task<bool> RegisterFaceAsync(int userId, FaceLoginRequestDto request, CancellationToken ct = default)
@@ -227,37 +309,29 @@ public sealed class AuthService(
             return false;
         }
 
-        // 3. Giải mã ảnh Base64 và lưu vào storage
+        // 3. Upload ảnh lên Cloudinary (fallback local nếu chưa config)
         try
         {
-            var apiDir = Directory.GetCurrentDirectory(); // src/SmartMarketBot.API
-            var storagePath = Path.GetFullPath(Path.Combine(apiDir, "..", "..", "storage", "member_faces"));
-            Directory.CreateDirectory(storagePath);
+            var fileName = $"member-{member.MemberId}-{Guid.NewGuid():N}";
+            var imageUrl = await cloudStorage.UploadBase64Async(
+                request.ImageBase64,
+                _cloudinaryOpts.MemberFacesFolder,
+                fileName,
+                ct);
 
-            var fileName = $"{Guid.NewGuid():N}.jpg";
-            var filePath = Path.Combine(storagePath, fileName);
-
-            var base64Data = request.ImageBase64;
-            if (base64Data.Contains(","))
-            {
-                base64Data = base64Data.Split(',')[1];
-            }
-            var imageBytes = Convert.FromBase64String(base64Data);
-            await File.WriteAllBytesAsync(filePath, imageBytes, ct);
-
-            // 4. Cập nhật thông tin FacePath và FaceVector trong Database
-            member.FacePath = filePath;
+            // 4. Cập nhật thông tin FacePath (Cloudinary URL) và FaceVector trong Database
+            member.FacePath = imageUrl;
             member.FaceVector = JsonSerializer.Serialize(vector);
 
             db.Members.Update(member);
             await db.SaveChangesAsync(ct);
 
-            logger.LogInformation("[AuthService] Đăng ký khuôn mặt thành công cho MemberId: {MemberId}. File: {File}", member.MemberId, filePath);
+            logger.LogInformation("[AuthService] Đăng ký khuôn mặt thành công cho MemberId: {MemberId}. ImageUrl: {Url}", member.MemberId, imageUrl);
             return true;
         }
         catch (Exception ex)
         {
-            logger.LogError(ex, "[AuthService] Lỗi khi lưu ảnh hoặc cập nhật Database đăng ký khuôn mặt");
+            logger.LogError(ex, "[AuthService] Lỗi khi upload ảnh hoặc cập nhật Database đăng ký khuôn mặt");
             return false;
         }
     }

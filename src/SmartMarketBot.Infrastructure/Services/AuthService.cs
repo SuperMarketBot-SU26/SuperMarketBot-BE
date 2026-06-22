@@ -42,7 +42,7 @@ public sealed class AuthService(
         if (existingAccount)
             throw new InvalidOperationException(localizer.Get("EmailInUse"));
 
-        // Lưu tạm thông tin đăng ký + OTP vào Account (Status = "Pending").
+        // Lưu tạm thông tin đăng ký + OTP vào Account. Kích hoạt Active luôn để hỗ trợ Mobile gọi login trực tiếp.
         // Schema mới (ERD V4.0) gộp EMAIL_OTP vào ACCOUNT - không còn bảng riêng.
         var account = await db.Accounts.FirstOrDefaultAsync(a => a.Email == email, ct);
         var otpCode = GenerateOtp();
@@ -56,7 +56,7 @@ public sealed class AuthService(
                 PasswordHash = HashPassword(request.Password),
                 FullName = request.FullName,
                 Phone = request.Phone,
-                Status = "Pending",
+                Status = "Active",
                 Role = AccountRole.Member.ToString(),
                 OtpCode = otpCode,
                 OtpType = OtpTypeRegistration,
@@ -77,14 +77,31 @@ public sealed class AuthService(
             account.PasswordHash = HashPassword(request.Password);
             account.FullName = request.FullName;
             account.Phone = request.Phone;
+            account.Status = "Active";
             account.OtpCode = otpCode;
             account.OtpType = OtpTypeRegistration;
             account.OtpExpiredAt = VnDateTime.Now.AddMinutes(_emailOpts.OtpExpiryMinutes);
         }
 
+        // Tự động tạo Member nếu là vai trò Member và chưa tồn tại
+        if (account.Role == AccountRole.Member.ToString())
+        {
+            var exists = await db.Members.AnyAsync(m => m.AccountId == account.AccountId || m.Account == account, ct);
+            if (!exists)
+            {
+                var member = new Member
+                {
+                    Account = account,
+                    FullName = account.FullName ?? account.Email,
+                    TotalPoints = 0
+                };
+                db.Members.Add(member);
+            }
+        }
+
         await db.SaveChangesAsync(ct);
         await emailService.SendRegistrationOtpAsync(email, request.FullName, otpCode, ct);
-        logger.LogInformation("[Auth] Registration OTP sent → {Email}", email);
+        logger.LogInformation("[Auth] Registration completed. Account set to Active, Member record created and OTP sent → {Email}", email);
     }
 
     public async Task<AuthResponseDto> VerifyOtpAndRegisterAsync(VerifyOtpDto request, CancellationToken ct = default)
@@ -100,9 +117,25 @@ public sealed class AuthService(
         account.OtpType = null;
         account.OtpExpiredAt = null;
 
+        // Tự động tạo Member nếu là vai trò Member và chưa tồn tại
+        if (account.Role == AccountRole.Member.ToString())
+        {
+            var exists = await db.Members.AnyAsync(m => m.AccountId == account.AccountId, ct);
+            if (!exists)
+            {
+                var member = new Member
+                {
+                    AccountId = account.AccountId,
+                    FullName = account.FullName ?? account.Email,
+                    TotalPoints = 0
+                };
+                db.Members.Add(member);
+            }
+        }
+
         await db.SaveChangesAsync(ct);
 
-        logger.LogInformation("[Auth] Account registered: {Email}", email);
+        logger.LogInformation("[Auth] Account registered and Member record created: {Email}", email);
         return await BuildAuthResponseAsync(account, ct);
     }
 

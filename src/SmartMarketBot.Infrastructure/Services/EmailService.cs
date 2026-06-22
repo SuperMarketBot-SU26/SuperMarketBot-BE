@@ -54,9 +54,12 @@ public sealed class EmailService(
 
     public async Task SendEmailAsync(string toEmail, string subject, string htmlBody, CancellationToken ct = default)
     {
-        if (string.IsNullOrWhiteSpace(_opts.SmtpUser))
+        if (string.IsNullOrWhiteSpace(_opts.SmtpUser) || 
+            _opts.SmtpUser.Contains("REPLACE_") || 
+            string.IsNullOrWhiteSpace(_opts.FromEmail) || 
+            _opts.FromEmail.Contains("REPLACE_"))
         {
-            logger.LogWarning("[Email] SmtpUser chưa cấu hình — bỏ qua gửi tới {Email}", toEmail);
+            logger.LogWarning("[Email] SmtpUser hoặc FromEmail chưa cấu hình đúng. Bỏ qua gửi email tới {Email}. [DEBUG OTP] Nội dung Email: {Body}", toEmail, htmlBody);
             return;
         }
 

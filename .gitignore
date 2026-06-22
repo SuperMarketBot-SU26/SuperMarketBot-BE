@@ -427,6 +427,9 @@ db/*.log
 
 # Local app settings (override secrets per-machine)
 **/appsettings.*.local.json
+**/appsettings.json
+**/appsettings.*.json
+!.env.example
 
 # Cursor workspace artifacts
 .cursor/

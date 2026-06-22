@@ -1,4 +1,4 @@
-using System.Security.Cryptography;
+using System.Net.Http.Headers;
 using System.Text;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -9,8 +9,10 @@ namespace SmartMarketBot.Infrastructure.Services;
 
 /// <summary>
 /// Upload ảnh lên Cloudinary thông qua REST API.
-/// Hỗ trợ cả signed upload (cần API key/secret) và unsigned upload (cần upload_preset đã tạo trên dashboard).
-/// Tự động chọn mode theo cấu hình. Nếu cả 2 fail hoặc chưa cấu hình → fallback local filesystem.
+/// Tự build multipart raw bytes (thay vì MultipartFormDataContent của .NET) để
+/// giống hệt format curl khi test thủ công — tránh Cloudinary parse sai form.
+/// Thử unsigned trước (cần upload_preset ở mode Unsigned), fallback sang signed.
+/// Nếu cả 2 fail → fallback local filesystem.
 /// </summary>
 public sealed class CloudinaryService(
     HttpClient httpClient,
@@ -34,20 +36,7 @@ public sealed class CloudinaryService(
             return await SaveLocalAsync(imageBytes, folder, fileName, ct);
         }
 
-        // Ưu tiên signed upload nếu có đủ API key + secret
-        if (!string.IsNullOrWhiteSpace(_options.ApiKey) && !string.IsNullOrWhiteSpace(_options.ApiSecret))
-        {
-            try
-            {
-                return await UploadSignedAsync(imageBytes, folder, fileName, ct);
-            }
-            catch (CloudinaryException ex)
-            {
-                logger.LogWarning(ex, "[Cloudinary] Signed upload failed: {Msg}", ex.Message);
-            }
-        }
-
-        // Fallback: unsigned upload (cần upload_preset tồn tại trên Cloudinary)
+        // 1. Unsigned upload trước
         if (!string.IsNullOrWhiteSpace(_options.UploadPreset))
         {
             try
@@ -60,6 +49,19 @@ public sealed class CloudinaryService(
             }
         }
 
+        // 2. Fallback signed
+        if (!string.IsNullOrWhiteSpace(_options.ApiKey) && !string.IsNullOrWhiteSpace(_options.ApiSecret))
+        {
+            try
+            {
+                return await UploadSignedAsync(imageBytes, folder, fileName, ct);
+            }
+            catch (CloudinaryException ex)
+            {
+                logger.LogWarning(ex, "[Cloudinary] Signed upload failed: {Msg}", ex.Message);
+            }
+        }
+
         logger.LogWarning("[Cloudinary] All modes failed → fallback to local storage");
         return await SaveLocalAsync(imageBytes, folder, fileName, ct);
     }
@@ -67,49 +69,91 @@ public sealed class CloudinaryService(
     private async Task<string> UploadSignedAsync(byte[] bytes, string folder, string fileName, CancellationToken ct)
     {
         var timestamp = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
-
-        // Signature theo spec: sort params alphabetically, nối =value&, kết thúc bằng api_secret.
-        // Chỉ các params gửi lên (không tính api_key, file, signature).
         var signatureBase = $"folder={folder}&timestamp={timestamp}{_options.ApiSecret}";
-        using var sha1 = SHA1.Create();
+        using var sha1 = System.Security.Cryptography.SHA1.Create();
         var sig = Convert.ToHexString(sha1.ComputeHash(Encoding.UTF8.GetBytes(signatureBase))).ToLowerInvariant();
 
-        using var form = new MultipartFormDataContent
-        {
-            { new StringContent(_options.ApiKey), "api_key" },
-            { new StringContent(timestamp.ToString()), "timestamp" },
-            { new StringContent(folder), "folder" },
-            { new StringContent(sig), "signature" },
-            { new ByteArrayContent(bytes), "file", $"{fileName}.jpg" }
-        };
+        var body = BuildMultipart(
+            new[]
+            {
+                ("api_key", _options.ApiKey),
+                ("timestamp", timestamp.ToString()),
+                ("folder", folder),
+                ("signature", sig)
+            },
+            ("file", $"{fileName}.jpg", "image/jpeg", bytes));
 
         var url = $"https://api.cloudinary.com/v1_1/{_options.CloudName}/image/upload";
-        using var response = await httpClient.PostAsync(url, form, ct);
-        var body = await response.Content.ReadAsStringAsync(ct);
-
-        if (!response.IsSuccessStatusCode)
-            throw new CloudinaryException($"Signed upload {response.StatusCode}: {body}");
-
-        return ExtractSecureUrl(body, "Signed");
+        return await SendAsync(url, body, ct, "Signed");
     }
 
     private async Task<string> UploadUnsignedAsync(byte[] bytes, string folder, string fileName, CancellationToken ct)
     {
-        using var form = new MultipartFormDataContent
-        {
-            { new StringContent(_options.UploadPreset), "upload_preset" },
-            { new StringContent(folder), "folder" },
-            { new ByteArrayContent(bytes), "file", $"{fileName}.jpg" }
-        };
+        var body = BuildMultipart(
+            new[]
+            {
+                ("upload_preset", _options.UploadPreset),
+                ("folder", folder)
+            },
+            ("file", $"{fileName}.jpg", "image/jpeg", bytes));
 
         var url = $"https://api.cloudinary.com/v1_1/{_options.CloudName}/image/upload";
-        using var response = await httpClient.PostAsync(url, form, ct);
-        var body = await response.Content.ReadAsStringAsync(ct);
+        return await SendAsync(url, body, ct, "Unsigned");
+    }
+
+    /// <summary>
+    /// Build multipart/form-data thuần (giống format curl) để tránh .NET MultipartFormDataContent
+    /// tự thêm Content-Type header cho từng part (gây Cloudinary parse sai form).
+    /// </summary>
+    private static byte[] BuildMultipart(
+        IEnumerable<(string Name, string Value)> stringFields,
+        (string Name, string FileName, string ContentType, byte[] Content) fileField)
+    {
+        var boundary = "----CloudFormBoundary" + Guid.NewGuid().ToString("N");
+        var sb = new StringBuilder();
+
+        foreach (var (name, value) in stringFields)
+        {
+            sb.Append("--").Append(boundary).Append("\r\n");
+            sb.Append("Content-Disposition: form-data; name=\"").Append(name).Append("\"\r\n\r\n");
+            sb.Append(value).Append("\r\n");
+        }
+
+        sb.Append("--").Append(boundary).Append("\r\n");
+        sb.Append("Content-Disposition: form-data; name=\"").Append(fileField.Name)
+          .Append("\"; filename=\"").Append(fileField.FileName).Append("\"\r\n");
+        sb.Append("Content-Type: ").Append(fileField.ContentType).Append("\r\n\r\n");
+
+        var headerBytes = Encoding.UTF8.GetBytes(sb.ToString());
+        var footerBytes = Encoding.UTF8.GetBytes($"\r\n--{boundary}--\r\n");
+        var total = new byte[headerBytes.Length + fileField.Content.Length + footerBytes.Length];
+        Buffer.BlockCopy(headerBytes, 0, total, 0, headerBytes.Length);
+        Buffer.BlockCopy(fileField.Content, 0, total, headerBytes.Length, fileField.Content.Length);
+        Buffer.BlockCopy(footerBytes, 0, total, headerBytes.Length + fileField.Content.Length, footerBytes.Length);
+        return total;
+    }
+
+    private async Task<string> SendAsync(string url, byte[] body, CancellationToken ct, string mode)
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Post, url)
+        {
+            Content = new ByteArrayContent(body)
+        };
+        var boundary = "----CloudFormBoundary"; // prefix; BE build boundary nội bộ
+        // Đọc lại boundary từ body[2..] (sau "--") — đơn giản: tìm trong body
+        var bMatch = System.Text.RegularExpressions.Regex.Match(
+            Encoding.UTF8.GetString(body, 0, Math.Min(200, body.Length)),
+            @"----CloudFormBoundary([0-9a-f]+)");
+        var actualBoundary = bMatch.Success ? bMatch.Value : boundary;
+        request.Content.Headers.ContentType = MediaTypeHeaderValue.Parse($"multipart/form-data; boundary={actualBoundary}");
+
+        using var response = await httpClient.SendAsync(request, ct);
+        var respBody = await response.Content.ReadAsStringAsync(ct);
 
         if (!response.IsSuccessStatusCode)
-            throw new CloudinaryException($"Unsigned upload {response.StatusCode}: {body}");
+            throw new CloudinaryException($"{mode} upload {response.StatusCode}: {respBody}");
 
-        return ExtractSecureUrl(body, "Unsigned");
+        return ExtractSecureUrl(respBody, mode);
     }
 
     private string ExtractSecureUrl(string body, string mode)

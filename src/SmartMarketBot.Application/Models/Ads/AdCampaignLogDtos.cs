@@ -23,8 +23,8 @@ public sealed record LogInteractionRequestDto
     [MaxLength(100, ErrorMessage = "SessionID không được vượt quá 100 ký tự.")]
     public string? SessionId { get; init; }
 
-    public decimal? XCoord { get; init; }
-    public decimal? YCoord { get; init; }
+    public int? XCoord { get; init; }
+    public int? YCoord { get; init; }
 }
 
 public sealed record LogInteractionResponseDto(

@@ -15,8 +15,8 @@ public sealed class AdCampaignLog
     public int? SlotId { get; set; }
     public int? MemberId { get; set; }
     public string? SessionId { get; set; }
-    public decimal? XCoord { get; set; }
-    public decimal? YCoord { get; set; }
+    public int? XCoord { get; set; }
+    public int? YCoord { get; set; }
 
     public AdCampaign? AdCampaign { get; set; }
     public SponsoredProduct? SponsoredProduct { get; set; }

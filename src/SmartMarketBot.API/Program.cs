@@ -84,8 +84,8 @@ app.MapGet("/swagger", () => Results.Redirect("/scalar/v1", permanent: false));
 app.MapGet("/swagger/index.html", () => Results.Redirect("/scalar/v1", permanent: false));
 app.MapGet("/", () => Results.Redirect("/scalar/v1", permanent: false));
 
-app.UseMiddleware<GlobalExceptionMiddleware>();
 app.UseCors("AllowAll");
+app.UseMiddleware<GlobalExceptionMiddleware>();
 app.UseStaticFiles();
 app.UseAuthentication();
 app.UseAuthorization();

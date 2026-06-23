@@ -96,4 +96,28 @@ public sealed class ProductService(AppDbContext dbContext) : IProductService
                 x.ProductTypeId))
             .ToListAsync(cancellationToken);
     }
+
+    public async Task<IReadOnlyList<ProductDto>> GetUnmappedProductsAsync(CancellationToken cancellationToken = default)
+    {
+        // Lấy danh sách ProductID đã được gán vào SemanticObject
+        var mappedProductIds = await dbContext.SemanticObjects
+            .AsNoTracking()
+            .Where(s => s.ProductId.HasValue)
+            .Select(s => s.ProductId!.Value)
+            .Distinct()
+            .ToListAsync(cancellationToken);
+
+        return await dbContext.Products
+            .AsNoTracking()
+            .Where(p => !mappedProductIds.Contains(p.ProductId) && p.Status == "Available")
+            .OrderBy(p => p.ProductName)
+            .Select(p => new ProductDto(
+                p.ProductId,
+                p.ProductName,
+                p.UnitPrice,
+                p.Status,
+                p.ImageUrl,
+                p.ProductTypeId))
+            .ToListAsync(cancellationToken);
+    }
 }

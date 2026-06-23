@@ -84,6 +84,18 @@ public sealed class LocalizationService : ILocalizationService
                 ["DestNodeInvalid"] = "DestinationNodeId phải là số nguyên hợp lệ.",
                 ["RobotNotFound"] = "Không tìm thấy robot '{0}'.",
                 ["AllergenRegistered"] = "Sản phẩm chứa thành phần dị ứng đã đăng ký.",
+
+                // Map Management
+                ["MapSyncSuccess"] = "Đã đồng bộ bản đồ thành công.",
+                ["MapNotFound"] = "Không tìm thấy bản đồ {0}.",
+                ["MapNotFoundForFloor"] = "Không tìm thấy bản đồ cho tầng {0}.",
+                ["FloorplanImageUploaded"] = "Đã tải ảnh mặt bằng thành công.",
+                ["FloorIdRequired"] = "FloorId là bắt buộc.",
+                ["MapSyncEmptyPayload"] = "Dữ liệu sync trống. Cần có Nodes, Edges hoặc SemanticObjects.",
+                ["FileRequired"] = "File là bắt buộc.",
+                ["ImageOnlyAllowed"] = "Chỉ chấp nhận file ảnh JPG/PNG.",
+                ["SemanticObjectNotFound"] = "Không tìm thấy SemanticObject {0}.",
+
                 ["UnexpectedError"] = "Đã xảy ra lỗi không mong muốn."
             },
             ["en"] = new Dictionary<string, string>
@@ -156,6 +168,18 @@ public sealed class LocalizationService : ILocalizationService
                 ["DestNodeInvalid"] = "DestinationNodeId must be a valid integer.",
                 ["RobotNotFound"] = "Robot '{0}' not found.",
                 ["AllergenRegistered"] = "Product contains a registered allergen ingredient.",
+
+                // Map Management
+                ["MapSyncSuccess"] = "Map synchronized successfully.",
+                ["MapNotFound"] = "Map {0} not found.",
+                ["MapNotFoundForFloor"] = "No map found for floor {0}.",
+                ["FloorplanImageUploaded"] = "Floorplan image uploaded successfully.",
+                ["FloorIdRequired"] = "FloorId is required.",
+                ["MapSyncEmptyPayload"] = "Sync payload is empty. Nodes, Edges, or SemanticObjects required.",
+                ["FileRequired"] = "File is required.",
+                ["ImageOnlyAllowed"] = "Only JPG/PNG image files are allowed.",
+                ["SemanticObjectNotFound"] = "SemanticObject {0} not found.",
+
                 ["UnexpectedError"] = "An unexpected error occurred."
             }
         };

@@ -39,4 +39,13 @@ public sealed class ProductsController(IProductService productService) : Control
         var alternatives = await productService.GetAlternativeProductsAsync(id, memberId, cancellationToken);
         return Ok(alternatives);
     }
+
+    /// <summary>Trả về các sản phẩm chưa được gán vào SemanticObject (kệ hàng) nào trên map.</summary>
+    [HttpGet("unmapped")]
+    [AllowAnonymous]
+    public async Task<ActionResult<IReadOnlyList<ProductDto>>> GetUnmappedProducts(CancellationToken cancellationToken)
+    {
+        var products = await productService.GetUnmappedProductsAsync(cancellationToken);
+        return Ok(products);
+    }
 }

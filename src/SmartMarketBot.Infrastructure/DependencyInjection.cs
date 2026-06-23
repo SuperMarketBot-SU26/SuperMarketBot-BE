@@ -39,6 +39,8 @@ public static class DependencyInjection
         services.AddScoped<IRobotService, RobotService>();
         services.AddScoped<IAisleScanService, AisleScanService>();
         services.AddScoped<ISearchService, SearchService>();
+        services.AddScoped<IMapSyncService, MapSyncService>();
+        services.AddScoped<ISemanticObjectService, SemanticObjectService>();
 
         // Member & Staff services
         services.AddScoped<IMealSuggestionService, MealSuggestionService>();

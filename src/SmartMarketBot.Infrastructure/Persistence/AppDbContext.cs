@@ -596,6 +596,7 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
             entity.Property(x => x.FloorId).HasColumnName("FloorID");
             entity.Property(x => x.MapName).HasColumnName("MapName").HasMaxLength(100).IsRequired();
             entity.Property(x => x.MapData).HasColumnName("MapData").HasColumnType("nvarchar(max)");
+            entity.Property(x => x.FloorplanImageUrl).HasColumnName("FloorplanImageUrl").HasMaxLength(500);
             entity.Property(x => x.CreatedAt).HasColumnName("CreatedAt").HasDefaultValueSql("DATEADD(hour, 7, GETUTCDATE())");
             entity.HasOne(x => x.Floor)
                 .WithMany(f => f.Maps)
@@ -746,10 +747,15 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
             entity.Property(x => x.Confidence).HasColumnName("Confidence");
             entity.Property(x => x.DetectedAt).HasColumnName("DetectedAt");
             entity.Property(x => x.ImageUrl).HasColumnName("ImageUrl").HasMaxLength(500);
+            entity.Property(x => x.ProductId).HasColumnName("ProductID");
             entity.HasOne(x => x.Map)
                 .WithMany(m => m.SemanticObjects)
                 .HasForeignKey(x => x.MapId)
                 .OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne(x => x.Product)
+                .WithMany()
+                .HasForeignKey(x => x.ProductId)
+                .OnDelete(DeleteBehavior.SetNull);
         });
     }
 }

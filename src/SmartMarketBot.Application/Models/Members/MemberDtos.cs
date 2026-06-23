@@ -83,3 +83,84 @@ public sealed record MemberEventDto(
     DateOnly EventDate,
     decimal? DiscountPct,
     bool IsProcessed);
+
+// ─── Member Profile ────────────────────────────────────────────────────────────
+
+/// <summary>Thông tin profile đầy đủ của member đang đăng nhập.</summary>
+public sealed record MemberProfileDto(
+    int MemberId,
+    int AccountId,
+    string FullName,
+    string Email,
+    string? Phone,
+    string? FacePath,
+    int TotalPoints,
+    decimal? SpendingLimit,
+    string MembershipTier,
+    string AccountStatus,
+    DateTime CreatedAt);
+
+/// <summary>Request body cho PUT /api/members/me</summary>
+public sealed record UpdateProfileRequestDto(
+    [System.ComponentModel.DataAnnotations.StringLength(100, MinimumLength = 2, ErrorMessage = "Tên phải từ 2–100 ký tự.")]
+    string? FullName,
+
+    [System.ComponentModel.DataAnnotations.Phone(ErrorMessage = "Số điện thoại không hợp lệ.")]
+    [System.ComponentModel.DataAnnotations.StringLength(20)]
+    string? Phone);
+
+// ─── Budget ────────────────────────────────────────────────────────────────────
+
+/// <summary>Thông tin ngân sách hiện tại của member.</summary>
+public sealed record MemberBudgetDto(
+    int MemberId,
+    decimal? SpendingLimit,
+    string Message);
+
+/// <summary>Request body cho PUT /api/members/me/budget</summary>
+public sealed record UpdateBudgetRequestDto(
+    [System.ComponentModel.DataAnnotations.Range(0, 999_999_999, ErrorMessage = "Ngân sách phải >= 0.")]
+    decimal? SpendingLimit);
+
+// ─── Health Preferences (Chế độ ăn & Dị ứng) ──────────────────────────────────
+
+/// <summary>Một health tag trong hệ thống (diet / allergen / ...).</summary>
+public sealed record HealthTagDto(
+    int HealthTagId,
+    string TagName,
+    /// <summary>'diet' | 'allergen' | 'ingredient' | ...</summary>
+    string TagType);
+
+/// <summary>Một preference của member với một health tag cụ thể.</summary>
+public sealed record MemberHealthPreferenceItemDto(
+    int HealthTagId,
+    string TagName,
+    string TagType,
+    /// <summary>'Allergy' | 'Avoid' | 'Preferred'</summary>
+    string Status);
+
+/// <summary>Toàn bộ health preferences của member.</summary>
+public sealed record MemberHealthPreferencesDto(
+    int MemberId,
+    IReadOnlyList<MemberHealthPreferenceItemDto> Allergies,
+    IReadOnlyList<MemberHealthPreferenceItemDto> Avoids,
+    IReadOnlyList<MemberHealthPreferenceItemDto> Preferreds);
+
+/// <summary>Một item trong request upsert health preferences.</summary>
+public sealed record HealthPreferenceItemDto(
+    [System.ComponentModel.DataAnnotations.Range(1, int.MaxValue, ErrorMessage = "HealthTagId không hợp lệ.")]
+    int HealthTagId,
+
+    [System.ComponentModel.DataAnnotations.Required]
+    [System.ComponentModel.DataAnnotations.RegularExpression("^(Allergy|Avoid|Preferred)$",
+        ErrorMessage = "Status phải là 'Allergy', 'Avoid' hoặc 'Preferred'.")]
+    string Status);
+
+/// <summary>
+/// Request body cho PUT /api/members/me/health-preferences.
+/// Danh sách này sẽ THAY THẾ HOÀN TOÀN preferences hiện tại của member.
+/// Gửi danh sách rỗng [] để xóa hết.
+/// </summary>
+public sealed record UpdateHealthPreferencesRequestDto(
+    IReadOnlyList<HealthPreferenceItemDto> Preferences);
+

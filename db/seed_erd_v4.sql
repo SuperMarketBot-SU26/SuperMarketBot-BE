@@ -145,7 +145,7 @@ GO
 
 SET IDENTITY_INSERT dbo.AD_CAMPAIGN ON;
 INSERT INTO dbo.AD_CAMPAIGN (AdCampaignID, PackageID, BrandID, RobotZoneID, CampaignName, StartDate, EndDate, Status) VALUES
-(1, 1, 1, NULL, N'Coca mùa hè 2026', DATEADD(hour, 7, GETUTCDATE()), DATEADD(month, 3, DATEADD(hour, 7, GETUTCDATE())), N'Running');
+(1, 1, 1, NULL, N'Coca mùa hè 2026', DATEADD(hour, 7, GETUTCDATE()), DATEADD(month, 3, DATEADD(hour, 7, GETUTCDATE())), N'Inactive');
 SET IDENTITY_INSERT dbo.AD_CAMPAIGN OFF;
 GO
 

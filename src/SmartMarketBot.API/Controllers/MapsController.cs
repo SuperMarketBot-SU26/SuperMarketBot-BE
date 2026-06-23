@@ -55,7 +55,7 @@ public sealed class MapsController(
         return Ok(stats);
     }
 
-    /// <summary>Upload ảnh mặt bằng (JPG/PNG) do Tablet SLAM sinh ra. Lưu vào Supabase Storage, trả về đường link làm Background cho Web Manager.</summary>
+    /// <summary>Upload ảnh mặt bằng (JPG/PNG) do Tablet SLAM sinh ra. Lưu vào thư mục cục bộ của container, trả về đường link làm Background cho Web Manager.</summary>
     [HttpPost("{mapId:int}/upload-image")]
     [Consumes("multipart/form-data")]
     public async Task<ActionResult<UploadFloorplanImageResponseDto>> UploadFloorplanImage(

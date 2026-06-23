@@ -77,6 +77,33 @@ public sealed class MapSyncService(
 
         if (nodesToDelete.Count > 0)
         {
+            // Delete edges referencing these nodes first to avoid FK constraint violation
+            var edgesToRemove = await db.NavigationEdges
+                .Where(e => nodesToDelete.Contains(e.FromNodeId) || nodesToDelete.Contains(e.ToNodeId))
+                .ToListAsync(cancellationToken);
+            if (edgesToRemove.Count > 0)
+            {
+                db.NavigationEdges.RemoveRange(edgesToRemove);
+            }
+
+            // Delete AisleNode connections if any
+            var aisleNodesToRemove = await db.AisleNodes
+                .Where(an => nodesToDelete.Contains(an.NodeId))
+                .ToListAsync(cancellationToken);
+            if (aisleNodesToRemove.Count > 0)
+            {
+                db.AisleNodes.RemoveRange(aisleNodesToRemove);
+            }
+
+            // Delete RouteNodeMapping connections if any
+            var routeNodesToRemove = await db.RouteNodeMappings
+                .Where(rnm => nodesToDelete.Contains(rnm.NodeId))
+                .ToListAsync(cancellationToken);
+            if (routeNodesToRemove.Count > 0)
+            {
+                db.RouteNodeMappings.RemoveRange(routeNodesToRemove);
+            }
+
             var toRemove = await db.NavigationNodes
                 .Where(n => n.MapId == mapId && nodesToDelete.Contains(n.NodeId))
                 .ToListAsync(cancellationToken);

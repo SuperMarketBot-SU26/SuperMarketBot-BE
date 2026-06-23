@@ -254,90 +254,113 @@ public sealed class AdCampaignService(
             .FirstOrDefaultAsync(c => c.AdCampaignId == campaignId, cancellationToken)
             ?? throw new KeyNotFoundException(localizer.Get("CampaignNotFound", campaignId));
 
-        if (campaign.Status != CampaignStatus.Inactive)
+        if (campaign.Status != CampaignStatus.Inactive && campaign.Status != CampaignStatus.Paused)
             throw new InvalidOperationException(localizer.Get("CampaignNotInactive"));
 
-        if (campaign.Package is null)
-            throw new InvalidOperationException(localizer.Get("CampaignNoPackage"));
+        var isResuming = campaign.Status == CampaignStatus.Paused;
+        decimal chargedAmount = 0;
 
-        var totalCost = campaign.Package.PricePackage + campaign.Package.PriceRoute;
-
-        var isInMemory = db.Database.ProviderName?.Contains("InMemory", StringComparison.OrdinalIgnoreCase) == true;
-
-        if (isInMemory)
+        if (!isResuming)
         {
-            lock (WalletLock)
-            {
-                if (campaign.Brand!.Wallet < totalCost)
-                    throw new InvalidOperationException(localizer.Get("InsufficientWalletBalance", totalCost, campaign.Brand.Wallet));
+            if (campaign.Package is null)
+                throw new InvalidOperationException(localizer.Get("CampaignNoPackage"));
 
-                campaign.Brand.Wallet -= totalCost;
+            var totalCost = campaign.Package.PricePackage + campaign.Package.PriceRoute;
+            var isInMemory = db.Database.ProviderName?.Contains("InMemory", StringComparison.OrdinalIgnoreCase) == true;
+
+            if (isInMemory)
+            {
+                lock (WalletLock)
+                {
+                    if (campaign.Brand!.Wallet < totalCost)
+                        throw new InvalidOperationException(localizer.Get("InsufficientWalletBalance", totalCost, campaign.Brand.Wallet));
+
+                    campaign.Brand.Wallet -= totalCost;
+                }
+
+                campaign.StartDate = DateTime.UtcNow;
+
+                db.AdCampaignLogs.Add(new AdCampaignLog
+                {
+                    AdCampaignId = campaign.AdCampaignId,
+                    ActionType = "Activation",
+                    ChargedAmount = totalCost,
+                    Timestamp = DateTime.UtcNow
+                });
+
+                await db.SaveChangesAsync(cancellationToken);
+
+                logger.LogInformation(
+                    "Campaign {CampaignId} activated (InMemory). Charged {Amount}. Remaining: {Balance}",
+                    campaignId, totalCost, campaign.Brand!.Wallet);
+
+                campaign.Status = CampaignStatus.Active;
+                return new ActivateCampaignResponseDto(
+                    campaign.AdCampaignId, campaign.CampaignName,
+                    CampaignStatus.Inactive, CampaignStatus.Active,
+                    totalCost, campaign.Brand.Wallet);
             }
 
-            campaign.Status = CampaignStatus.Active;
-            campaign.StartDate = DateTime.UtcNow;
-
-            db.AdCampaignLogs.Add(new AdCampaignLog
+            await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
+            try
             {
-                AdCampaignId = campaign.AdCampaignId,
-                ActionType = "Activation",
-                ChargedAmount = totalCost,
-                Timestamp = DateTime.UtcNow
-            });
+                decimal newBalance;
+                lock (WalletLock)
+                {
+                    if (campaign.Brand!.Wallet < totalCost)
+                        throw new InvalidOperationException(localizer.Get("InsufficientWalletBalance", totalCost, campaign.Brand.Wallet));
 
-            await db.SaveChangesAsync(cancellationToken);
+                    campaign.Brand.Wallet -= totalCost;
+                    newBalance = campaign.Brand.Wallet;
+                }
 
-            logger.LogInformation(
-                "Campaign {CampaignId} activated (InMemory). Charged {Amount}. Remaining: {Balance}",
-                campaignId, totalCost, campaign.Brand.Wallet);
+                campaign.StartDate = DateTime.UtcNow;
 
-            return new ActivateCampaignResponseDto(
-                campaign.AdCampaignId, campaign.CampaignName,
-                CampaignStatus.Inactive, CampaignStatus.Active,
-                totalCost, campaign.Brand.Wallet);
-        }
+                db.AdCampaignLogs.Add(new AdCampaignLog
+                {
+                    AdCampaignId = campaign.AdCampaignId,
+                    ActionType = "Activation",
+                    ChargedAmount = totalCost,
+                    Timestamp = DateTime.UtcNow
+                });
 
-        await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
-        try
-        {
-            decimal newBalance;
-            lock (WalletLock)
-            {
-                if (campaign.Brand!.Wallet < totalCost)
-                    throw new InvalidOperationException(localizer.Get("InsufficientWalletBalance", totalCost, campaign.Brand.Wallet));
+                await db.SaveChangesAsync(cancellationToken);
+                await transaction.CommitAsync(cancellationToken);
 
-                campaign.Brand.Wallet -= totalCost;
-                newBalance = campaign.Brand.Wallet;
+                logger.LogInformation(
+                    "Campaign {CampaignId} activated. Charged {Amount} from Brand {BrandId} wallet. Remaining: {Balance}",
+                    campaignId, totalCost, campaign.BrandId, newBalance);
+
+                campaign.Status = CampaignStatus.Active;
+                return new ActivateCampaignResponseDto(
+                    campaign.AdCampaignId, campaign.CampaignName,
+                    CampaignStatus.Inactive, CampaignStatus.Active,
+                    totalCost, newBalance);
             }
-
-            campaign.Status = CampaignStatus.Active;
-            campaign.StartDate = DateTime.UtcNow;
-
-            db.AdCampaignLogs.Add(new AdCampaignLog
+            catch
             {
-                AdCampaignId = campaign.AdCampaignId,
-                ActionType = "Activation",
-                ChargedAmount = totalCost,
-                Timestamp = DateTime.UtcNow
-            });
-
-            await db.SaveChangesAsync(cancellationToken);
-            await transaction.CommitAsync(cancellationToken);
-
-            logger.LogInformation(
-                "Campaign {CampaignId} activated. Charged {Amount} from Brand {BrandId} wallet. Remaining: {Balance}",
-                campaignId, totalCost, campaign.BrandId, newBalance);
-
-            return new ActivateCampaignResponseDto(
-                campaign.AdCampaignId, campaign.CampaignName,
-                CampaignStatus.Inactive, CampaignStatus.Active,
-                totalCost, newBalance);
+                await transaction.RollbackAsync(cancellationToken);
+                throw;
+            }
         }
-        catch
+
+        campaign.Status = CampaignStatus.Active;
+        db.AdCampaignLogs.Add(new AdCampaignLog
         {
-            await transaction.RollbackAsync(cancellationToken);
-            throw;
-        }
+            AdCampaignId = campaign.AdCampaignId,
+            ActionType = "Resumed",
+            ChargedAmount = 0,
+            Timestamp = DateTime.UtcNow
+        });
+
+        await db.SaveChangesAsync(cancellationToken);
+
+        logger.LogInformation("Campaign {CampaignId} resumed from Paused. No charge applied.", campaignId);
+
+        return new ActivateCampaignResponseDto(
+            campaign.AdCampaignId, campaign.CampaignName,
+            CampaignStatus.Paused, CampaignStatus.Active,
+            0, campaign.Brand!.Wallet);
     }
 
     public async Task<PauseCampaignResponseDto> PauseAsync(int campaignId, string reason, CancellationToken cancellationToken = default)

@@ -22,8 +22,8 @@ curl http://localhost:5000/api/health
 | Service        | Port | URL                                          |
 | -------------- | ---- | -------------------------------------------- |
 | API + Swagger  | 5000 | http://localhost:5000                        |
-| SQL Server     | 1434 | `localhost,1434` (sa / `YourStrong!Passw0rd`)|
-| MQTT Broker    | 1883 | `mqtt://localhost:1883`                      |
+| SQL Server     | 1433 | `supermarketbot.database.windows.net,1433` (Azure SQL Database) |
+| MQTT Broker    | 8883 | `60922debd474446a84747b871c4a8182.s1.eu.hivemq.cloud` (HiveMQ Cloud TLS) |
 | SignalR Hub    | 5000 | `ws://localhost:5000/hubs/robot`             |
 
 > AI Face Service (Python) chạy riêng ở repo [`SuperMarketBot-AI`](../SuperMarketBot-AI).
@@ -33,11 +33,8 @@ curl http://localhost:5000/api/health
 ## 🛠️ Dev (không dùng Docker)
 
 ```bash
-# 1. Khởi động SQL Server LocalDB
-sqllocaldb start MSSQLLocalDB
-sqlcmd -S "(localdb)\MSSQLLocalDB" -i db/erd_database.sql
-
-# 2. Chạy API
+# Cấu hình kết nối DB và MQTT đã được trỏ sang Azure SQL và HiveMQ Cloud trong appsettings.json.
+# Bạn chỉ cần chạy ứng dụng:
 dotnet run --project src/SmartMarketBot.API
 ```
 

@@ -3,14 +3,15 @@ using SmartMarketBot.Application.Interfaces;
 using SmartMarketBot.Application.Models.Members;
 using SmartMarketBot.Application.Models.Products;
 using SmartMarketBot.Domain.Common;
+using SmartMarketBot.Domain.Entities;
 using SmartMarketBot.Infrastructure.Persistence;
 
 namespace SmartMarketBot.Infrastructure.Services;
 
-/// <summary>Flow 3 — Budget &amp; Health + Flow 2 Deal Hunter + Member Alerts.</summary>
+/// <summary>Flow 3 — Budget &amp; Health + Flow 2 Deal Hunter + Member Alerts + Profile.</summary>
 public sealed class MemberService(AppDbContext db, ILocalizationService localizer) : IMemberService
 {
-    // ── Budget ───────────────────────────────────────────────────────────────
+    // ── Budget (Robot Flow) ───────────────────────────────────────────────────
 
     public async Task<SetBudgetResponseDto> SetShoppingBudgetAsync(
         int memberId, SetBudgetRequestDto request, CancellationToken ct = default)
@@ -133,7 +134,7 @@ public sealed class MemberService(AppDbContext db, ILocalizationService localize
         var today = DateOnly.FromDateTime(VnDateTime.Now);
         var deals = new List<MemberDealDto>();
 
-        // 1. Khuyến mãi: sản phẩm có PromotionPrice < UnitPrice (schema mới dùng PromotionPrice thay vì bảng PROMOTION/PROMOTION_PRODUCT)
+        // 1. Khuyến mãi: sản phẩm có PromotionPrice < UnitPrice
         var promoProducts = await db.Products
             .AsNoTracking()
             .Where(p => p.PromotionPrice.HasValue
@@ -190,5 +191,216 @@ public sealed class MemberService(AppDbContext db, ILocalizationService localize
     {
         // Bảng MEMBER_ALERT không còn trong schema mới — no-op
         return Task.CompletedTask;
+    }
+
+    // ── Profile ───────────────────────────────────────────────────────────────
+
+    public async Task<MemberProfileDto> GetProfileAsync(int accountId, CancellationToken ct = default)
+    {
+        var account = await db.Accounts
+            .AsNoTracking()
+            .Include(a => a.Member)
+                .ThenInclude(m => m!.Memberships)
+            .FirstOrDefaultAsync(a => a.AccountId == accountId, ct)
+            ?? throw new KeyNotFoundException($"Không tìm thấy tài khoản #{accountId}.");
+
+        var member = account.Member
+            ?? throw new KeyNotFoundException($"Tài khoản #{accountId} chưa có hồ sơ Member.");
+
+        var activeMembership = member.Memberships
+            .FirstOrDefault(ms => ms.Status == "Active");
+
+        return new MemberProfileDto(
+            MemberId:       member.MemberId,
+            AccountId:      accountId,
+            FullName:       account.FullName ?? member.FullName,
+            Email:          account.Email,
+            Phone:          account.Phone,
+            FacePath:       member.FacePath,
+            TotalPoints:    member.TotalPoints,
+            SpendingLimit:  member.SpendingLimit,
+            MembershipTier: activeMembership?.TierName ?? "Bronze",
+            AccountStatus:  account.Status,
+            CreatedAt:      account.CreatedAt);
+    }
+
+    public async Task<MemberProfileDto> UpdateProfileAsync(
+        int accountId, UpdateProfileRequestDto request, CancellationToken ct = default)
+    {
+        var account = await db.Accounts
+            .Include(a => a.Member)
+                .ThenInclude(m => m!.Memberships)
+            .FirstOrDefaultAsync(a => a.AccountId == accountId, ct)
+            ?? throw new KeyNotFoundException($"Không tìm thấy tài khoản #{accountId}.");
+
+        var member = account.Member
+            ?? throw new KeyNotFoundException($"Tài khoản #{accountId} chưa có hồ sơ Member.");
+
+        // Cập nhật FullName (cả 2 bảng Account và Member đều lưu)
+        if (!string.IsNullOrWhiteSpace(request.FullName))
+        {
+            account.FullName = request.FullName.Trim();
+            member.FullName  = request.FullName.Trim();
+        }
+
+        // Cập nhật Phone (chỉ lưu trên Account)
+        if (request.Phone is not null)
+            account.Phone = string.IsNullOrWhiteSpace(request.Phone) ? null : request.Phone.Trim();
+
+        await db.SaveChangesAsync(ct);
+
+        var activeMembership = member.Memberships.FirstOrDefault(ms => ms.Status == "Active");
+
+        return new MemberProfileDto(
+            MemberId:       member.MemberId,
+            AccountId:      accountId,
+            FullName:       account.FullName ?? member.FullName,
+            Email:          account.Email,
+            Phone:          account.Phone,
+            FacePath:       member.FacePath,
+            TotalPoints:    member.TotalPoints,
+            SpendingLimit:  member.SpendingLimit,
+            MembershipTier: activeMembership?.TierName ?? "Bronze",
+            AccountStatus:  account.Status,
+            CreatedAt:      account.CreatedAt);
+    }
+
+    // ── Budget (self-service) ─────────────────────────────────────────────────
+
+    public async Task<MemberBudgetDto> GetBudgetAsync(int accountId, CancellationToken ct = default)
+    {
+        var member = await GetMemberByAccountIdAsync(accountId, ct);
+
+        return new MemberBudgetDto(
+            MemberId:      member.MemberId,
+            SpendingLimit: member.SpendingLimit,
+            Message:       member.SpendingLimit.HasValue
+                ? $"Ngân sách hiện tại: {member.SpendingLimit.Value:N0} VNĐ"
+                : "Chưa đặt ngân sách mua sắm.");
+    }
+
+    public async Task<MemberBudgetDto> UpdateBudgetAsync(
+        int accountId, UpdateBudgetRequestDto request, CancellationToken ct = default)
+    {
+        var member = await GetMemberByAccountIdAsync(accountId, ct, tracking: true);
+
+        member.SpendingLimit = request.SpendingLimit; // null = bỏ giới hạn
+        await db.SaveChangesAsync(ct);
+
+        return new MemberBudgetDto(
+            MemberId:      member.MemberId,
+            SpendingLimit: member.SpendingLimit,
+            Message:       member.SpendingLimit.HasValue
+                ? $"Đã cập nhật ngân sách: {member.SpendingLimit.Value:N0} VNĐ"
+                : "Đã bỏ giới hạn ngân sách mua sắm.");
+    }
+
+    // ── Health Preferences (chế độ ăn & dị ứng) ──────────────────────────────
+
+    public async Task<MemberHealthPreferencesDto> GetHealthPreferencesAsync(
+        int accountId, CancellationToken ct = default)
+    {
+        var member = await GetMemberByAccountIdAsync(accountId, ct);
+
+        var prefs = await db.MemberHealthPreferences
+            .AsNoTracking()
+            .Include(p => p.HealthTag)
+            .Where(p => p.MemberId == member.MemberId)
+            .ToListAsync(ct);
+
+        return BuildHealthPreferencesDto(member.MemberId, prefs);
+    }
+
+    public async Task<MemberHealthPreferencesDto> UpdateHealthPreferencesAsync(
+        int accountId, UpdateHealthPreferencesRequestDto request, CancellationToken ct = default)
+    {
+        var member = await GetMemberByAccountIdAsync(accountId, ct);
+
+        // Xác thực tất cả HealthTagId tồn tại
+        var requestedTagIds = request.Preferences.Select(p => p.HealthTagId).Distinct().ToList();
+        if (requestedTagIds.Count > 0)
+        {
+            var existingTagIds = await db.HealthTags
+                .AsNoTracking()
+                .Where(t => requestedTagIds.Contains(t.HealthTagId))
+                .Select(t => t.HealthTagId)
+                .ToListAsync(ct);
+
+            var missingIds = requestedTagIds.Except(existingTagIds).ToList();
+            if (missingIds.Count > 0)
+                throw new KeyNotFoundException(
+                    $"HealthTagId không tồn tại: {string.Join(", ", missingIds)}.");
+        }
+
+        // Xóa toàn bộ preferences cũ của member
+        var oldPrefs = await db.MemberHealthPreferences
+            .Where(p => p.MemberId == member.MemberId)
+            .ToListAsync(ct);
+        db.MemberHealthPreferences.RemoveRange(oldPrefs);
+
+        // Thêm preferences mới (loại trùng theo HealthTagId)
+        var newPrefs = request.Preferences
+            .DistinctBy(p => p.HealthTagId)
+            .Select(p => new MemberHealthPreference
+            {
+                MemberId    = member.MemberId,
+                HealthTagId = p.HealthTagId,
+                Status      = p.Status
+            })
+            .ToList();
+
+        await db.MemberHealthPreferences.AddRangeAsync(newPrefs, ct);
+        await db.SaveChangesAsync(ct);
+
+        // Load lại với navigation để trả về đầy đủ thông tin tag
+        var savedPrefs = await db.MemberHealthPreferences
+            .AsNoTracking()
+            .Include(p => p.HealthTag)
+            .Where(p => p.MemberId == member.MemberId)
+            .ToListAsync(ct);
+
+        return BuildHealthPreferencesDto(member.MemberId, savedPrefs);
+    }
+
+    public async Task<IReadOnlyList<HealthTagDto>> GetAllHealthTagsAsync(CancellationToken ct = default)
+    {
+        return await db.HealthTags
+            .AsNoTracking()
+            .OrderBy(t => t.TagType)
+            .ThenBy(t => t.TagName)
+            .Select(t => new HealthTagDto(t.HealthTagId, t.TagName, t.TagType))
+            .ToListAsync(ct);
+    }
+
+    // ── Private Helpers ───────────────────────────────────────────────────────
+
+    private async Task<Member> GetMemberByAccountIdAsync(
+        int accountId, CancellationToken ct, bool tracking = false)
+    {
+        var baseQuery = tracking
+            ? db.Accounts.Include(a => a.Member)
+            : db.Accounts.AsNoTracking().Include(a => a.Member);
+
+        var account = await baseQuery
+            .FirstOrDefaultAsync(a => a.AccountId == accountId, ct)
+            ?? throw new KeyNotFoundException($"Không tìm thấy tài khoản #{accountId}.");
+
+        return account.Member
+            ?? throw new KeyNotFoundException($"Tài khoản #{accountId} chưa có hồ sơ Member.");
+    }
+
+    private static MemberHealthPreferencesDto BuildHealthPreferencesDto(
+        int memberId,
+        IEnumerable<MemberHealthPreference> prefs)
+    {
+        static MemberHealthPreferenceItemDto ToDto(MemberHealthPreference p) =>
+            new(p.HealthTagId, p.HealthTag?.TagName ?? "", p.HealthTag?.TagType ?? "", p.Status);
+
+        var list = prefs.ToList();
+        return new MemberHealthPreferencesDto(
+            MemberId:   memberId,
+            Allergies:  list.Where(p => p.Status == "Allergy").Select(ToDto).ToList(),
+            Avoids:     list.Where(p => p.Status == "Avoid").Select(ToDto).ToList(),
+            Preferreds: list.Where(p => p.Status == "Preferred").Select(ToDto).ToList());
     }
 }

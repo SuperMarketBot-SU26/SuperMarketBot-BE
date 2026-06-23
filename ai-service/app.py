@@ -9,6 +9,7 @@ app = FastAPI(title="SmartMarketBot AI Face Service")
 
 class ImageRequest(BaseModel):
     image_base64: str
+    detector_backend: str = "opencv"
 
 def decode_base64_image(image_b64: str) -> np.ndarray:
     try:
@@ -19,6 +20,14 @@ def decode_base64_image(image_b64: str) -> np.ndarray:
         img = cv2.imdecode(np_arr, cv2.IMREAD_COLOR)
         if img is None:
             raise ValueError("Failed to decode image")
+        
+        # Tối ưu hóa hiệu năng: Giảm kích thước ảnh lớn về tối đa 640px để tăng tốc độ nhận diện
+        h, w = img.shape[:2]
+        max_size = 640
+        if max(h, w) > max_size:
+            scale = max_size / max(h, w)
+            img = cv2.resize(img, (int(w * scale), int(h * scale)))
+            
         return img
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Invalid image data: {str(e)}")
@@ -31,8 +40,8 @@ def extract_vector(request: ImageRequest):
         representations = DeepFace.represent(
             img_path=img,
             model_name="Facenet",
-            enforce_detection=True,
-            detector_backend="opencv"
+            enforce_detection=True if request.detector_backend != "skip" else False,
+            detector_backend=request.detector_backend
         )
         if not representations:
             raise HTTPException(status_code=400, detail="No face detected in the image")
@@ -42,7 +51,11 @@ def extract_vector(request: ImageRequest):
             "status": "success",
             "face_vector": vector
         }
+    except HTTPException as he:
+        raise he
     except Exception as e:
+        import traceback
+        traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/verify")

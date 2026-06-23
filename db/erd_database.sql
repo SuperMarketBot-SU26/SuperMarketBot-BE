@@ -252,11 +252,12 @@ CREATE TABLE dbo.PRODUCT_SLOT (
 -- ============================================================
 
 CREATE TABLE dbo.MAP (
-    MapID           INT IDENTITY(1,1) PRIMARY KEY,
-    FloorID         INT            NOT NULL REFERENCES dbo.FLOOR(FloorID),
-    MapName         NVARCHAR(100)  NOT NULL,
-    MapData         NVARCHAR(MAX)  NULL,    -- JSON layout
-    CreatedAt       DATETIME2      NOT NULL DEFAULT DATEADD(hour, 7, GETUTCDATE()) -- Múi giờ Việt Nam (UTC+7)
+    MapID               INT IDENTITY(1,1) PRIMARY KEY,
+    FloorID             INT            NOT NULL REFERENCES dbo.FLOOR(FloorID),
+    MapName             NVARCHAR(100)  NOT NULL,
+    MapData             NVARCHAR(MAX)  NULL,    -- JSON layout
+    FloorplanImageUrl   NVARCHAR(500)  NULL,    -- Ảnh mặt bằng SLAM từ Tablet (lưu vào Supabase Storage)
+    CreatedAt           DATETIME2      NOT NULL DEFAULT DATEADD(hour, 7, GETUTCDATE()) -- Múi giờ Việt Nam (UTC+7)
 );
 
 CREATE TABLE dbo.NAVIGATION_NODE (
@@ -294,7 +295,9 @@ CREATE TABLE dbo.SEMANTIC_OBJECT (
     Label           NVARCHAR(100)  NULL,
     Confidence      FLOAT          NULL,
     DetectedAt      DATETIME2      NULL,
-    ImageUrl        NVARCHAR(500)  NULL
+    ImageUrl        NVARCHAR(500)  NULL,
+    -- Phase B+: Map Management — gán sản phẩm vào kệ trên map (ProductID → SemanticObject)
+    ProductID       INT            NULL REFERENCES dbo.PRODUCT(ProductID) ON DELETE SET NULL
 );
 
 CREATE TABLE dbo.ROBOT (

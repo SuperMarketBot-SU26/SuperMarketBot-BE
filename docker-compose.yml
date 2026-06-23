@@ -28,6 +28,10 @@ services:
     environment:
       ASPNETCORE_ENVIRONMENT: Docker
       ASPNETCORE_URLS: http://+:8080
+      # Supabase Storage — dùng cho upload ảnh mặt bằng (Map floorplan) và ad resources
+      Supabase__Url: "${SUPABASE_URL:-https://your-project.supabase.co}"
+      Supabase__ApiKey: "${SUPABASE_API_KEY:-your-anon-key}"
+      Supabase__StorageBucket: "${SUPABASE_STORAGE_BUCKET:-floorplans}"
     depends_on:
       mosquitto:
         condition: service_started

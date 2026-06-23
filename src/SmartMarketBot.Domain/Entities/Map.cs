@@ -6,6 +6,7 @@ public class Map
     public int FloorId { get; set; }
     public string MapName { get; set; } = string.Empty;
     public string? MapData { get; set; }
+    public string? FloorplanImageUrl { get; set; }
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
     public virtual Floor? Floor { get; set; }

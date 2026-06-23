@@ -21,6 +21,7 @@ public static class DependencyInjection
         services.Configure<AiServiceOptions>(configuration.GetSection(AiServiceOptions.SectionName));
         services.Configure<EmailOptions>(configuration.GetSection(EmailOptions.SectionName));
         services.Configure<CloudinaryOptions>(configuration.GetSection(CloudinaryOptions.SectionName));
+        services.Configure<SupabaseOptions>(configuration.GetSection(SupabaseOptions.SectionName));
 
         // Database
         services.AddDbContext<AppDbContext>(options =>
@@ -39,6 +40,8 @@ public static class DependencyInjection
         services.AddScoped<IRobotService, RobotService>();
         services.AddScoped<IAisleScanService, AisleScanService>();
         services.AddScoped<ISearchService, SearchService>();
+        services.AddScoped<IMapSyncService, MapSyncService>();
+        services.AddScoped<ISemanticObjectService, SemanticObjectService>();
 
         // Member & Staff services
         services.AddScoped<IMealSuggestionService, MealSuggestionService>();

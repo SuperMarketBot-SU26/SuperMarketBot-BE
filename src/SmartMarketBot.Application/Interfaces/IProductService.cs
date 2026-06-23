@@ -12,4 +12,7 @@ public interface IProductService
     /// không chứa thành phần dị ứng của member (nếu memberId != null), phân khúc giá tương đương.
     /// </summary>
     Task<IReadOnlyList<ProductDto>> GetAlternativeProductsAsync(int productId, int? memberId, CancellationToken cancellationToken = default);
+
+    /// <summary>Trả về các sản phẩm chưa được gán (assign) vào bất kỳ SemanticObject nào trên map.</summary>
+    Task<IReadOnlyList<ProductDto>> GetUnmappedProductsAsync(CancellationToken cancellationToken = default);
 }

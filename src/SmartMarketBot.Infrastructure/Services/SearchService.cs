@@ -21,7 +21,7 @@ public sealed class SearchService(
         if (request.MemberId is int mid && mid > 0)
         {
             memberAllergyTagIds = (await db.MemberHealthPreferences
-                .Where(p => p.MemberId == mid && p.Status == "Allergic")
+                .Where(p => p.MemberId == mid && p.Status == "Allergy")
                 .Select(p => p.HealthTagId)
                 .ToListAsync(ct))
                 .ToHashSet();
@@ -169,7 +169,7 @@ public sealed class SearchService(
             .ToList();
 
         return new SearchResponseDto(
-            request.Query,
+            query,
             scored.Count,
             results,
             request.UseAiRanking && !string.IsNullOrEmpty(aiExplanation),

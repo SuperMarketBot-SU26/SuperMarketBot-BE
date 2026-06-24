@@ -25,6 +25,8 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
     public DbSet<InvoiceHistoryItem> InvoiceHistoryItems => Set<InvoiceHistoryItem>();
     public DbSet<MealSuggestion> MealSuggestions => Set<MealSuggestion>();
     public DbSet<MealItem> MealItems => Set<MealItem>();
+    public DbSet<Cart> Carts => Set<Cart>();
+    public DbSet<CartItem> CartItems => Set<CartItem>();
 
     // ── Region 4: Store Layout ───────────────────────────────────────────────
     public DbSet<Floor> Floors => Set<Floor>();
@@ -298,6 +300,42 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
             entity.HasOne(x => x.Product)
                 .WithMany(p => p.MealItems)
                 .HasForeignKey(x => x.ProductId);
+        });
+
+        modelBuilder.Entity<Cart>(entity =>
+        {
+            entity.ToTable("CART");
+            entity.HasKey(x => x.CartId);
+            entity.Property(x => x.CartId).HasColumnName("CartID");
+            entity.Property(x => x.MemberId).HasColumnName("MemberID");
+            entity.Property(x => x.CreatedAt).HasColumnName("CreatedAt").HasDefaultValueSql("DATEADD(hour, 7, GETUTCDATE())");
+            entity.Property(x => x.UpdatedAt).HasColumnName("UpdatedAt");
+
+            entity.HasOne(x => x.Member)
+                .WithOne()
+                .HasForeignKey<Cart>(x => x.MemberId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<CartItem>(entity =>
+        {
+            entity.ToTable("CART_ITEM");
+            entity.HasKey(x => x.CartItemId);
+            entity.Property(x => x.CartItemId).HasColumnName("CartItemID");
+            entity.Property(x => x.CartId).HasColumnName("CartID");
+            entity.Property(x => x.ProductId).HasColumnName("ProductID");
+            entity.Property(x => x.Quantity).HasColumnName("Quantity").HasDefaultValue(1);
+            entity.Property(x => x.AddedAt).HasColumnName("AddedAt").HasDefaultValueSql("DATEADD(hour, 7, GETUTCDATE())");
+
+            entity.HasOne(x => x.Cart)
+                .WithMany(c => c.CartItems)
+                .HasForeignKey(x => x.CartId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(x => x.Product)
+                .WithMany()
+                .HasForeignKey(x => x.ProductId)
+                .OnDelete(DeleteBehavior.Cascade);
         });
 
         // ─────────────────────────────────────────────

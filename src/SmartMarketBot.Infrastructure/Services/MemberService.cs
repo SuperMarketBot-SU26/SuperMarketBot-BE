@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using SmartMarketBot.Application.Interfaces;
 using SmartMarketBot.Application.Models.Members;
 using SmartMarketBot.Application.Models.Products;
+using SmartMarketBot.Application.Models.MealSuggestions;
 using SmartMarketBot.Domain.Common;
 using SmartMarketBot.Domain.Entities;
 using SmartMarketBot.Infrastructure.Persistence;
@@ -402,5 +403,143 @@ public sealed class MemberService(AppDbContext db, ILocalizationService localize
             Allergies:  list.Where(p => p.Status == "Allergy").Select(ToDto).ToList(),
             Avoids:     list.Where(p => p.Status == "Avoid").Select(ToDto).ToList(),
             Preferreds: list.Where(p => p.Status == "Preferred").Select(ToDto).ToList());
+    }
+
+    public async Task<IReadOnlyList<RecipeDto>> GetPersonalizedMealsAsync(int accountId, CancellationToken ct = default)
+    {
+        var member = await GetMemberByAccountIdAsync(accountId, ct);
+
+        // 1. Get health preferences
+        var preferences = await db.MemberHealthPreferences
+            .AsNoTracking()
+            .Where(mhp => mhp.MemberId == member.MemberId)
+            .ToListAsync(ct);
+
+        var allergyTagIds = preferences.Where(p => p.Status == "Allergy").Select(p => p.HealthTagId).ToList();
+        var avoidTagIds = preferences.Where(p => p.Status == "Avoid").Select(p => p.HealthTagId).ToList();
+        var preferredTagIds = preferences.Where(p => p.Status == "Preferred").Select(p => p.HealthTagId).ToList();
+
+        // 2. Fetch all recipes
+        var recipes = await db.MealSuggestions
+            .Include(ms => ms.MealItems)
+                .ThenInclude(mi => mi.Product)
+                    .ThenInclude(p => p!.ProductHealthTags)
+            .ToListAsync(ct);
+
+        var personalizedList = new List<(MealSuggestion Recipe, decimal Score)>();
+
+        foreach (var r in recipes)
+        {
+            bool hasAllergy = false;
+            bool hasAvoid = false;
+            decimal preferenceBoost = 0;
+
+            foreach (var item in r.MealItems)
+            {
+                if (item.Product == null) continue;
+                var productTagIds = item.Product.ProductHealthTags.Select(pht => pht.HealthTagId).ToList();
+
+                if (allergyTagIds.Intersect(productTagIds).Any())
+                {
+                    hasAllergy = true;
+                    break;
+                }
+                if (avoidTagIds.Intersect(productTagIds).Any())
+                {
+                    hasAvoid = true;
+                }
+                if (preferredTagIds.Intersect(productTagIds).Any())
+                {
+                    preferenceBoost += 20;
+                }
+            }
+
+            if (hasAllergy || hasAvoid) continue; // Exclude allergy and avoid tags
+
+            decimal baseScore = r.HealthyScore ?? 50m;
+            personalizedList.Add((r, baseScore + preferenceBoost));
+        }
+
+        return personalizedList
+            .OrderByDescending(x => x.Score)
+            .Select(x => new RecipeDto(
+                x.Recipe.MealSuggestionId,
+                x.Recipe.MealName,
+                x.Recipe.Description,
+                x.Recipe.YieldPortions,
+                x.Recipe.ImageUrl,
+                x.Recipe.Calories,
+                x.Recipe.HealthyScore.HasValue ? (int)x.Recipe.HealthyScore.Value : null,
+                x.Recipe.AlternativeSuggestion))
+            .ToList();
+    }
+
+    public async Task<IReadOnlyList<ProductDto>> GetPersonalizedProductsAsync(int accountId, CancellationToken ct = default)
+    {
+        var member = await GetMemberByAccountIdAsync(accountId, ct);
+
+        // 1. Load preferences
+        var preferences = await db.MemberHealthPreferences
+            .AsNoTracking()
+            .Where(mhp => mhp.MemberId == member.MemberId)
+            .ToListAsync(ct);
+
+        var allergyTagIds = preferences.Where(p => p.Status == "Allergy").Select(p => p.HealthTagId).ToList();
+        var avoidTagIds = preferences.Where(p => p.Status == "Avoid").Select(p => p.HealthTagId).ToList();
+        var preferredTagIds = preferences.Where(p => p.Status == "Preferred").Select(p => p.HealthTagId).ToList();
+
+        // 2. Fetch past purchases
+        var pastPurchases = await db.InvoiceHistoryItems
+            .AsNoTracking()
+            .Where(i => i.InvoiceHistory != null && i.InvoiceHistory.MemberId == member.MemberId)
+            .GroupBy(i => i.ProductId)
+            .Select(g => new { ProductId = g.Key, Frequency = g.Count() })
+            .ToDictionaryAsync(x => x.ProductId, x => x.Frequency, ct);
+
+        // 3. Load products with tags
+        var products = await db.Products
+            .Include(p => p.ProductHealthTags)
+            .Where(p => p.Status == "Available")
+            .ToListAsync(ct);
+
+        var rankedProducts = new List<(Product Product, decimal Score)>();
+
+        foreach (var p in products)
+        {
+            var productTagIds = p.ProductHealthTags.Select(pht => pht.HealthTagId).ToList();
+
+            if (allergyTagIds.Intersect(productTagIds).Any() || avoidTagIds.Intersect(productTagIds).Any())
+                continue; // Exclude allergy or avoid tags
+
+            decimal score = 0;
+            if (pastPurchases.TryGetValue(p.ProductId, out var freq))
+            {
+                score += freq * 10;
+            }
+
+            if (preferredTagIds.Intersect(productTagIds).Any())
+            {
+                score += 15;
+            }
+
+            if (p.PromotionPrice.HasValue && p.PromotionPrice < p.UnitPrice)
+            {
+                score += 5;
+            }
+
+            rankedProducts.Add((p, score));
+        }
+
+        return rankedProducts
+            .OrderByDescending(x => x.Score)
+            .Take(20)
+            .Select(x => new ProductDto(
+                x.Product.ProductId,
+                x.Product.ProductName,
+                x.Product.UnitPrice,
+                x.Product.Status,
+                x.Product.ImageUrl,
+                x.Product.ProductTypeId))
+            .ToList();
     }
 }

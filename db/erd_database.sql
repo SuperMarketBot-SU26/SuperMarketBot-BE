@@ -448,8 +448,28 @@ ALTER TABLE dbo.AD_CAMPAIGN_LOG ADD CONSTRAINT FK_AD_CAMPAIGN_LOG_SPONSORED
     FOREIGN KEY (SponsoredID) REFERENCES dbo.SPONSORED_PRODUCT(SponsoredID) ON DELETE SET NULL;
 GO
 
+-- CART & CART_ITEM (Shopping Cart Option A)
+CREATE TABLE dbo.CART (
+    CartID       INT IDENTITY(1,1) PRIMARY KEY,
+    MemberID     INT            NOT NULL UNIQUE REFERENCES dbo.MEMBER(MemberID) ON DELETE CASCADE,
+    CreatedAt    DATETIME2      NOT NULL DEFAULT DATEADD(hour, 7, GETUTCDATE()),
+    UpdatedAt    DATETIME2      NULL
+);
+CREATE INDEX IX_CART_MemberID ON dbo.CART(MemberID);
+
+CREATE TABLE dbo.CART_ITEM (
+    CartItemID   INT IDENTITY(1,1) PRIMARY KEY,
+    CartID       INT            NOT NULL REFERENCES dbo.CART(CartID) ON DELETE CASCADE,
+    ProductID    INT            NOT NULL REFERENCES dbo.PRODUCT(ProductID) ON DELETE CASCADE,
+    Quantity     INT            NOT NULL DEFAULT 1,
+    AddedAt      DATETIME2      NOT NULL DEFAULT DATEADD(hour, 7, GETUTCDATE())
+);
+CREATE INDEX IX_CART_ITEM_CartID ON dbo.CART_ITEM(CartID);
+CREATE INDEX IX_CART_ITEM_ProductID ON dbo.CART_ITEM(ProductID);
+GO
+
 -- ============================================================
--- TỔNG KẾT: 37 bảng (Đã gộp EMAIL_OTP vào ACCOUNT)
+-- TỔNG KẾT: 39 bảng (Đã thêm CART và CART_ITEM)
 -- ============================================================
 -- 1.  ACCOUNT
 -- 2.  MEMBER

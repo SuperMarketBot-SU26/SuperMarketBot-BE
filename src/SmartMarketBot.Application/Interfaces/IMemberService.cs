@@ -1,4 +1,6 @@
 using SmartMarketBot.Application.Models.Members;
+using SmartMarketBot.Application.Models.MealSuggestions;
+using SmartMarketBot.Application.Models.Products;
 
 namespace SmartMarketBot.Application.Interfaces;
 
@@ -44,6 +46,12 @@ public interface IMemberService
     Task<MemberBudgetDto> UpdateBudgetAsync(int accountId, UpdateBudgetRequestDto request, CancellationToken ct = default);
 
     // ── Health Preferences (chế độ ăn & dị ứng) ──────────────────────────────
+
+    /// <summary>Lấy gợi ý món ăn cá nhân hóa dựa trên dị ứng và sở thích.</summary>
+    Task<IReadOnlyList<RecipeDto>> GetPersonalizedMealsAsync(int accountId, CancellationToken ct = default);
+
+    /// <summary>Lấy gợi ý sản phẩm cá nhân hóa dựa trên lịch sử mua sắm và dị ứng.</summary>
+    Task<IReadOnlyList<ProductDto>> GetPersonalizedProductsAsync(int accountId, CancellationToken ct = default);
 
     /// <summary>Lấy toàn bộ chế độ ăn &amp; dị ứng của member, nhóm theo Status.</summary>
     Task<MemberHealthPreferencesDto> GetHealthPreferencesAsync(int accountId, CancellationToken ct = default);

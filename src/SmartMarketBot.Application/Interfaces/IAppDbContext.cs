@@ -19,11 +19,13 @@ public interface IAppDbContext
     DbSet<Product> Products { get; }
     DbSet<ProductHealthTag> ProductHealthTags { get; }
 
-    // Region 3: Shopping & Meal (4)
+    // Region 3: Shopping & Meal (6)
     DbSet<InvoiceHistory> InvoiceHistories { get; }
     DbSet<InvoiceHistoryItem> InvoiceHistoryItems { get; }
     DbSet<MealSuggestion> MealSuggestions { get; }
     DbSet<MealItem> MealItems { get; }
+    DbSet<Cart> Carts { get; }
+    DbSet<CartItem> CartItems { get; }
 
     // Region 4: Store Layout (6)
     DbSet<Floor> Floors { get; }

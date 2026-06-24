@@ -3,6 +3,8 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using SmartMarketBot.Application.Interfaces;
 using SmartMarketBot.Application.Models.Members;
+using SmartMarketBot.Application.Models.MealSuggestions;
+using SmartMarketBot.Application.Models.Products;
 
 namespace SmartMarketBot.API.Controllers;
 
@@ -206,6 +208,38 @@ public sealed class MembersController(IMemberService memberService) : Controller
 
         var result = await memberService.UpdateHealthPreferencesAsync(
             accountId.Value, request, cancellationToken);
+        return Ok(result);
+    }
+
+    /// <summary>
+    /// Lấy danh sách gợi ý món ăn cá nhân hóa dựa trên chế độ sức khỏe và dị ứng.
+    /// </summary>
+    [Authorize]
+    [HttpGet("me/personalized-meals")]
+    [ProducesResponseType(typeof(IReadOnlyList<RecipeDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    public async Task<ActionResult<IReadOnlyList<RecipeDto>>> GetPersonalizedMeals(CancellationToken cancellationToken)
+    {
+        var accountId = GetCurrentAccountId();
+        if (accountId is null) return Unauthorized();
+
+        var result = await memberService.GetPersonalizedMealsAsync(accountId.Value, cancellationToken);
+        return Ok(result);
+    }
+
+    /// <summary>
+    /// Lấy danh sách sản phẩm cá nhân hóa dựa trên lịch sử mua sắm và sức khỏe.
+    /// </summary>
+    [Authorize]
+    [HttpGet("me/personalized-products")]
+    [ProducesResponseType(typeof(IReadOnlyList<ProductDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    public async Task<ActionResult<IReadOnlyList<ProductDto>>> GetPersonalizedProducts(CancellationToken cancellationToken)
+    {
+        var accountId = GetCurrentAccountId();
+        if (accountId is null) return Unauthorized();
+
+        var result = await memberService.GetPersonalizedProductsAsync(accountId.Value, cancellationToken);
         return Ok(result);
     }
 

@@ -34,7 +34,12 @@ public sealed record RobotTelemetryDto(
     double? RpmRL = null,
     double? RpmRR = null,
     string? NavState = null,
-    bool? Estop = null);
+    bool? Estop = null,
+    double? HeadingRad = null,
+    int? UsLF = null,
+    int? UsLR = null,
+    int? UsRF = null,
+    int? UsRR = null);
 
 public sealed record RobotStatusDto(
     string RobotCode,

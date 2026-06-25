@@ -252,7 +252,12 @@ public sealed class MqttClientService(
                     RpmRL: payload.RpmRL,
                     RpmRR: payload.RpmRR,
                     NavState: payload.NavState,
-                    Estop: payload.Estop);
+                    Estop: payload.Estop,
+                    HeadingRad: payload.HeadingRad,
+                    UsLF: payload.UsLF,
+                    UsLR: payload.UsLR,
+                    UsRF: payload.UsRF,
+                    UsRR: payload.UsRR);
 
                 await notifier.NotifyTelemetryAsync(telemetry);
             }
@@ -413,6 +418,10 @@ public sealed class MqttClientService(
         public bool? Estop { get; set; }
         // Phase 2 — Dead Reckoning
         public double? HeadingRad { get; set; }
+        public int? UsLF { get; set; }
+        public int? UsLR { get; set; }
+        public int? UsRF { get; set; }
+        public int? UsRR { get; set; }
     }
 
     private static byte[] CopySequenceToArray(in ReadOnlySequence<byte> sequence)

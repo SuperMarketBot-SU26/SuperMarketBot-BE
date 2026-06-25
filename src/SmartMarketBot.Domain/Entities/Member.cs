@@ -14,4 +14,5 @@ public class Member
     public virtual ICollection<Membership> Memberships { get; set; } = new List<Membership>();
     public virtual ICollection<MemberHealthPreference> MemberHealthPreferences { get; set; } = new List<MemberHealthPreference>();
     public virtual ICollection<InvoiceHistory> InvoiceHistories { get; set; } = new List<InvoiceHistory>();
+    public virtual ICollection<MemberNotification> MemberNotifications { get; set; } = new List<MemberNotification>();
 }

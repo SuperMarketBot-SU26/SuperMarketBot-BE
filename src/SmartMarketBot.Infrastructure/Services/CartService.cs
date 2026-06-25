@@ -201,6 +201,23 @@ public sealed class CartService(
         var cartDto = await BuildCartDtoAsync(member, cart, ct);
         await NotifyMemberCartUpdatedAsync(member.MemberId, cartDto, ct);
 
+        // Push thông báo tích điểm thưởng
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                await memberRealtimeNotifier.PushToMemberAsync(member.MemberId,
+                    new SmartMarketBot.Application.Models.Realtime.MemberRealtimeUpdateDto(
+                        MemberId:   member.MemberId,
+                        UpdateType: "PointsEarned",
+                        Title:      "🎉 Tích điểm thành công",
+                        Message:    $"Bạn vừa tích được {pointsEarned} điểm! Tổng điểm hiện tại: {member.TotalPoints} điểm.",
+                        Payload:    new { PointsEarned = pointsEarned, TotalPoints = member.TotalPoints, InvoiceId = invoice.InvoiceHistoryId },
+                        Timestamp:  VnDateTime.Now));
+            }
+            catch { /* fire-and-forget */ }
+        });
+
         return new CheckoutResponseDto(
             InvoiceId: invoice.InvoiceHistoryId,
             TotalPrice: totalPrice,

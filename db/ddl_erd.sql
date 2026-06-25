@@ -15,6 +15,7 @@ CREATE TABLE ACCOUNT (
     Email           NVARCHAR(256) NOT NULL,
     Phone           NVARCHAR(20)  NULL,
     FullName        NVARCHAR(100) NULL,
+    AvatarUrl       NVARCHAR(500) NULL,
     Status          NVARCHAR(50)  NOT NULL DEFAULT N'Active',   -- Active | Inactive | Suspended
     Role            NVARCHAR(50)  NOT NULL DEFAULT N'Member',   -- Member | Staff | Admin
     OtpCode         NVARCHAR(6)   NULL,

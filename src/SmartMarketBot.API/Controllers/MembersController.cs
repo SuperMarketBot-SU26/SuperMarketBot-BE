@@ -3,6 +3,10 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using SmartMarketBot.Application.Interfaces;
 using SmartMarketBot.Application.Models.Members;
+using SmartMarketBot.Application.Models.MealSuggestions;
+using SmartMarketBot.Application.Models.Products;
+using SmartMarketBot.Application.Models.Realtime;
+using SmartMarketBot.Domain.Common;
 
 namespace SmartMarketBot.API.Controllers;
 
@@ -12,8 +16,111 @@ namespace SmartMarketBot.API.Controllers;
 /// </summary>
 [ApiController]
 [Route("api/members")]
-public sealed class MembersController(IMemberService memberService) : ControllerBase
+public sealed class MembersController(
+    IMemberService memberService,
+    IMemberRealtimeNotifier realtimeNotifier) : ControllerBase
 {
+    // ── Notifications (SignalR) ──────────────────────────────────────────────────────
+
+    /// <summary>
+    /// [DEV] Gửi thử một notification realtime tới member đang đăng nhập.
+    /// FE dùng để test kết nối SignalR hub /hubs/member.
+    /// Flow: connect hub → JoinMemberGroup(memberId) → gọi endpoint này → nhận event "memberUpdate".
+    /// </summary>
+    [Authorize]
+    [HttpPost("me/notifications/test")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> SendTestNotification(CancellationToken cancellationToken)
+    {
+        var accountId = GetCurrentAccountId();
+        if (accountId is null) return Unauthorized();
+
+        var profile = await memberService.GetProfileAsync(accountId.Value, cancellationToken);
+
+        await realtimeNotifier.PushToMemberAsync(profile.MemberId,
+            new MemberRealtimeUpdateDto(
+                MemberId:   profile.MemberId,
+                UpdateType: "TestNotification",
+                Title:      "🔔 Kết nối thành công",
+                Message:    $"Xin chào {profile.FullName}! SignalR realtime notification hoạt động bình thường.",
+                Payload:    new { AccountId = accountId.Value, MemberId = profile.MemberId },
+                Timestamp:  VnDateTime.Now),
+            cancellationToken);
+
+        return Ok(new { success = true, message = "Đã gửi test notification qua SignalR." });
+    }
+
+    /// <summary>
+    /// Lấy danh sách notification của member, mới nhất trước.
+    /// Hỗ trợ phân trang qua query ?page=1&amp;pageSize=20.
+    /// </summary>
+    [Authorize]
+    [HttpGet("me/notifications")]
+    [ProducesResponseType(typeof(NotificationListDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    public async Task<ActionResult<NotificationListDto>> GetNotifications(
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 20,
+        CancellationToken cancellationToken = default)
+    {
+        var accountId = GetCurrentAccountId();
+        if (accountId is null) return Unauthorized();
+
+        var result = await memberService.GetNotificationsAsync(accountId.Value, page, pageSize, cancellationToken);
+        return Ok(result);
+    }
+
+    /// <summary>
+    /// Số lượng notification chưa đọc — dùng cho badge UI.
+    /// </summary>
+    [Authorize]
+    [HttpGet("me/notifications/unread-count")]
+    [ProducesResponseType(typeof(UnreadCountDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    public async Task<ActionResult<UnreadCountDto>> GetUnreadCount(CancellationToken cancellationToken)
+    {
+        var accountId = GetCurrentAccountId();
+        if (accountId is null) return Unauthorized();
+
+        var result = await memberService.GetUnreadCountAsync(accountId.Value, cancellationToken);
+        return Ok(result);
+    }
+
+    /// <summary>
+    /// Đánh dấu tất cả notification đã đọc (khi member mở màn hình thông báo).
+    /// </summary>
+    [Authorize]
+    [HttpPatch("me/notifications/read-all")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    public async Task<IActionResult> MarkAllRead(CancellationToken cancellationToken)
+    {
+        var accountId = GetCurrentAccountId();
+        if (accountId is null) return Unauthorized();
+
+        await memberService.MarkAllNotificationsReadAsync(accountId.Value, cancellationToken);
+        return NoContent();
+    }
+
+    /// <summary>
+    /// Đánh dấu một notification cụ thể đã đọc.
+    /// </summary>
+    [Authorize]
+    [HttpPatch("me/notifications/{notificationId:int}/read")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> MarkOneRead(int notificationId, CancellationToken cancellationToken)
+    {
+        var accountId = GetCurrentAccountId();
+        if (accountId is null) return Unauthorized();
+
+        await memberService.MarkNotificationReadAsync(accountId.Value, notificationId, cancellationToken);
+        return NoContent();
+    }
+
     // ── Profile ─────────────────────────────────────────────────────────────────────
 
     /// <summary>
@@ -207,6 +314,87 @@ public sealed class MembersController(IMemberService memberService) : Controller
         var result = await memberService.UpdateHealthPreferencesAsync(
             accountId.Value, request, cancellationToken);
         return Ok(result);
+    }
+
+    /// <summary>
+    /// Lấy danh sách gợi ý món ăn cá nhân hóa dựa trên chế độ sức khỏe và dị ứng.
+    /// </summary>
+    [Authorize]
+    [HttpGet("me/personalized-meals")]
+    [ProducesResponseType(typeof(IReadOnlyList<RecipeDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    public async Task<ActionResult<IReadOnlyList<RecipeDto>>> GetPersonalizedMeals(CancellationToken cancellationToken)
+    {
+        var accountId = GetCurrentAccountId();
+        if (accountId is null) return Unauthorized();
+
+        var result = await memberService.GetPersonalizedMealsAsync(accountId.Value, cancellationToken);
+        return Ok(result);
+    }
+
+    /// <summary>
+    /// Lấy danh sách sản phẩm cá nhân hóa dựa trên lịch sử mua sắm và sức khỏe.
+    /// </summary>
+    [Authorize]
+    [HttpGet("me/personalized-products")]
+    [ProducesResponseType(typeof(IReadOnlyList<ProductDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    public async Task<ActionResult<IReadOnlyList<ProductDto>>> GetPersonalizedProducts(CancellationToken cancellationToken)
+    {
+        var accountId = GetCurrentAccountId();
+        if (accountId is null) return Unauthorized();
+
+        var result = await memberService.GetPersonalizedProductsAsync(accountId.Value, cancellationToken);
+        return Ok(result);
+    }
+
+    // ── Avatar ───────────────────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Upload ảnh đại diện (avatar) hiển thị UI cho tài khoản đang đăng nhập.
+    /// Chấp nhận file ảnh multipart/form-data (jpg, jpeg, png, webp). Tối đa 5MB.
+    /// </summary>
+    [Authorize]
+    [HttpPut("me/avatar")]
+    [Consumes("multipart/form-data")]
+    [ProducesResponseType(typeof(AvatarUploadResponseDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    public async Task<ActionResult<AvatarUploadResponseDto>> UploadAvatar(
+        IFormFile file,
+        CancellationToken cancellationToken)
+    {
+        var accountId = GetCurrentAccountId();
+        if (accountId is null) return Unauthorized();
+
+        if (file is null || file.Length == 0)
+            return BadRequest("Vui lòng chọn file ảnh.");
+
+        // Kiểm tra content type
+        var allowedTypes = new[] { "image/jpeg", "image/jpg", "image/png", "image/webp" };
+        if (!allowedTypes.Contains(file.ContentType.ToLowerInvariant()))
+            return BadRequest("Chỉ chấp nhận ảnh định dạng JPG, PNG hoặc WebP.");
+
+        await using var stream = file.OpenReadStream();
+        var result = await memberService.UploadAvatarAsync(
+            accountId.Value, stream, file.FileName, cancellationToken);
+        return Ok(result);
+    }
+
+    /// <summary>
+    /// Xóa ảnh đại diện hiện tại (set AvatarUrl = null).
+    /// </summary>
+    [Authorize]
+    [HttpDelete("me/avatar")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    public async Task<IActionResult> DeleteAvatar(CancellationToken cancellationToken)
+    {
+        var accountId = GetCurrentAccountId();
+        if (accountId is null) return Unauthorized();
+
+        await memberService.DeleteAvatarAsync(accountId.Value, cancellationToken);
+        return NoContent();
     }
 
     // ── Helpers ──────────────────────────────────────────────────────────────────────

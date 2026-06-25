@@ -1,16 +1,27 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using SmartMarketBot.Application.Interfaces;
 using SmartMarketBot.Application.Models.Members;
 using SmartMarketBot.Application.Models.Products;
+using SmartMarketBot.Application.Models.MealSuggestions;
 using SmartMarketBot.Domain.Common;
 using SmartMarketBot.Domain.Entities;
+using SmartMarketBot.Infrastructure.Options;
 using SmartMarketBot.Infrastructure.Persistence;
 
 namespace SmartMarketBot.Infrastructure.Services;
 
 /// <summary>Flow 3 — Budget &amp; Health + Flow 2 Deal Hunter + Member Alerts + Profile.</summary>
-public sealed class MemberService(AppDbContext db, ILocalizationService localizer) : IMemberService
+public sealed class MemberService(
+    AppDbContext db,
+    ILocalizationService localizer,
+    ICloudStorageService cloudStorage,
+    IOptions<CloudinaryOptions> cloudinaryOptions,
+    IMemberRealtimeNotifier realtimeNotifier,
+    ILogger<MemberService> logger) : IMemberService
 {
+    private readonly CloudinaryOptions _cloudinaryOpts = cloudinaryOptions.Value;
     // ── Budget (Robot Flow) ───────────────────────────────────────────────────
 
     public async Task<SetBudgetResponseDto> SetShoppingBudgetAsync(
@@ -90,6 +101,47 @@ public sealed class MemberService(AppDbContext db, ILocalizationService localize
         {
             alertType = "DuplicatePurchase";
             alertMessage = localizer.Get("DuplicatePurchaseAlert", product.ProductName);
+        }
+
+        // Push realtime notification nếu có cảnh báo
+        if (alertType is not null)
+        {
+            _ = Task.Run(async () =>
+            {
+                try
+                {
+                    await realtimeNotifier.PushToMemberAsync(memberId, new Application.Models.Realtime.MemberRealtimeUpdateDto(
+                        MemberId:   memberId,
+                        UpdateType: alertType,
+                        Title:      alertType switch
+                        {
+                            "Allergy"          => "⚠️ Cảnh báo dị ứng",
+                            "BudgetExceeded"   => "💰 Vượt ngân sách",
+                            "DuplicatePurchase"=> "🔄 Sản phẩm đã mua",
+                            _                  => "Thông báo"
+                        },
+                        Message:    alertMessage!,
+                        Payload:    new { ProductId = product.ProductId, ProductName = product.ProductName },
+                        Timestamp:  Domain.Common.VnDateTime.Now));
+
+                    // Lưu vào DB để member xem lại
+                    await SaveNotificationAsync(
+                        memberId:    memberId,
+                        notifType:   alertType,
+                        title:       alertType switch
+                        {
+                            "Allergy"           => "⚠️ Cảnh báo dị ứng",
+                            "BudgetExceeded"    => "💰 Vượt ngân sách",
+                            "DuplicatePurchase" => "🔄 Sản phẩm đã mua",
+                            _                   => "Thông báo"
+                        },
+                        message:     alertMessage!,
+                        payloadJson: System.Text.Json.JsonSerializer.Serialize(
+                            new { ProductId = product.ProductId, ProductName = product.ProductName }),
+                        ct: default); // không truyền ct để tránh cancel khi client disconnect
+                }
+                catch { /* fire-and-forget: không fail transaction chính */ }
+            });
         }
 
         // Lấy sản phẩm thay thế nếu bị block
@@ -216,6 +268,7 @@ public sealed class MemberService(AppDbContext db, ILocalizationService localize
             FullName:       account.FullName ?? member.FullName,
             Email:          account.Email,
             Phone:          account.Phone,
+            AvatarUrl:      account.AvatarUrl,
             FacePath:       member.FacePath,
             TotalPoints:    member.TotalPoints,
             SpendingLimit:  member.SpendingLimit,
@@ -257,6 +310,7 @@ public sealed class MemberService(AppDbContext db, ILocalizationService localize
             FullName:       account.FullName ?? member.FullName,
             Email:          account.Email,
             Phone:          account.Phone,
+            AvatarUrl:      account.AvatarUrl,
             FacePath:       member.FacePath,
             TotalPoints:    member.TotalPoints,
             SpendingLimit:  member.SpendingLimit,
@@ -403,4 +457,305 @@ public sealed class MemberService(AppDbContext db, ILocalizationService localize
             Avoids:     list.Where(p => p.Status == "Avoid").Select(ToDto).ToList(),
             Preferreds: list.Where(p => p.Status == "Preferred").Select(ToDto).ToList());
     }
+
+    public async Task<IReadOnlyList<RecipeDto>> GetPersonalizedMealsAsync(int accountId, CancellationToken ct = default)
+    {
+        var member = await GetMemberByAccountIdAsync(accountId, ct);
+
+        // 1. Get health preferences
+        var preferences = await db.MemberHealthPreferences
+            .AsNoTracking()
+            .Where(mhp => mhp.MemberId == member.MemberId)
+            .ToListAsync(ct);
+
+        var allergyTagIds = preferences.Where(p => p.Status == "Allergy").Select(p => p.HealthTagId).ToList();
+        var avoidTagIds = preferences.Where(p => p.Status == "Avoid").Select(p => p.HealthTagId).ToList();
+        var preferredTagIds = preferences.Where(p => p.Status == "Preferred").Select(p => p.HealthTagId).ToList();
+
+        // 2. Fetch all recipes
+        var recipes = await db.MealSuggestions
+            .Include(ms => ms.MealItems)
+                .ThenInclude(mi => mi.Product)
+                    .ThenInclude(p => p!.ProductHealthTags)
+            .ToListAsync(ct);
+
+        var personalizedList = new List<(MealSuggestion Recipe, decimal Score)>();
+
+        foreach (var r in recipes)
+        {
+            bool hasAllergy = false;
+            bool hasAvoid = false;
+            decimal preferenceBoost = 0;
+
+            foreach (var item in r.MealItems)
+            {
+                if (item.Product == null) continue;
+                var productTagIds = item.Product.ProductHealthTags.Select(pht => pht.HealthTagId).ToList();
+
+                if (allergyTagIds.Intersect(productTagIds).Any())
+                {
+                    hasAllergy = true;
+                    break;
+                }
+                if (avoidTagIds.Intersect(productTagIds).Any())
+                {
+                    hasAvoid = true;
+                }
+                if (preferredTagIds.Intersect(productTagIds).Any())
+                {
+                    preferenceBoost += 20;
+                }
+            }
+
+            if (hasAllergy || hasAvoid) continue; // Exclude allergy and avoid tags
+
+            decimal baseScore = r.HealthyScore ?? 50m;
+            personalizedList.Add((r, baseScore + preferenceBoost));
+        }
+
+        return personalizedList
+            .OrderByDescending(x => x.Score)
+            .Select(x => new RecipeDto(
+                x.Recipe.MealSuggestionId,
+                x.Recipe.MealName,
+                x.Recipe.Description,
+                x.Recipe.YieldPortions,
+                x.Recipe.ImageUrl,
+                x.Recipe.Calories,
+                x.Recipe.HealthyScore.HasValue ? (int)x.Recipe.HealthyScore.Value : null,
+                x.Recipe.AlternativeSuggestion))
+            .ToList();
+    }
+
+    public async Task<IReadOnlyList<ProductDto>> GetPersonalizedProductsAsync(int accountId, CancellationToken ct = default)
+    {
+        var member = await GetMemberByAccountIdAsync(accountId, ct);
+
+        // 1. Load preferences
+        var preferences = await db.MemberHealthPreferences
+            .AsNoTracking()
+            .Where(mhp => mhp.MemberId == member.MemberId)
+            .ToListAsync(ct);
+
+        var allergyTagIds = preferences.Where(p => p.Status == "Allergy").Select(p => p.HealthTagId).ToList();
+        var avoidTagIds = preferences.Where(p => p.Status == "Avoid").Select(p => p.HealthTagId).ToList();
+        var preferredTagIds = preferences.Where(p => p.Status == "Preferred").Select(p => p.HealthTagId).ToList();
+
+        // 2. Fetch past purchases
+        var pastPurchases = await db.InvoiceHistoryItems
+            .AsNoTracking()
+            .Where(i => i.InvoiceHistory != null && i.InvoiceHistory.MemberId == member.MemberId)
+            .GroupBy(i => i.ProductId)
+            .Select(g => new { ProductId = g.Key, Frequency = g.Count() })
+            .ToDictionaryAsync(x => x.ProductId, x => x.Frequency, ct);
+
+        // 3. Load products with tags
+        var products = await db.Products
+            .Include(p => p.ProductHealthTags)
+            .Where(p => p.Status == "Available")
+            .ToListAsync(ct);
+
+        var rankedProducts = new List<(Product Product, decimal Score)>();
+
+        foreach (var p in products)
+        {
+            var productTagIds = p.ProductHealthTags.Select(pht => pht.HealthTagId).ToList();
+
+            if (allergyTagIds.Intersect(productTagIds).Any() || avoidTagIds.Intersect(productTagIds).Any())
+                continue; // Exclude allergy or avoid tags
+
+            decimal score = 0;
+            if (pastPurchases.TryGetValue(p.ProductId, out var freq))
+            {
+                score += freq * 10;
+            }
+
+            if (preferredTagIds.Intersect(productTagIds).Any())
+            {
+                score += 15;
+            }
+
+            if (p.PromotionPrice.HasValue && p.PromotionPrice < p.UnitPrice)
+            {
+                score += 5;
+            }
+
+            rankedProducts.Add((p, score));
+        }
+
+        return rankedProducts
+            .OrderByDescending(x => x.Score)
+            .Take(20)
+            .Select(x => new ProductDto(
+                x.Product.ProductId,
+                x.Product.ProductName,
+                x.Product.UnitPrice,
+                x.Product.Status,
+                x.Product.ImageUrl,
+                x.Product.ProductTypeId))
+            .ToList();
+    }
+
+    // ── Avatar ───────────────────────────────────────────────────────────────
+
+    public async Task<AvatarUploadResponseDto> UploadAvatarAsync(
+        int accountId, Stream imageStream, string fileName, CancellationToken ct = default)
+    {
+        var account = await db.Accounts.FindAsync([accountId], ct)
+            ?? throw new KeyNotFoundException($"Không tìm thấy tài khoản #{accountId}.");
+
+        // Đọc stream → byte[]
+        using var ms = new MemoryStream();
+        await imageStream.CopyToAsync(ms, ct);
+        var imageBytes = ms.ToArray();
+
+        if (imageBytes.Length == 0)
+            throw new InvalidOperationException("File ảnh rỗng.");
+
+        // Giới hạn kích thước 5MB
+        const int MaxBytes = 5 * 1024 * 1024;
+        if (imageBytes.Length > MaxBytes)
+            throw new InvalidOperationException("Ảnh không được vượt quá 5MB.");
+
+        // Upload lên Cloudinary
+        var publicId = $"avatar-{accountId}-{Guid.NewGuid():N}";
+        var avatarUrl = await cloudStorage.UploadImageAsync(
+            imageBytes,
+            _cloudinaryOpts.MemberAvatarsFolder,
+            publicId,
+            ct);
+
+        account.AvatarUrl = avatarUrl;
+        await db.SaveChangesAsync(ct);
+
+        logger.LogInformation(
+            "[MemberService] Avatar updated for AccountId={Id}. Url={Url}",
+            accountId, avatarUrl);
+
+        return new AvatarUploadResponseDto(
+            AccountId: accountId,
+            AvatarUrl: avatarUrl,
+            Message: "Cập nhật ảnh đại diện thành công.");
+    }
+
+    public async Task DeleteAvatarAsync(int accountId, CancellationToken ct = default)
+    {
+        var account = await db.Accounts.FindAsync([accountId], ct)
+            ?? throw new KeyNotFoundException($"Không tìm thấy tài khoản #{accountId}.");
+
+        account.AvatarUrl = null;
+        await db.SaveChangesAsync(ct);
+
+        logger.LogInformation("[MemberService] Avatar removed for AccountId={Id}", accountId);
+    }
+
+    // ── Notifications ─────────────────────────────────────────────────────────
+
+    public async Task<NotificationListDto> GetNotificationsAsync(
+        int accountId, int page = 1, int pageSize = 20, CancellationToken ct = default)
+    {
+        var member = await GetMemberByAccountIdAsync(accountId, ct);
+
+        pageSize = Math.Clamp(pageSize, 1, 50);
+        page     = Math.Max(1, page);
+
+        var query = db.MemberNotifications
+            .AsNoTracking()
+            .Where(n => n.MemberId == member.MemberId);
+
+        var totalCount   = await query.CountAsync(ct);
+        var unreadCount  = await query.CountAsync(n => !n.IsRead, ct);
+
+        var items = await query
+            .OrderByDescending(n => n.CreatedAt)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .Select(n => new MemberNotificationDto(
+                n.NotificationId,
+                n.NotifType,
+                n.Title,
+                n.Message,
+                n.PayloadJson,
+                n.IsRead,
+                n.CreatedAt))
+            .ToListAsync(ct);
+
+        return new NotificationListDto(
+            MemberId:    member.MemberId,
+            UnreadCount: unreadCount,
+            TotalCount:  totalCount,
+            Page:        page,
+            PageSize:    pageSize,
+            Items:       items);
+    }
+
+    public async Task<UnreadCountDto> GetUnreadCountAsync(int accountId, CancellationToken ct = default)
+    {
+        var member = await GetMemberByAccountIdAsync(accountId, ct);
+
+        var count = await db.MemberNotifications
+            .AsNoTracking()
+            .CountAsync(n => n.MemberId == member.MemberId && !n.IsRead, ct);
+
+        return new UnreadCountDto(member.MemberId, count);
+    }
+
+    public async Task MarkAllNotificationsReadAsync(int accountId, CancellationToken ct = default)
+    {
+        var member = await GetMemberByAccountIdAsync(accountId, ct);
+
+        await db.MemberNotifications
+            .Where(n => n.MemberId == member.MemberId && !n.IsRead)
+            .ExecuteUpdateAsync(s => s.SetProperty(n => n.IsRead, true), ct);
+
+        logger.LogInformation("[MemberService] MarkAllRead for MemberId={Id}", member.MemberId);
+    }
+
+    public async Task MarkNotificationReadAsync(int accountId, int notificationId, CancellationToken ct = default)
+    {
+        var member = await GetMemberByAccountIdAsync(accountId, ct);
+
+        var notif = await db.MemberNotifications
+            .FirstOrDefaultAsync(n => n.NotificationId == notificationId && n.MemberId == member.MemberId, ct)
+            ?? throw new KeyNotFoundException($"Notification #{notificationId} không tồn tại.");
+
+        if (!notif.IsRead)
+        {
+            notif.IsRead = true;
+            await db.SaveChangesAsync(ct);
+        }
+    }
+
+    // ── Internal Helper ───────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Lưu notification vào DB (fire-and-forget safe).
+    /// Gọi sau khi đã SaveChanges() cho transaction chính.
+    /// </summary>
+    internal async Task SaveNotificationAsync(
+        int memberId, string notifType, string title, string message,
+        string? payloadJson = null, CancellationToken ct = default)
+    {
+        try
+        {
+            db.MemberNotifications.Add(new MemberNotification
+            {
+                MemberId    = memberId,
+                NotifType   = notifType,
+                Title       = title,
+                Message     = message,
+                PayloadJson = payloadJson,
+                IsRead      = false,
+                CreatedAt   = VnDateTime.Now
+            });
+            await db.SaveChangesAsync(ct);
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex,
+                "[MemberService] Không thể lưu notification (MemberId={Id}, Type={Type})",
+                memberId, notifType);
+        }
+    }
 }
+

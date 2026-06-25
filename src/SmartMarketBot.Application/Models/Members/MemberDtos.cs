@@ -93,6 +93,7 @@ public sealed record MemberProfileDto(
     string FullName,
     string Email,
     string? Phone,
+    string? AvatarUrl,
     string? FacePath,
     int TotalPoints,
     decimal? SpendingLimit,
@@ -163,4 +164,36 @@ public sealed record HealthPreferenceItemDto(
 /// </summary>
 public sealed record UpdateHealthPreferencesRequestDto(
     IReadOnlyList<HealthPreferenceItemDto> Preferences);
+
+// ─── Avatar ────────────────────────────────────────────────────────────────────
+
+/// <summary>Response sau khi upload ảnh đại diện thành công.</summary>
+public sealed record AvatarUploadResponseDto(
+    int AccountId,
+    string AvatarUrl,
+    string Message);
+
+// ─── Member Notification ───────────────────────────────────────────────────────
+
+/// <summary>Một notification của member.</summary>
+public sealed record MemberNotificationDto(
+    int NotificationId,
+    string NotifType,
+    string Title,
+    string Message,
+    string? PayloadJson,
+    bool IsRead,
+    DateTime CreatedAt);
+
+/// <summary>Danh sách notification có phân trang + unread count.</summary>
+public sealed record NotificationListDto(
+    int MemberId,
+    int UnreadCount,
+    int TotalCount,
+    int Page,
+    int PageSize,
+    IReadOnlyList<MemberNotificationDto> Items);
+
+/// <summary>Số lượng notification chưa đọc.</summary>
+public sealed record UnreadCountDto(int MemberId, int UnreadCount);
 

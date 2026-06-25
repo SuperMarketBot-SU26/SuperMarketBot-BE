@@ -1,4 +1,6 @@
 using SmartMarketBot.Application.Models.Members;
+using SmartMarketBot.Application.Models.MealSuggestions;
+using SmartMarketBot.Application.Models.Products;
 
 namespace SmartMarketBot.Application.Interfaces;
 
@@ -45,6 +47,12 @@ public interface IMemberService
 
     // ── Health Preferences (chế độ ăn & dị ứng) ──────────────────────────────
 
+    /// <summary>Lấy gợi ý món ăn cá nhân hóa dựa trên dị ứng và sở thích.</summary>
+    Task<IReadOnlyList<RecipeDto>> GetPersonalizedMealsAsync(int accountId, CancellationToken ct = default);
+
+    /// <summary>Lấy gợi ý sản phẩm cá nhân hóa dựa trên lịch sử mua sắm và dị ứng.</summary>
+    Task<IReadOnlyList<ProductDto>> GetPersonalizedProductsAsync(int accountId, CancellationToken ct = default);
+
     /// <summary>Lấy toàn bộ chế độ ăn &amp; dị ứng của member, nhóm theo Status.</summary>
     Task<MemberHealthPreferencesDto> GetHealthPreferencesAsync(int accountId, CancellationToken ct = default);
 
@@ -55,4 +63,26 @@ public interface IMemberService
 
     /// <summary>Lấy toàn bộ danh sách HealthTag trong hệ thống (để FE hiển thị picker).</summary>
     Task<IReadOnlyList<HealthTagDto>> GetAllHealthTagsAsync(CancellationToken ct = default);
+
+    // ── Avatar ───────────────────────────────────────────────────────────────
+
+    /// <summary>Upload ảnh đại diện UI lên Cloudinary, lưu URL vào ACCOUNT.AvatarUrl.</summary>
+    Task<AvatarUploadResponseDto> UploadAvatarAsync(int accountId, Stream imageStream, string fileName, CancellationToken ct = default);
+
+    /// <summary>Xóa ảnh đại diện hiện tại (set AvatarUrl = null).</summary>
+    Task DeleteAvatarAsync(int accountId, CancellationToken ct = default);
+
+    // ── Notifications ────────────────────────────────────────────────────────
+
+    /// <summary>Lấy danh sách notification của member có phân trang, mới nhất trước.</summary>
+    Task<NotificationListDto> GetNotificationsAsync(int accountId, int page = 1, int pageSize = 20, CancellationToken ct = default);
+
+    /// <summary>Số lượng notification chưa đọc (dùng cho badge UI).</summary>
+    Task<UnreadCountDto> GetUnreadCountAsync(int accountId, CancellationToken ct = default);
+
+    /// <summary>Đánh dấu tất cả notification đã đọc.</summary>
+    Task MarkAllNotificationsReadAsync(int accountId, CancellationToken ct = default);
+
+    /// <summary>Đánh dấu một notification cụ thể đã đọc.</summary>
+    Task MarkNotificationReadAsync(int accountId, int notificationId, CancellationToken ct = default);
 }

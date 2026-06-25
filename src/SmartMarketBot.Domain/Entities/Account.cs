@@ -9,6 +9,9 @@ public class Account
     public string? Phone { get; set; }
     public string? FullName { get; set; }
 
+    /// <summary>URL ảnh đại diện hiển thị trên UI (Cloudinary hoặc bất kỳ CDN nào).</summary>
+    public string? AvatarUrl { get; set; }
+
     /// <summary>Enum dạng string: 'Active' | 'Inactive' | 'Pending' | 'Blocked'.</summary>
     public string Status { get; set; } = "Pending";
 

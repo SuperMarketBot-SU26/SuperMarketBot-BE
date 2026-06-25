@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using SmartMarketBot.Application.Interfaces;
 using SmartMarketBot.Application.Models.Realtime;
+using SmartMarketBot.Domain.Common;
 using SmartMarketBot.Infrastructure.Persistence;
 
 namespace SmartMarketBot.Infrastructure.Services;
@@ -25,11 +26,13 @@ public sealed class MemberRealtimeService(
 
     public async Task<int> GetPurchaseFrequencyAsync(int memberId, int productId, int windowDays = 30, CancellationToken ct = default)
     {
-        // TODO(bạn B): đếm số lần Member mua Product trong windowDays. Ví dụ:
-        //   - Nếu có bảng ORDER/INVOICE: WHERE MemberID = @mid AND ProductID = @pid AND CreatedAt >= GETUTCDATE() - @days
-        //   - Hoặc dùng MEMBER_CART.ScanTime làm proxy.
-        // Tạm trả 0 cho skeleton.
-        await Task.CompletedTask;
-        return 0;
+        var cutoff = VnDateTime.Now.AddDays(-windowDays);
+        return await db.InvoiceHistoryItems
+            .AsNoTracking()
+            .Where(i => i.InvoiceHistory != null
+                && i.InvoiceHistory.MemberId == memberId
+                && i.ProductId == productId
+                && i.InvoiceHistory.PurchaseDate >= cutoff)
+            .SumAsync(i => i.Quantity, ct);
     }
 }

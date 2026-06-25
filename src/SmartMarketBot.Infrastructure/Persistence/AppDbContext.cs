@@ -12,6 +12,7 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
     public DbSet<Membership> Memberships => Set<Membership>();
     public DbSet<HealthTag> HealthTags => Set<HealthTag>();
     public DbSet<MemberHealthPreference> MemberHealthPreferences => Set<MemberHealthPreference>();
+    public DbSet<MemberNotification> MemberNotifications => Set<MemberNotification>();
 
     // ── Region 2: Product Catalog ────────────────────────────────────────────
     public DbSet<Category> Categories => Set<Category>();
@@ -25,6 +26,8 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
     public DbSet<InvoiceHistoryItem> InvoiceHistoryItems => Set<InvoiceHistoryItem>();
     public DbSet<MealSuggestion> MealSuggestions => Set<MealSuggestion>();
     public DbSet<MealItem> MealItems => Set<MealItem>();
+    public DbSet<Cart> Carts => Set<Cart>();
+    public DbSet<CartItem> CartItems => Set<CartItem>();
 
     // ── Region 4: Store Layout ───────────────────────────────────────────────
     public DbSet<Floor> Floors => Set<Floor>();
@@ -80,6 +83,7 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
             entity.Property(x => x.Email).HasColumnName("Email").HasMaxLength(256).IsRequired();
             entity.Property(x => x.Phone).HasColumnName("Phone").HasMaxLength(20);
             entity.Property(x => x.FullName).HasColumnName("FullName").HasMaxLength(100);
+            entity.Property(x => x.AvatarUrl).HasColumnName("AvatarUrl").HasMaxLength(500);
             entity.Property(x => x.Status).HasColumnName("Status").HasMaxLength(50).IsRequired();
             entity.Property(x => x.Role).HasColumnName("Role").HasMaxLength(50).IsRequired();
             entity.Property(x => x.OtpCode).HasColumnName("OtpCode").HasMaxLength(6);
@@ -153,6 +157,26 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
         });
 
         // Refresh token đã gộp vào bảng ACCOUNT (37 bảng — không có USER_TOKEN).
+
+        modelBuilder.Entity<MemberNotification>(entity =>
+        {
+            entity.ToTable("MEMBER_NOTIFICATION");
+            entity.HasKey(x => x.NotificationId);
+            entity.Property(x => x.NotificationId).HasColumnName("NotificationID");
+            entity.Property(x => x.MemberId).HasColumnName("MemberID");
+            entity.Property(x => x.NotifType).HasColumnName("NotifType").HasMaxLength(50).IsRequired();
+            entity.Property(x => x.Title).HasColumnName("Title").HasMaxLength(200).IsRequired();
+            entity.Property(x => x.Message).HasColumnName("Message").HasColumnType("nvarchar(max)").IsRequired();
+            entity.Property(x => x.PayloadJson).HasColumnName("PayloadJson").HasColumnType("nvarchar(max)");
+            entity.Property(x => x.IsRead).HasColumnName("IsRead").HasDefaultValue(false);
+            entity.Property(x => x.CreatedAt).HasColumnName("CreatedAt").HasDefaultValueSql("DATEADD(hour, 7, GETUTCDATE())");
+            entity.HasOne(x => x.Member)
+                .WithMany(m => m.MemberNotifications)
+                .HasForeignKey(x => x.MemberId)
+                .OnDelete(DeleteBehavior.Cascade);
+            entity.HasIndex(x => new { x.MemberId, x.IsRead }).HasDatabaseName("IX_MN_MemberID_IsRead");
+            entity.HasIndex(x => x.CreatedAt).HasDatabaseName("IX_MN_CreatedAt").IsDescending();
+        });
 
         // MemberHealthPreference đã cấu hình ở trên
 
@@ -298,6 +322,42 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
             entity.HasOne(x => x.Product)
                 .WithMany(p => p.MealItems)
                 .HasForeignKey(x => x.ProductId);
+        });
+
+        modelBuilder.Entity<Cart>(entity =>
+        {
+            entity.ToTable("CART");
+            entity.HasKey(x => x.CartId);
+            entity.Property(x => x.CartId).HasColumnName("CartID");
+            entity.Property(x => x.MemberId).HasColumnName("MemberID");
+            entity.Property(x => x.CreatedAt).HasColumnName("CreatedAt").HasDefaultValueSql("DATEADD(hour, 7, GETUTCDATE())");
+            entity.Property(x => x.UpdatedAt).HasColumnName("UpdatedAt");
+
+            entity.HasOne(x => x.Member)
+                .WithOne()
+                .HasForeignKey<Cart>(x => x.MemberId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<CartItem>(entity =>
+        {
+            entity.ToTable("CART_ITEM");
+            entity.HasKey(x => x.CartItemId);
+            entity.Property(x => x.CartItemId).HasColumnName("CartItemID");
+            entity.Property(x => x.CartId).HasColumnName("CartID");
+            entity.Property(x => x.ProductId).HasColumnName("ProductID");
+            entity.Property(x => x.Quantity).HasColumnName("Quantity").HasDefaultValue(1);
+            entity.Property(x => x.AddedAt).HasColumnName("AddedAt").HasDefaultValueSql("DATEADD(hour, 7, GETUTCDATE())");
+
+            entity.HasOne(x => x.Cart)
+                .WithMany(c => c.CartItems)
+                .HasForeignKey(x => x.CartId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(x => x.Product)
+                .WithMany()
+                .HasForeignKey(x => x.ProductId)
+                .OnDelete(DeleteBehavior.Cascade);
         });
 
         // ─────────────────────────────────────────────

@@ -7,7 +7,8 @@ public sealed record RobotDto(
     int BatteryPct,
     string Mode,
     string Status,
-    DateTime? LastSeenAt);
+    DateTime? LastSeenAt,
+    string? IpAddress = null);
 
 public sealed record PublishRobotCommandRequestDto(string RobotCode, string Command, string? Payload);
 

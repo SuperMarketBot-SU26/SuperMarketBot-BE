@@ -121,6 +121,7 @@ public sealed class MqttClientService(
         var subscribeOptions = new MqttClientSubscribeOptionsBuilder()
             .WithTopicFilter("smartmarketbot/robot/+/status")
             .WithTopicFilter("smartmarketbot/robot/+/telemetry")
+            .WithTopicFilter("smartmarketbot/robot/+/log")
             .Build();
 
         await _mqttClient.SubscribeAsync(subscribeOptions, cancellationToken);
@@ -156,15 +157,38 @@ public sealed class MqttClientService(
             var eventType = topicParts[3];
 
             logger.LogInformation("MQTT recv [{Topic}] {Bytes}B: {Payload}", topic, payloadJson.Length, payloadJson);
+
+            await using var scope = scopeFactory.CreateAsyncScope();
+            var notifier = scope.ServiceProvider.GetRequiredService<IRobotHubNotifier>();
+
+            if (eventType.Equals("log", StringComparison.OrdinalIgnoreCase))
+            {
+                string logMessage = payloadJson;
+                try
+                {
+                    using var doc = JsonDocument.Parse(payloadJson);
+                    if (doc.RootElement.TryGetProperty("msg", out var msgProp))
+                    {
+                        logMessage = msgProp.GetString() ?? payloadJson;
+                    }
+                }
+                catch
+                {
+                    // Ignore parsing issues
+                }
+
+                logger.LogInformation("[ROBOT LOG][{RobotCode}] {LogMessage}", robotCode, logMessage);
+                await notifier.NotifyLogAsync(robotCode, logMessage);
+                return;
+            }
+
             var payload = JsonSerializer.Deserialize<IncomingRobotPayload>(payloadJson, new JsonSerializerOptions
             {
                 PropertyNameCaseInsensitive = true
             }) ?? new IncomingRobotPayload();
             var timestamp = payload.Timestamp ?? VnDateTime.Now;
 
-            await using var scope = scopeFactory.CreateAsyncScope();
             var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-            var notifier = scope.ServiceProvider.GetRequiredService<IRobotHubNotifier>();
 
             var robot = await dbContext.Robots.FirstOrDefaultAsync(x => x.RobotCode == robotCode);
             var log = new RobotLog
@@ -196,6 +220,11 @@ public sealed class MqttClientService(
                 if (payload.IsOnline.HasValue)
                 {
                     robot.Status = payload.IsOnline.Value ? "Online" : "Offline";
+                }
+
+                if (!string.IsNullOrWhiteSpace(payload.Ip))
+                {
+                    robot.IPAddress = payload.Ip;
                 }
 
                 robot.LastSeenAt = timestamp;
@@ -371,6 +400,7 @@ public sealed class MqttClientService(
         public double? XCoord { get; set; }
         public double? YCoord { get; set; }
         public DateTime? Timestamp { get; set; }
+        public string? Ip { get; set; }
 
         // Phase 1 — sensor telemetry từ ESP32-S3
         public int? LidarFront { get; set; }

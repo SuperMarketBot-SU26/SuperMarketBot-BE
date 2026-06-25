@@ -30,7 +30,8 @@ public sealed class RobotService(
                 x.BatteryPct,
                 x.Mode,
                 x.Status,
-                x.LastSeenAt))
+                x.LastSeenAt,
+                x.IPAddress))
             .ToListAsync(cancellationToken);
     }
 
@@ -180,6 +181,7 @@ public sealed class RobotService(
             robot.BatteryPct,
             robot.Mode,
             robot.Status,
-            robot.LastSeenAt);
+            robot.LastSeenAt,
+            robot.IPAddress);
     }
 }

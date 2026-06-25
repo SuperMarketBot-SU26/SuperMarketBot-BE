@@ -22,4 +22,12 @@ public sealed class SignalRRobotHubNotifier(IHubContext<RobotHub> hubContext) : 
         await hubContext.Clients.All
             .SendAsync("status", status, cancellationToken);
     }
+
+    public async Task NotifyLogAsync(string robotCode, string message, CancellationToken cancellationToken = default)
+    {
+        await hubContext.Clients.Group(RobotHub.GroupName(robotCode))
+            .SendAsync("robotLog", robotCode, message, cancellationToken);
+        await hubContext.Clients.All
+            .SendAsync("robotLog", robotCode, message, cancellationToken);
+    }
 }

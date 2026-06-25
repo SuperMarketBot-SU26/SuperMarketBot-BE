@@ -12,6 +12,7 @@ public class Robot
     public string Status { get; set; } = "Offline";
 
     public DateTime? LastSeenAt { get; set; }
+    public string? IPAddress { get; set; }
 
     public virtual ICollection<RobotLog> RobotLogs { get; set; } = new List<RobotLog>();
     public virtual ICollection<RobotZone> RobotZones { get; set; } = new List<RobotZone>();

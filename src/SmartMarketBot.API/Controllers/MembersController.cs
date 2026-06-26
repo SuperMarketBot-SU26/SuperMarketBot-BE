@@ -317,6 +317,57 @@ public sealed class MembersController(
     }
 
     /// <summary>
+    /// Lấy danh sách sản phẩm yêu thích của member đang đăng nhập.
+    /// </summary>
+    [Authorize]
+    [HttpGet("me/favorites")]
+    [ProducesResponseType(typeof(IReadOnlyList<ProductDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    public async Task<ActionResult<IReadOnlyList<ProductDto>>> GetMyFavorites(CancellationToken cancellationToken)
+    {
+        var accountId = GetCurrentAccountId();
+        if (accountId is null) return Unauthorized();
+
+        var result = await memberService.GetFavoriteProductsAsync(accountId.Value, cancellationToken);
+        return Ok(result);
+    }
+
+    /// <summary>
+    /// Thêm hoặc xóa sản phẩm khỏi danh sách yêu thích của member đang đăng nhập.
+    /// </summary>
+    [Authorize]
+    [HttpPut("me/favorites/{productId:int}")]
+    [ProducesResponseType(typeof(FavoriteToggleResponseDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<FavoriteToggleResponseDto>> ToggleFavorite(int productId, CancellationToken cancellationToken)
+    {
+        var accountId = GetCurrentAccountId();
+        if (accountId is null) return Unauthorized();
+
+        var result = await memberService.ToggleFavoriteProductAsync(accountId.Value, productId, cancellationToken);
+        return Ok(result);
+    }
+
+    /// <summary>
+    /// Lấy lịch sử mua hàng gần đây của member đang đăng nhập.
+    /// </summary>
+    [Authorize]
+    [HttpGet("me/purchase-history")]
+    [ProducesResponseType(typeof(IReadOnlyList<PurchaseHistoryItemDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    public async Task<ActionResult<IReadOnlyList<PurchaseHistoryItemDto>>> GetMyPurchaseHistory(
+        [FromQuery] int limit = 10,
+        CancellationToken cancellationToken = default)
+    {
+        var accountId = GetCurrentAccountId();
+        if (accountId is null) return Unauthorized();
+
+        var result = await memberService.GetPurchaseHistoryAsync(accountId.Value, limit, cancellationToken);
+        return Ok(result);
+    }
+
+    /// <summary>
     /// Lấy danh sách gợi ý món ăn cá nhân hóa dựa trên chế độ sức khỏe và dị ứng.
     /// </summary>
     [Authorize]

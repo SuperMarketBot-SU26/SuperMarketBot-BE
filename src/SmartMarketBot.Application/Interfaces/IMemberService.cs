@@ -1,6 +1,7 @@
 using SmartMarketBot.Application.Models.Members;
 using SmartMarketBot.Application.Models.MealSuggestions;
 using SmartMarketBot.Application.Models.Products;
+using HealthTagDto = SmartMarketBot.Application.Models.Members.HealthTagDto;
 
 namespace SmartMarketBot.Application.Interfaces;
 
@@ -63,6 +64,15 @@ public interface IMemberService
 
     /// <summary>Lấy toàn bộ danh sách HealthTag trong hệ thống (để FE hiển thị picker).</summary>
     Task<IReadOnlyList<HealthTagDto>> GetAllHealthTagsAsync(CancellationToken ct = default);
+
+    /// <summary>Lấy danh sách sản phẩm yêu thích của member đang đăng nhập.</summary>
+    Task<IReadOnlyList<ProductDto>> GetFavoriteProductsAsync(int accountId, CancellationToken ct = default);
+
+    /// <summary>Thêm hoặc xóa sản phẩm khỏi danh sách yêu thích.</summary>
+    Task<FavoriteToggleResponseDto> ToggleFavoriteProductAsync(int accountId, int productId, CancellationToken ct = default);
+
+    /// <summary>Lấy lịch sử mua hàng gần đây của member.</summary>
+    Task<IReadOnlyList<PurchaseHistoryItemDto>> GetPurchaseHistoryAsync(int accountId, int limit = 10, CancellationToken ct = default);
 
     // ── Avatar ───────────────────────────────────────────────────────────────
 

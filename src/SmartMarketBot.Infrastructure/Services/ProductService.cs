@@ -9,8 +9,58 @@ public sealed class ProductService(AppDbContext dbContext) : IProductService
 {
     public async Task<IReadOnlyList<ProductDto>> GetProductsAsync(CancellationToken cancellationToken = default)
     {
-        return await dbContext.Products
-            .AsNoTracking()
+        return await SearchProductsAsync(null, null, null, null, null, null, cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<ProductDto>> SearchProductsAsync(
+        string? keyword,
+        int? categoryId,
+        int? subcategoryId,
+        int? productTypeId,
+        IReadOnlyList<int>? healthTagIds,
+        bool? availableOnly,
+        CancellationToken cancellationToken = default)
+    {
+        var query = dbContext.Products.AsNoTracking().AsQueryable();
+
+        if (!string.IsNullOrWhiteSpace(keyword))
+        {
+            var normalized = keyword.Trim();
+            query = query.Where(x => x.ProductName.Contains(normalized)
+                || (x.Description != null && x.Description.Contains(normalized)));
+        }
+
+        if (categoryId.HasValue)
+        {
+            query = query.Where(x => x.ProductType != null
+                && x.ProductType.Subcategory != null
+                && x.ProductType.Subcategory.CategoryId == categoryId.Value);
+        }
+
+        if (subcategoryId.HasValue)
+        {
+            query = query.Where(x => x.ProductType != null
+                && x.ProductType.Subcategory != null
+                && x.ProductType.Subcategory.SubcategoryId == subcategoryId.Value);
+        }
+
+        if (productTypeId.HasValue)
+        {
+            query = query.Where(x => x.ProductTypeId == productTypeId.Value);
+        }
+
+        if (healthTagIds is { Count: > 0 })
+        {
+            var ids = healthTagIds.Distinct().ToList();
+            query = query.Where(x => x.ProductHealthTags.Any(pht => ids.Contains(pht.HealthTagId)));
+        }
+
+        if (availableOnly == true)
+        {
+            query = query.Where(x => x.Status == "Available");
+        }
+
+        return await query
             .OrderBy(x => x.ProductName)
             .Select(x => new ProductDto(
                 x.ProductId,
@@ -35,6 +85,37 @@ public sealed class ProductService(AppDbContext dbContext) : IProductService
                 x.ImageUrl,
                 x.ProductTypeId))
             .FirstOrDefaultAsync(cancellationToken);
+    }
+
+    public async Task<ProductDetailDto?> GetProductDetailByIdAsync(int productId, int? memberId, CancellationToken cancellationToken = default)
+    {
+        var product = await dbContext.Products
+            .AsNoTracking()
+            .Include(x => x.ProductHealthTags)
+            .ThenInclude(x => x.HealthTag)
+            .FirstOrDefaultAsync(x => x.ProductId == productId, cancellationToken);
+
+        if (product is null) return null;
+
+        var isFavorite = memberId.HasValue && await dbContext.MemberFavoriteProducts
+            .AsNoTracking()
+            .AnyAsync(x => x.MemberId == memberId.Value && x.ProductId == productId, cancellationToken);
+
+        return new ProductDetailDto(
+            product.ProductId,
+            product.ProductName,
+            product.UnitPrice,
+            product.PromotionPrice,
+            product.Status,
+            product.ImageUrl,
+            product.Description,
+            product.ProductTypeId,
+            product.PromotionPrice.HasValue && product.PromotionPrice.Value < product.UnitPrice,
+            isFavorite,
+            product.ProductHealthTags
+                .Select(x => new HealthTagDto(x.HealthTag!.HealthTagId, x.HealthTag.TagName, x.HealthTag.TagType))
+                .OrderBy(x => x.TagName)
+                .ToList());
     }
 
     public async Task<IReadOnlyList<ProductDto>> GetAlternativeProductsAsync(
@@ -118,6 +199,42 @@ public sealed class ProductService(AppDbContext dbContext) : IProductService
                 p.Status,
                 p.ImageUrl,
                 p.ProductTypeId))
+            .ToListAsync(cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<CategoryDto>> GetCategoriesAsync(CancellationToken cancellationToken = default)
+    {
+        return await dbContext.Categories
+            .AsNoTracking()
+            .OrderBy(x => x.CategoryName)
+            .Select(x => new CategoryDto(x.CategoryId, x.CategoryName, x.Description))
+            .ToListAsync(cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<SubcategoryDto>> GetSubcategoriesAsync(CancellationToken cancellationToken = default)
+    {
+        return await dbContext.Subcategories
+            .AsNoTracking()
+            .OrderBy(x => x.SubcategoryName)
+            .Select(x => new SubcategoryDto(x.SubcategoryId, x.CategoryId, x.SubcategoryName))
+            .ToListAsync(cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<ProductTypeDto>> GetProductTypesAsync(CancellationToken cancellationToken = default)
+    {
+        return await dbContext.ProductTypes
+            .AsNoTracking()
+            .OrderBy(x => x.TypeName)
+            .Select(x => new ProductTypeDto(x.ProductTypeId, x.SubcategoryId, x.TypeName))
+            .ToListAsync(cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<HealthTagDto>> GetHealthTagsAsync(CancellationToken cancellationToken = default)
+    {
+        return await dbContext.HealthTags
+            .AsNoTracking()
+            .OrderBy(x => x.TagName)
+            .Select(x => new HealthTagDto(x.HealthTagId, x.TagName, x.TagType))
             .ToListAsync(cancellationToken);
     }
 }

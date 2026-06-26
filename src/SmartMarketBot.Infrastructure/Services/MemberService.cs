@@ -5,6 +5,7 @@ using SmartMarketBot.Application.Interfaces;
 using SmartMarketBot.Application.Models.Members;
 using SmartMarketBot.Application.Models.Products;
 using SmartMarketBot.Application.Models.MealSuggestions;
+using HealthTagDto = SmartMarketBot.Application.Models.Members.HealthTagDto;
 using SmartMarketBot.Domain.Common;
 using SmartMarketBot.Domain.Entities;
 using SmartMarketBot.Infrastructure.Options;
@@ -423,6 +424,83 @@ public sealed class MemberService(
             .OrderBy(t => t.TagType)
             .ThenBy(t => t.TagName)
             .Select(t => new HealthTagDto(t.HealthTagId, t.TagName, t.TagType))
+            .ToListAsync(ct);
+    }
+
+    public async Task<IReadOnlyList<ProductDto>> GetFavoriteProductsAsync(int accountId, CancellationToken ct = default)
+    {
+        var member = await GetMemberByAccountIdAsync(accountId, ct);
+
+        return await db.MemberFavoriteProducts
+            .AsNoTracking()
+            .Where(x => x.MemberId == member.MemberId)
+            .OrderByDescending(x => x.CreatedAt)
+            .Select(x => new ProductDto(
+                x.Product!.ProductId,
+                x.Product.ProductName,
+                x.Product.UnitPrice,
+                x.Product.Status,
+                x.Product.ImageUrl,
+                x.Product.ProductTypeId))
+            .ToListAsync(ct);
+    }
+
+    public async Task<FavoriteToggleResponseDto> ToggleFavoriteProductAsync(int accountId, int productId, CancellationToken ct = default)
+    {
+        var member = await GetMemberByAccountIdAsync(accountId, ct);
+
+        var productExists = await db.Products.AnyAsync(x => x.ProductId == productId, ct);
+        if (!productExists)
+        {
+            throw new KeyNotFoundException($"Không tìm thấy sản phẩm #{productId}.");
+        }
+
+        var favorite = await db.MemberFavoriteProducts
+            .FirstOrDefaultAsync(x => x.MemberId == member.MemberId && x.ProductId == productId, ct);
+
+        if (favorite is not null)
+        {
+            db.MemberFavoriteProducts.Remove(favorite);
+            await db.SaveChangesAsync(ct);
+            return new FavoriteToggleResponseDto(productId, false, "Đã xóa khỏi danh sách yêu thích.");
+        }
+
+        await db.MemberFavoriteProducts.AddAsync(new MemberFavoriteProduct
+        {
+            MemberId = member.MemberId,
+            ProductId = productId,
+            CreatedAt = VnDateTime.Now
+        }, ct);
+
+        await db.SaveChangesAsync(ct);
+        return new FavoriteToggleResponseDto(productId, true, "Đã thêm vào danh sách yêu thích.");
+    }
+
+    public async Task<IReadOnlyList<PurchaseHistoryItemDto>> GetPurchaseHistoryAsync(int accountId, int limit = 10, CancellationToken ct = default)
+    {
+        var member = await GetMemberByAccountIdAsync(accountId, ct);
+
+        IQueryable<InvoiceHistoryItem> query = db.InvoiceHistoryItems
+            .AsNoTracking()
+            .Where(x => x.InvoiceHistory.MemberId == member.MemberId);
+
+        query = query
+            .OrderByDescending(x => x.InvoiceHistory.PurchaseDate)
+            .ThenByDescending(x => x.InvoiceHistoryItemId);
+
+        if (limit > 0)
+        {
+            query = query.Take(limit);
+        }
+
+        return await query
+            .Select(x => new PurchaseHistoryItemDto(
+                x.ProductId,
+                x.Product.ProductName,
+                x.UnitPrice,
+                x.Product.ImageUrl,
+                x.InvoiceHistory.PurchaseDate,
+                x.Quantity))
             .ToListAsync(ct);
     }
 

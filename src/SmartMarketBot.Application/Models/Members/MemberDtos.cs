@@ -173,6 +173,19 @@ public sealed record AvatarUploadResponseDto(
     string AvatarUrl,
     string Message);
 
+public sealed record FavoriteToggleResponseDto(
+    int ProductId,
+    bool IsFavorite,
+    string Message);
+
+public sealed record PurchaseHistoryItemDto(
+    int ProductId,
+    string ProductName,
+    decimal UnitPrice,
+    string? ImageUrl,
+    DateTime PurchasedAt,
+    int Quantity);
+
 // ─── Member Notification ───────────────────────────────────────────────────────
 
 /// <summary>Một notification của member.</summary>

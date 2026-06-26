@@ -7,8 +7,10 @@ public sealed record ShelfScanDto(
     int RobotId,
     DateTime ScannedAt,
     decimal EmptyPercentage,
+    decimal DensityPercentage,
     bool NeedsRestock,
-    string? ImageUrl);
+    string? ImageUrl,
+    int? AisleNodeId);
 
 /// <summary>
 /// Request robot/AI Vision tạo bản ghi quét kệ.
@@ -21,7 +23,8 @@ public sealed record CreateAisleScanRequestDto(
     int RobotId,
     decimal? EmptyPercentage,
     string? ImageBase64,
-    string? ImageUrl);
+    string? ImageUrl,
+    int? AisleNodeId = null);
 
 /// <summary>
 /// Request mới (Phase 2): robot gửi ảnh chụp kèm theo AisleId/RobotId,
@@ -32,4 +35,5 @@ public sealed record AisleScanWithPhotoRequestDto(
     int RobotId,
     string ImageBase64,
     /// <summary>Threshold % trống để đánh dấu NeedsRestock (mặc định 30).</summary>
-    decimal? RestockThreshold = null);
+    decimal? RestockThreshold = null,
+    int? AisleNodeId = null);

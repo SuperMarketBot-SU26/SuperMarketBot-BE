@@ -1,9 +1,9 @@
+using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using SmartMarketBot.Application.Interfaces;
 using SmartMarketBot.Application.Models.AisleScans;
-using SmartMarketBot.Application.Models.Realtime;
 using SmartMarketBot.Domain.Common;
 using SmartMarketBot.Domain.Entities;
 using SmartMarketBot.Infrastructure.Options;
@@ -15,7 +15,7 @@ public sealed class AisleScanService(
     AppDbContext dbContext,
     ICloudStorageService cloudStorage,
     IOptions<CloudinaryOptions> cloudinaryOptions,
-    IStaffRealtimeNotifier staffNotifier,
+    IAiVisionProxy aiVisionProxy,
     ILogger<AisleScanService> logger) : IAisleScanService
 {
     private readonly CloudinaryOptions _cloudOpts = cloudinaryOptions.Value;
@@ -38,16 +38,20 @@ public sealed class AisleScanService(
                 x.RobotId,
                 x.ScannedAt,
                 x.EmptyPercentage,
+                x.DensityPercentage,
                 x.NeedsRestock,
-                x.ImageUrl))
+                x.ImageUrl,
+                x.AisleNodeId))
             .ToListAsync(cancellationToken);
     }
 
     public async Task<ShelfScanDto> CreateScanAsync(CreateAisleScanRequestDto request, CancellationToken cancellationToken = default)
     {
-        // Upload ảnh Base64 lên Cloudinary nếu có
         string? imageUrl = request.ImageUrl;
-        if (!string.IsNullOrEmpty(request.ImageBase64))
+        decimal emptyPct = request.EmptyPercentage ?? await ComputeEmptyPercentageFromSlotsAsync(request.AisleId, cancellationToken);
+        decimal densityPct = Math.Clamp(100m - emptyPct, 0m, 100m);
+
+        if (!string.IsNullOrWhiteSpace(request.ImageBase64))
         {
             var fileName = $"aisle-{request.AisleId}-robot-{request.RobotId}-{Guid.NewGuid():N}";
             imageUrl = await cloudStorage.UploadBase64Async(
@@ -55,64 +59,47 @@ public sealed class AisleScanService(
                 _cloudOpts.AisleScansFolder,
                 fileName,
                 cancellationToken);
-        }
 
-        // Nếu client không cung cấp EmptyPercentage → tự tính từ trung bình Slot.Quantity của toàn bộ Shelf thuộc Aisle
-        decimal emptyPct = request.EmptyPercentage ?? await ComputeEmptyPercentageFromSlotsAsync(request.AisleId, cancellationToken);
+            var aiDensity = await AnalyzeImageForDensityAsync(request.ImageBase64, fileName, cancellationToken);
+            if (aiDensity.HasValue)
+            {
+                densityPct = Math.Clamp(aiDensity.Value, 0m, 100m);
+                emptyPct = Math.Clamp(100m - densityPct, 0m, 100m);
+            }
+            else if (request.EmptyPercentage is not null)
+            {
+                emptyPct = request.EmptyPercentage.Value;
+                densityPct = Math.Clamp(100m - emptyPct, 0m, 100m);
+            }
+        }
+        else if (request.EmptyPercentage is not null)
+        {
+            emptyPct = request.EmptyPercentage.Value;
+            densityPct = Math.Clamp(100m - emptyPct, 0m, 100m);
+        }
 
         var entity = new AisleScan
         {
             AisleId = request.AisleId,
+            AisleNodeId = request.AisleNodeId,
             RobotId = request.RobotId,
-            EmptyPercentage = emptyPct,
+            EmptyPercentage = Math.Round(emptyPct, 2),
+            DensityPercentage = Math.Round(densityPct, 2),
             ImageUrl = imageUrl,
             ScannedAt = VnDateTime.Now,
-            NeedsRestock = emptyPct > 30m
+            NeedsRestock = densityPct < 70m || emptyPct > 30m
         };
 
         dbContext.AisleScans.Add(entity);
         await dbContext.SaveChangesAsync(cancellationToken);
 
-        // Broadcast tới Staff Hub nếu vượt ngưỡng cần bổ sung hàng
-        if (entity.NeedsRestock)
-        {
-            var aisle = await dbContext.Aisles
-                .AsNoTracking()
-                .Include(a => a.Zone)
-                .FirstOrDefaultAsync(a => a.AisleId == entity.AisleId, cancellationToken);
-
-            var location = aisle is null
-                ? $"Aisle #{entity.AisleId}"
-                : $"Khu {aisle.Zone?.ZoneName ?? aisle.ZoneId.ToString()} - Dãy {aisle.AisleCode}";
-
-            var severity = entity.EmptyPercentage >= 80 ? "critical"
-                          : entity.EmptyPercentage >= 50 ? "warning" : "info";
-
-            var alert = new StaffRealtimeAlertDto(
-                AlertId: entity.ScanId,
-                AlertType: "RestockTask",
-                Severity: severity,
-                Title: $"Kệ trống {entity.EmptyPercentage:F1}% - cần bổ sung hàng",
-                Message: $"{location}. Mật độ trống: {entity.EmptyPercentage:F1}%.",
-                ZoneId: aisle?.ZoneId,
-                AisleId: entity.AisleId,
-                SlotId: null,
-                RobotId: entity.RobotId,
-                MemberId: null,
-                Timestamp: DateTime.UtcNow);
-
-            try
-            {
-                await staffNotifier.BroadcastAlertAsync(alert, cancellationToken);
-                logger.LogInformation(
-                    "[AisleScanService] Broadcasted staff alert: scanId={ScanId} pct={Pct}",
-                    entity.ScanId, entity.EmptyPercentage);
-            }
-            catch (Exception ex)
-            {
-                logger.LogWarning(ex, "[AisleScanService] Failed to broadcast staff alert");
-            }
-        }
+        logger.LogInformation(
+            "[AisleScanService] Persisted scan: scanId={ScanId}, aisleId={AisleId}, aisleNodeId={AisleNodeId}, densityPct={DensityPct}%, imageUrl={ImageUrl}",
+            entity.ScanId,
+            entity.AisleId,
+            entity.AisleNodeId,
+            entity.DensityPercentage,
+            entity.ImageUrl);
 
         return new ShelfScanDto(
             entity.ScanId,
@@ -121,8 +108,89 @@ public sealed class AisleScanService(
             entity.RobotId,
             entity.ScannedAt,
             entity.EmptyPercentage,
+            entity.DensityPercentage,
             entity.NeedsRestock,
-            entity.ImageUrl);
+            entity.ImageUrl,
+            entity.AisleNodeId);
+    }
+
+    private async Task<decimal?> AnalyzeImageForDensityAsync(string imageBase64, string fileName, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var imageBytes = Convert.FromBase64String(imageBase64);
+            var analysisJson = await aiVisionProxy.AnalyzeImageAsync(imageBytes, fileName, cancellationToken);
+            if (string.IsNullOrWhiteSpace(analysisJson))
+            {
+                return null;
+            }
+
+            using var document = JsonDocument.Parse(analysisJson);
+            var root = document.RootElement;
+            return FindDensityPercentage(root);
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "[AisleScanService] AI density analysis failed, using fallback calculation");
+            return null;
+        }
+    }
+
+    private static decimal? FindDensityPercentage(JsonElement element)
+    {
+        if (element.ValueKind == JsonValueKind.Object)
+        {
+            foreach (var candidate in new[] { "densityPercentage", "remainingDensityPercentage", "stockPercentage", "availableDensityPercentage", "density", "stockDensity" })
+            {
+                if (element.TryGetProperty(candidate, out var property) && TryReadDecimal(property, out var value))
+                {
+                    return value;
+                }
+            }
+
+            foreach (var child in element.EnumerateObject())
+            {
+                var nested = FindDensityPercentage(child.Value);
+                if (nested.HasValue)
+                {
+                    return nested;
+                }
+            }
+        }
+        else if (element.ValueKind == JsonValueKind.Array)
+        {
+            foreach (var item in element.EnumerateArray())
+            {
+                var nested = FindDensityPercentage(item);
+                if (nested.HasValue)
+                {
+                    return nested;
+                }
+            }
+        }
+
+        if (element.ValueKind == JsonValueKind.Number && element.TryGetDecimal(out var number))
+        {
+            return number;
+        }
+
+        return null;
+    }
+
+    private static bool TryReadDecimal(JsonElement element, out decimal value)
+    {
+        if (element.ValueKind == JsonValueKind.Number && element.TryGetDecimal(out value))
+        {
+            return true;
+        }
+
+        if (element.ValueKind == JsonValueKind.String && decimal.TryParse(element.GetString(), out value))
+        {
+            return true;
+        }
+
+        value = 0m;
+        return false;
     }
 
     /// <summary>

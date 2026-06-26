@@ -779,14 +779,20 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
             entity.HasKey(x => x.ScanId);
             entity.Property(x => x.ScanId).HasColumnName("ScanID");
             entity.Property(x => x.AisleId).HasColumnName("AisleID");
+            entity.Property(x => x.AisleNodeId).HasColumnName("AisleNodeID");
             entity.Property(x => x.RobotId).HasColumnName("RobotID");
             entity.Property(x => x.ScannedAt).HasColumnName("ScannedAt").HasDefaultValueSql("DATEADD(hour, 7, GETUTCDATE())");
             entity.Property(x => x.EmptyPercentage).HasColumnName("EmptyPercentage").HasPrecision(5, 2).HasDefaultValue(0m);
+            entity.Property(x => x.DensityPercentage).HasColumnName("DensityPercentage").HasPrecision(5, 2).HasDefaultValue(100m);
             entity.Property(x => x.NeedsRestock).HasColumnName("NeedsRestock").HasDefaultValue(false);
             entity.Property(x => x.ImageUrl).HasColumnName("ImageUrl").HasMaxLength(500);
             entity.HasOne(x => x.Aisle)
                 .WithMany(a => a.AisleScans)
                 .HasForeignKey(x => x.AisleId);
+            entity.HasOne(x => x.AisleNode)
+                .WithMany()
+                .HasForeignKey(x => x.AisleNodeId)
+                .OnDelete(DeleteBehavior.SetNull);
             entity.HasOne(x => x.Robot)
                 .WithMany(r => r.AisleScans)
                 .HasForeignKey(x => x.RobotId);

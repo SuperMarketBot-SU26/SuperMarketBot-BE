@@ -23,8 +23,8 @@ public sealed class AisleScansController(
 
     /// <summary>
     /// Tạo bản ghi quét kệ mới.
-    /// Client có thể gửi kèm ImageBase64 (sẽ được upload Cloudinary)
-    /// hoặc gửi sẵn ImageUrl. EmptyPercentage có thể bỏ trống — BE tự tính từ Slot.Quantity.
+    /// Client có thể gửi kèm ImageBase64 (sẽ upload Cloudinary và dùng AI phân tích mật độ còn hàng)
+    /// hoặc gửi sẵn ImageUrl. Nếu không có ảnh, BE sẽ dùng dữ liệu kệ làm fallback.
     /// </summary>
     [HttpPost]
     public async Task<ActionResult<ShelfScanDto>> Create(
@@ -41,9 +41,8 @@ public sealed class AisleScansController(
     }
 
     /// <summary>
-    /// Phase 2 — Robot chụp ảnh kệ rồi gửi về (chỉ cần AisleId + RobotId + ImageBase64).
-    /// BE tự upload Cloudinary, tự tính % trống trung bình từ Slot.Quantity của Aisle,
-    /// và tự broadcast SignalR staffAlert nếu vượt ngưỡng.
+    /// Robot chụp ảnh tại một aisle node rồi gửi về.
+    /// Backend sẽ upload ảnh, dùng AI phân tích mật độ còn hàng, lưu lịch sử scan và gắn aisleNodeId + aisleId.
     /// </summary>
     [HttpPost("scan-with-photo")]
     [Consumes("application/json")]
@@ -64,7 +63,39 @@ public sealed class AisleScansController(
             request.RobotId,
             EmptyPercentage: null,
             ImageBase64: request.ImageBase64,
-            ImageUrl: null);
+            ImageUrl: null,
+            AisleNodeId: request.AisleNodeId);
+
+        var scan = await AisleScanService.CreateScanAsync(create, cancellationToken);
+        return Ok(scan);
+    }
+
+    /// <summary>
+    /// Endpoint riêng cho flow robot dừng tại aisle node: lưu lịch sử scan kèm aisleNodeId và aisleId.
+    /// </summary>
+    [HttpPost("robot-node-scan")]
+    [Consumes("application/json")]
+    public async Task<ActionResult<ShelfScanDto>> ScanAtAisleNode(
+        [FromBody] AisleScanWithPhotoRequestDto request,
+        CancellationToken cancellationToken = default)
+    {
+        if (request == null)
+            return BadRequest(new { message = "Body không được rỗng." });
+        if (request.AisleId <= 0 || request.RobotId <= 0)
+            return BadRequest(new { message = "AisleId và RobotId phải > 0." });
+        if (request.AisleNodeId is null or <= 0)
+            return BadRequest(new { message = "AisleNodeId phải > 0." });
+        if (string.IsNullOrWhiteSpace(request.ImageBase64))
+            return BadRequest(new { message = "ImageBase64 không được rỗng." });
+
+        var create = new CreateAisleScanRequestDto(
+            request.AisleId,
+            ShelfLevelId: null,
+            request.RobotId,
+            EmptyPercentage: null,
+            ImageBase64: request.ImageBase64,
+            ImageUrl: null,
+            AisleNodeId: request.AisleNodeId);
 
         var scan = await AisleScanService.CreateScanAsync(create, cancellationToken);
         return Ok(scan);

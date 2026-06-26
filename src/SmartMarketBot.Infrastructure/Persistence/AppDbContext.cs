@@ -13,6 +13,7 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
     public DbSet<HealthTag> HealthTags => Set<HealthTag>();
     public DbSet<MemberHealthPreference> MemberHealthPreferences => Set<MemberHealthPreference>();
     public DbSet<MemberNotification> MemberNotifications => Set<MemberNotification>();
+    public DbSet<MemberFavoriteProduct> MemberFavoriteProducts => Set<MemberFavoriteProduct>();
 
     // ── Region 2: Product Catalog ────────────────────────────────────────────
     public DbSet<Category> Categories => Set<Category>();
@@ -176,6 +177,25 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
                 .OnDelete(DeleteBehavior.Cascade);
             entity.HasIndex(x => new { x.MemberId, x.IsRead }).HasDatabaseName("IX_MN_MemberID_IsRead");
             entity.HasIndex(x => x.CreatedAt).HasDatabaseName("IX_MN_CreatedAt").IsDescending();
+        });
+
+        modelBuilder.Entity<MemberFavoriteProduct>(entity =>
+        {
+            entity.ToTable("MEMBER_FAVORITE_PRODUCT");
+            entity.HasKey(x => x.FavoriteId);
+            entity.Property(x => x.FavoriteId).HasColumnName("FavoriteID");
+            entity.Property(x => x.MemberId).HasColumnName("MemberID");
+            entity.Property(x => x.ProductId).HasColumnName("ProductID");
+            entity.Property(x => x.CreatedAt).HasColumnName("CreatedAt").HasDefaultValueSql("DATEADD(hour, 7, GETUTCDATE())");
+            entity.HasOne(x => x.Member)
+                .WithMany()
+                .HasForeignKey(x => x.MemberId)
+                .OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne(x => x.Product)
+                .WithMany()
+                .HasForeignKey(x => x.ProductId)
+                .OnDelete(DeleteBehavior.Cascade);
+            entity.HasIndex(x => new { x.MemberId, x.ProductId }).IsUnique().HasDatabaseName("IX_MFP_MemberID_ProductID");
         });
 
         // MemberHealthPreference đã cấu hình ở trên

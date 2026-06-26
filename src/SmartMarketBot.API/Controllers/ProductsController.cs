@@ -11,9 +11,23 @@ public sealed class ProductsController(IProductService productService) : Control
 {
     [HttpGet]
     [AllowAnonymous]
-    public async Task<ActionResult<IReadOnlyList<ProductDto>>> GetProducts(CancellationToken cancellationToken)
+    public async Task<ActionResult<IReadOnlyList<ProductDto>>> GetProducts(
+        [FromQuery] string? keyword,
+        [FromQuery] int? categoryId,
+        [FromQuery] int? subcategoryId,
+        [FromQuery] int? productTypeId,
+        [FromQuery] int[]? healthTagIds,
+        [FromQuery] bool? availableOnly,
+        CancellationToken cancellationToken)
     {
-        var products = await productService.GetProductsAsync(cancellationToken);
+        var products = await productService.SearchProductsAsync(
+            keyword,
+            categoryId,
+            subcategoryId,
+            productTypeId,
+            healthTagIds?.ToList(),
+            availableOnly,
+            cancellationToken);
         return Ok(products);
     }
 
@@ -22,6 +36,17 @@ public sealed class ProductsController(IProductService productService) : Control
     public async Task<ActionResult<ProductDto>> GetById(int id, CancellationToken cancellationToken)
     {
         var product = await productService.GetProductByIdAsync(id, cancellationToken);
+        return product is null ? NotFound() : Ok(product);
+    }
+
+    [HttpGet("{id:int}/detail")]
+    [AllowAnonymous]
+    public async Task<ActionResult<ProductDetailDto>> GetProductDetail(
+        int id,
+        [FromQuery] int? memberId,
+        CancellationToken cancellationToken)
+    {
+        var product = await productService.GetProductDetailByIdAsync(id, memberId, cancellationToken);
         return product is null ? NotFound() : Ok(product);
     }
 
@@ -47,5 +72,37 @@ public sealed class ProductsController(IProductService productService) : Control
     {
         var products = await productService.GetUnmappedProductsAsync(cancellationToken);
         return Ok(products);
+    }
+
+    [HttpGet("categories")]
+    [AllowAnonymous]
+    public async Task<ActionResult<IReadOnlyList<CategoryDto>>> GetCategories(CancellationToken cancellationToken)
+    {
+        var result = await productService.GetCategoriesAsync(cancellationToken);
+        return Ok(result);
+    }
+
+    [HttpGet("subcategories")]
+    [AllowAnonymous]
+    public async Task<ActionResult<IReadOnlyList<SubcategoryDto>>> GetSubcategories(CancellationToken cancellationToken)
+    {
+        var result = await productService.GetSubcategoriesAsync(cancellationToken);
+        return Ok(result);
+    }
+
+    [HttpGet("product-types")]
+    [AllowAnonymous]
+    public async Task<ActionResult<IReadOnlyList<ProductTypeDto>>> GetProductTypes(CancellationToken cancellationToken)
+    {
+        var result = await productService.GetProductTypesAsync(cancellationToken);
+        return Ok(result);
+    }
+
+    [HttpGet("health-tags")]
+    [AllowAnonymous]
+    public async Task<ActionResult<IReadOnlyList<HealthTagDto>>> GetHealthTags(CancellationToken cancellationToken)
+    {
+        var result = await productService.GetHealthTagsAsync(cancellationToken);
+        return Ok(result);
     }
 }

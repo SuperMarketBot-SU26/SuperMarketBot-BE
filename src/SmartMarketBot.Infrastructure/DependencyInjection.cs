@@ -36,11 +36,14 @@ public static class DependencyInjection
 
         // Domain services
         services.AddScoped<IProductService, ProductService>();
+        services.AddScoped<IAdminProductService, AdminProductService>();
         services.AddScoped<IRobotService, RobotService>();
         services.AddScoped<IAisleScanService, AisleScanService>();
         services.AddScoped<ISearchService, SearchService>();
         services.AddScoped<IMapSyncService, MapSyncService>();
         services.AddScoped<ISemanticObjectService, SemanticObjectService>();
+
+        services.AddScoped<IAdminUserService, AdminUserService>();
 
         // Member & Staff services
         services.AddScoped<IMealSuggestionService, MealSuggestionService>();

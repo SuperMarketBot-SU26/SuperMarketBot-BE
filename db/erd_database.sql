@@ -24,8 +24,13 @@ BEGIN
 END
 GO
 
+IF OBJECT_ID('dbo.CART_ITEM', 'U') IS NOT NULL DROP TABLE dbo.CART_ITEM;
+IF OBJECT_ID('dbo.CART', 'U') IS NOT NULL DROP TABLE dbo.CART;
+IF OBJECT_ID('dbo.MEMBER_FAVORITE_PRODUCT', 'U') IS NOT NULL DROP TABLE dbo.MEMBER_FAVORITE_PRODUCT;
+IF OBJECT_ID('dbo.MEMBER_NOTIFICATION', 'U') IS NOT NULL DROP TABLE dbo.MEMBER_NOTIFICATION;
 IF OBJECT_ID('dbo.AD_CAMPAIGN_LOG', 'U') IS NOT NULL DROP TABLE dbo.AD_CAMPAIGN_LOG;
 IF OBJECT_ID('dbo.SPONSORED_PRODUCT', 'U') IS NOT NULL DROP TABLE dbo.SPONSORED_PRODUCT;
+IF OBJECT_ID('dbo.AD_RESOURCE', 'U') IS NOT NULL DROP TABLE dbo.AD_RESOURCE;
 IF OBJECT_ID('dbo.AD_CAMPAIGN', 'U') IS NOT NULL DROP TABLE dbo.AD_CAMPAIGN;
 IF OBJECT_ID('dbo.AD_PACKAGE', 'U') IS NOT NULL DROP TABLE dbo.AD_PACKAGE;
 IF OBJECT_ID('dbo.BRAND', 'U') IS NOT NULL DROP TABLE dbo.BRAND;
@@ -74,6 +79,7 @@ CREATE TABLE dbo.ACCOUNT (
     Email           NVARCHAR(256)  NOT NULL UNIQUE,
     Phone           NVARCHAR(20)   NULL,
     FullName        NVARCHAR(100)  NULL,
+    AvatarUrl       NVARCHAR(500)  NULL,      -- URL ảnh đại diện (Cloudinary/CDN)
     Status          NVARCHAR(50)   NOT NULL,  -- enum (e.g. Active, Inactive, Pending, Blocked)
     Role            NVARCHAR(50)   NOT NULL,  -- Enum (e.g. Admin, Staff, Member)
     OtpCode         NVARCHAR(6)    NULL,      -- Mã OTP xác thực email/quên mật khẩu (Gộp từ EMAIL_OTP)
@@ -119,13 +125,35 @@ CREATE TABLE dbo.MEMBERHEALTH_PREFERENCE (
     PRIMARY KEY (MemberID, HealthTagID)
 );
 
+CREATE TABLE dbo.MEMBER_NOTIFICATION (
+    NotificationID INT IDENTITY(1,1) PRIMARY KEY,
+    MemberID       INT            NOT NULL REFERENCES dbo.MEMBER(MemberID) ON DELETE CASCADE,
+    NotifType      NVARCHAR(50)   NOT NULL,  -- Allergy | BudgetExceeded | DuplicatePurchase | CartUpdate | PointsEarned | TestNotification
+    Title          NVARCHAR(200)  NOT NULL,
+    Message        NVARCHAR(MAX)  NOT NULL,
+    PayloadJson    NVARCHAR(MAX)  NULL,      -- JSON payload tùy loại (productId, points...)
+    IsRead         BIT            NOT NULL DEFAULT 0,
+    CreatedAt      DATETIME2      NOT NULL DEFAULT DATEADD(hour, 7, GETUTCDATE()) -- Múi giờ Việt Nam (UTC+7)
+);
+CREATE INDEX IX_MN_MemberID_IsRead ON dbo.MEMBER_NOTIFICATION(MemberID, IsRead);
+CREATE INDEX IX_MN_CreatedAt ON dbo.MEMBER_NOTIFICATION(CreatedAt DESC);
+
+CREATE TABLE dbo.MEMBER_FAVORITE_PRODUCT (
+    FavoriteID     INT IDENTITY(1,1) PRIMARY KEY,
+    MemberID       INT NOT NULL REFERENCES dbo.MEMBER(MemberID) ON DELETE CASCADE,
+    ProductID      INT NOT NULL REFERENCES dbo.PRODUCT(ProductID) ON DELETE CASCADE,
+    CreatedAt      DATETIME2 NOT NULL DEFAULT DATEADD(hour, 7, GETUTCDATE()) -- Múi giờ Việt Nam (UTC+7)
+);
+CREATE UNIQUE INDEX IX_MFP_MemberID_ProductID ON dbo.MEMBER_FAVORITE_PRODUCT(MemberID, ProductID);
+
 -- ============================================================
 -- 3. SẢN PHẨM & DANH MỤC
 -- ============================================================
 
 CREATE TABLE dbo.CATEGORY (
     CategoryID      INT IDENTITY(1,1) PRIMARY KEY,
-    CategoryName    NVARCHAR(100)  NOT NULL
+    CategoryName    NVARCHAR(100)  NOT NULL,
+    Description     NVARCHAR(500)  NULL
 );
 
 CREATE TABLE dbo.SUBCATEGORY (
@@ -146,7 +174,6 @@ CREATE TABLE dbo.PRODUCT (
     ProductName         NVARCHAR(200)  NOT NULL,
     UnitPrice           DECIMAL(18,2)  NOT NULL DEFAULT 0,
     PromotionPrice      DECIMAL(18,2)  NULL,      -- Giá khuyến mãi đã giảm
-    AdCampaignID        INT            NULL,      -- Liên kết chiến dịch quảng cáo/khuyến mãi (Nối ngoại ở cuối file)
     ExpiredDate         DATETIME2      NULL,
     ImageUrl            NVARCHAR(500)  NULL,
     WeightOrVolume      DECIMAL(18,3)  NULL,
@@ -155,6 +182,12 @@ CREATE TABLE dbo.PRODUCT (
     Status              NVARCHAR(50)   NOT NULL, -- enum
     SubstituteProductID INT            NULL REFERENCES dbo.PRODUCT(ProductID)
 );
+
+-- Product không còn liên kết trực tiếp đến AdCampaign;
+-- quảng cáo sản phẩm được quản lý qua bảng trung gian SPONSORED_PRODUCT.
+IF OBJECT_ID('dbo.FK_PRODUCT_AD_CAMPAIGN', 'F') IS NOT NULL
+    ALTER TABLE dbo.PRODUCT DROP CONSTRAINT FK_PRODUCT_AD_CAMPAIGN;
+GO
 
 CREATE TABLE dbo.PRODUCT_HEALTHTAG (
     ProductID       INT NOT NULL REFERENCES dbo.PRODUCT(ProductID) ON DELETE CASCADE,
@@ -205,7 +238,29 @@ CREATE TABLE dbo.MEAL_ITEM (
 );
 
 -- ============================================================
--- 6. KHÔNG GIAN SIÊU THỊ & KỆ HÀNG
+-- 6. GIỎ HÀNG
+-- ============================================================
+
+CREATE TABLE dbo.CART (
+    CartID       INT IDENTITY(1,1) PRIMARY KEY,
+    MemberID     INT            NOT NULL UNIQUE REFERENCES dbo.MEMBER(MemberID) ON DELETE CASCADE,
+    CreatedAt    DATETIME2      NOT NULL DEFAULT DATEADD(hour, 7, GETUTCDATE()), -- Múi giờ Việt Nam (UTC+7)
+    UpdatedAt    DATETIME2      NULL
+);
+CREATE INDEX IX_CART_MemberID ON dbo.CART(MemberID);
+
+CREATE TABLE dbo.CART_ITEM (
+    CartItemID   INT IDENTITY(1,1) PRIMARY KEY,
+    CartID       INT            NOT NULL REFERENCES dbo.CART(CartID) ON DELETE CASCADE,
+    ProductID    INT            NOT NULL REFERENCES dbo.PRODUCT(ProductID) ON DELETE CASCADE,
+    Quantity     INT            NOT NULL DEFAULT 1,
+    AddedAt      DATETIME2      NOT NULL DEFAULT DATEADD(hour, 7, GETUTCDATE()) -- Múi giờ Việt Nam (UTC+7)
+);
+CREATE INDEX IX_CART_ITEM_CartID ON dbo.CART_ITEM(CartID);
+CREATE INDEX IX_CART_ITEM_ProductID ON dbo.CART_ITEM(ProductID);
+
+-- ============================================================
+-- 7. KHÔNG GIAN SIÊU THỊ & KỆ HÀNG
 -- ============================================================
 
 CREATE TABLE dbo.FLOOR (
@@ -248,7 +303,7 @@ CREATE TABLE dbo.PRODUCT_SLOT (
 );
 
 -- ============================================================
--- 7. BẢN ĐỒ & ĐIỀU HƯỚNG ROBOT
+-- 8. BẢN ĐỒ & ĐIỀU HƯỚNG ROBOT
 -- ============================================================
 
 CREATE TABLE dbo.MAP (
@@ -307,16 +362,17 @@ CREATE TABLE dbo.ROBOT (
     BatteryPct      INT            NOT NULL DEFAULT 100,
     Mode            NVARCHAR(50)   NOT NULL DEFAULT 'idle',  -- idle / navigating / scanning / charging
     Status          NVARCHAR(50)   NOT NULL,  -- enum
-    LastSeenAt      DATETIME2      NULL
+    LastSeenAt      DATETIME2      NULL,
+    IPAddress       NVARCHAR(45)   NULL       -- IPv4/IPv6 của robot
 );
 
 CREATE TABLE dbo.ROBOT_LOG (
     LogID           INT IDENTITY(1,1) PRIMARY KEY,
     RobotID         INT            NULL REFERENCES dbo.ROBOT(RobotID),
-    battery         INT            NULL,
-    location        NVARCHAR(200)  NULL,
-    status          NVARCHAR(50)   NOT NULL, -- Enum
-    timestamp       DATETIME2      NOT NULL DEFAULT DATEADD(hour, 7, GETUTCDATE()), -- Múi giờ Việt Nam (UTC+7)
+    Battery         INT            NULL,
+    Location        NVARCHAR(200)  NULL,
+    Status          NVARCHAR(50)   NOT NULL, -- Enum
+    Timestamp       DATETIME2      NOT NULL DEFAULT DATEADD(hour, 7, GETUTCDATE()), -- Múi giờ Việt Nam (UTC+7)
     XCoord          FLOAT          NULL,
     YCoord          FLOAT          NULL,
     HeadingRad      FLOAT          NULL
@@ -357,12 +413,13 @@ CREATE TABLE dbo.AISLE_SCAN (
     RobotID             INT            NOT NULL REFERENCES dbo.ROBOT(RobotID),
     ScannedAt           DATETIME2      NOT NULL DEFAULT DATEADD(hour, 7, GETUTCDATE()), -- Múi giờ Việt Nam (UTC+7)
     EmptyPercentage     DECIMAL(5,2)   NOT NULL DEFAULT 0,
+    DensityPercentage   DECIMAL(5,2)   NOT NULL DEFAULT 100, -- Phần trăm mật độ còn lại
     NeedsRestock        BIT            NOT NULL DEFAULT 0,
     ImageUrl            NVARCHAR(500)  NULL
 );
 
 -- ============================================================
--- 8. THƯƠNG HIỆU & QUẢNG CÁO
+-- 9. THƯƠNG HIỆU & QUẢNG CÁO
 -- ============================================================
 
 CREATE TABLE dbo.BRAND (
@@ -396,10 +453,10 @@ CREATE TABLE dbo.AD_CAMPAIGN (
 CREATE TABLE dbo.AD_CAMPAIGN_LOG (
     LogID           INT IDENTITY(1,1) PRIMARY KEY,
     AdCampaignID    INT            NOT NULL REFERENCES dbo.AD_CAMPAIGN(AdCampaignID) ON DELETE CASCADE,
-    ActionType      NVARCHAR(50)   NOT NULL,  -- Click / View / RoutePass
+    ActionType      NVARCHAR(50)   NOT NULL,  -- Click | Navigation | Impression | FraudDetected
     ChargedAmount   DECIMAL(18,2)  NOT NULL DEFAULT 0, -- Số tiền thực tế bị trừ của lượt tương tác
     Timestamp       DATETIME2      NOT NULL DEFAULT DATEADD(hour, 7, GETUTCDATE()), -- Múi giờ Việt Nam (UTC+7)
-    -- Phase B+: chi tiết cho ActionType = 'RoutePass' (nullable, không phá dữ liệu Click/View cũ)
+    -- Chi tiết bổ sung theo loại tương tác (nullable để không phá dữ liệu cũ)
     SponsoredID     INT            NULL,
     ProductID       INT            NULL REFERENCES dbo.PRODUCT(ProductID),
     RobotID         INT            NULL REFERENCES dbo.ROBOT(RobotID),
@@ -437,76 +494,54 @@ CREATE INDEX IX_SPONSORED_PRODUCT_CAMPAIGN ON dbo.SPONSORED_PRODUCT(AdCampaignID
 
 GO
 
--- Xóa ràng buộc FK_PRODUCT_AD_CAMPAIGN vì Product không còn liên kết trực tiếp đến AdCampaign
--- Việc tài trợ sản phẩm được quản lý qua bảng trung gian SPONSORED_PRODUCT
-IF OBJECT_ID('dbo.FK_PRODUCT_AD_CAMPAIGN', 'F') IS NOT NULL
-    ALTER TABLE dbo.PRODUCT DROP CONSTRAINT FK_PRODUCT_AD_CAMPAIGN;
-GO
-
 -- Nối sau cùng để tránh lỗi vòng lặp phụ thuộc (SPONSORED_PRODUCT tạo sau AD_CAMPAIGN_LOG)
 ALTER TABLE dbo.AD_CAMPAIGN_LOG ADD CONSTRAINT FK_AD_CAMPAIGN_LOG_SPONSORED
     FOREIGN KEY (SponsoredID) REFERENCES dbo.SPONSORED_PRODUCT(SponsoredID) ON DELETE SET NULL;
 GO
 
--- CART & CART_ITEM (Shopping Cart Option A)
-CREATE TABLE dbo.CART (
-    CartID       INT IDENTITY(1,1) PRIMARY KEY,
-    MemberID     INT            NOT NULL UNIQUE REFERENCES dbo.MEMBER(MemberID) ON DELETE CASCADE,
-    CreatedAt    DATETIME2      NOT NULL DEFAULT DATEADD(hour, 7, GETUTCDATE()),
-    UpdatedAt    DATETIME2      NULL
-);
-CREATE INDEX IX_CART_MemberID ON dbo.CART(MemberID);
-
-CREATE TABLE dbo.CART_ITEM (
-    CartItemID   INT IDENTITY(1,1) PRIMARY KEY,
-    CartID       INT            NOT NULL REFERENCES dbo.CART(CartID) ON DELETE CASCADE,
-    ProductID    INT            NOT NULL REFERENCES dbo.PRODUCT(ProductID) ON DELETE CASCADE,
-    Quantity     INT            NOT NULL DEFAULT 1,
-    AddedAt      DATETIME2      NOT NULL DEFAULT DATEADD(hour, 7, GETUTCDATE())
-);
-CREATE INDEX IX_CART_ITEM_CartID ON dbo.CART_ITEM(CartID);
-CREATE INDEX IX_CART_ITEM_ProductID ON dbo.CART_ITEM(ProductID);
-GO
-
 -- ============================================================
--- TỔNG KẾT: 39 bảng (Đã thêm CART và CART_ITEM)
+-- TỔNG KẾT: 42 bảng
 -- ============================================================
 -- 1.  ACCOUNT
 -- 2.  MEMBER
 -- 3.  MEMBERSHIP
 -- 4.  HEALTH_TAG
 -- 5.  MEMBERHEALTH_PREFERENCE
--- 6.  CATEGORY
--- 7.  SUBCATEGORY
--- 8.  PRODUCT_TYPE
--- 9.  PRODUCT
--- 10. PRODUCT_HEALTHTAG
--- 11. INVOICE_HISTORY
--- 12. INVOICE_HISTORY_ITEM
--- 13. MEAL_SUGGESTION
--- 14. MEAL_ITEM
--- 15. FLOOR
--- 16. ZONE
--- 17. AISLE
--- 18. SHELF
--- 19. SLOT
--- 20. PRODUCT_SLOT
--- 21. MAP
--- 22. NAVIGATION_NODE
--- 23. NAVIGATION_EDGE
--- 24. AISLE_NODE
--- 25. SEMANTIC_OBJECT
--- 26. ROBOT
--- 27. ROBOT_LOG
--- 28. ROBOT_ROUTE
--- 29. ROUTE_NODE_MAPPING
--- 30. ROUTE_ASSIGNMENT
--- 31. ROBOT_ZONE
--- 32. AISLE_SCAN
--- 33. BRAND
--- 34. AD_PACKAGE
--- 35. AD_CAMPAIGN
--- 36. AD_CAMPAIGN_LOG (mở rộng Phase B+: SessionID, ChargedAmount, MemberID)
--- 37. SPONSORED_PRODUCT
--- 38. AD_RESOURCE (lưu trữ nội dung đa phương tiện: IMAGE/VIDEO/VOICE_TEXT)
+-- 6.  MEMBER_NOTIFICATION
+-- 7.  MEMBER_FAVORITE_PRODUCT
+-- 8.  CATEGORY
+-- 9.  SUBCATEGORY
+-- 10. PRODUCT_TYPE
+-- 11. PRODUCT
+-- 12. PRODUCT_HEALTHTAG
+-- 13. INVOICE_HISTORY
+-- 14. INVOICE_HISTORY_ITEM
+-- 15. MEAL_SUGGESTION
+-- 16. MEAL_ITEM
+-- 17. CART
+-- 18. CART_ITEM
+-- 19. FLOOR
+-- 20. ZONE
+-- 21. AISLE
+-- 22. SHELF
+-- 23. SLOT
+-- 24. PRODUCT_SLOT
+-- 25. MAP
+-- 26. NAVIGATION_NODE
+-- 27. NAVIGATION_EDGE
+-- 28. AISLE_NODE
+-- 29. SEMANTIC_OBJECT
+-- 30. ROBOT
+-- 31. ROBOT_LOG
+-- 32. ROBOT_ROUTE
+-- 33. ROUTE_NODE_MAPPING
+-- 34. ROUTE_ASSIGNMENT
+-- 35. ROBOT_ZONE
+-- 36. AISLE_SCAN
+-- 37. BRAND
+-- 38. AD_PACKAGE
+-- 39. AD_CAMPAIGN
+-- 40. AD_CAMPAIGN_LOG
+-- 41. SPONSORED_PRODUCT
+-- 42. AD_RESOURCE
 -- ============================================================

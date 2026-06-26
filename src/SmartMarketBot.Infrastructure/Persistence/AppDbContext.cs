@@ -65,8 +65,8 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
         base.OnModelCreating(modelBuilder);
 
         // ═══════════════════════════════════════════════════════════════════════
-        // ERD V4.0 — Direct Schema Mapping
-        // DB chuẩn: db/erd_database.sql (37 bảng, gộp EMAIL_OTP vào ACCOUNT)
+        // ERD V4.1 — Direct Schema Mapping
+        // DB chuẩn: db/erd_database.sql (42 bảng, gộp EMAIL_OTP vào ACCOUNT)
         // Default thời gian: DATEADD(hour, 7, GETUTCDATE()) — UTC+7 (VN)
         // ═══════════════════════════════════════════════════════════════════════
 

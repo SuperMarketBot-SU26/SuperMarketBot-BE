@@ -181,7 +181,7 @@ GO
 -- ─── 11. ROBOT (1 robot mẫu cho smoke test IoT) ──────────────
 SET IDENTITY_INSERT dbo.ROBOT ON;
 INSERT INTO dbo.ROBOT (RobotID, RobotName, RobotCode, BatteryPct, Mode, Status, LastSeenAt) VALUES
-(1, N'Robot 01', N'RB-001', 100, N'idle', N'Online', DATEADD(hour, 7, GETUTCDATE()));
+(1, N'Robot 01', N'RB001', 100, N'idle', N'Online', DATEADD(hour, 7, GETUTCDATE()));
 SET IDENTITY_INSERT dbo.ROBOT OFF;
 GO
 

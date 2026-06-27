@@ -347,10 +347,10 @@ GO
 -- ══════════════════════════════════════════════════════════════
 SET IDENTITY_INSERT dbo.ROBOT ON;
 INSERT INTO dbo.ROBOT (RobotID, RobotName, RobotCode, BatteryPct, Mode, Status, LastSeenAt) VALUES
-(2, N'Robot 02', N'RB-002', 87, N'idle', N'Online', DATEADD(minute, -2, DATEADD(hour, 7, GETUTCDATE()))),
-(3, N'Robot 03', N'RB-003', 45, N'navigating', N'Online', DATEADD(minute, -1, DATEADD(hour, 7, GETUTCDATE()))),
-(4, N'Robot 04', N'RB-004', 15, N'charging', N'Online', DATEADD(hour, -1, DATEADD(hour, 7, GETUTCDATE()))),
-(5, N'Robot 05', N'RB-005', 92, N'scanning', N'Online', DATEADD(minute, -5, DATEADD(hour, 7, GETUTCDATE())));
+(2, N'Robot 02', N'RB002', 87, N'idle', N'Online', DATEADD(minute, -2, DATEADD(hour, 7, GETUTCDATE()))),
+(3, N'Robot 03', N'RB003', 45, N'navigating', N'Online', DATEADD(minute, -1, DATEADD(hour, 7, GETUTCDATE()))),
+(4, N'Robot 04', N'RB004', 15, N'charging', N'Online', DATEADD(hour, -1, DATEADD(hour, 7, GETUTCDATE()))),
+(5, N'Robot 05', N'RB005', 92, N'scanning', N'Online', DATEADD(minute, -5, DATEADD(hour, 7, GETUTCDATE())));
 SET IDENTITY_INSERT dbo.ROBOT OFF;
 GO
 

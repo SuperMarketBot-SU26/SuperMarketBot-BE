@@ -40,24 +40,24 @@ public sealed class MapSyncService(
             map.MapData = request.MapData ?? map.MapData;
         }
 
-        var stats = await SyncNodesAsync(map.MapId, request.Nodes, cancellationToken);
-        var edgeStats = await SyncEdgesAsync(map.MapId, request.Edges, cancellationToken);
+        var (nodesCreated, nodesUpdated, nodesDeleted, idMap) = await SyncNodesAsync(map.MapId, request.Nodes, cancellationToken);
+        var edgeStats = await SyncEdgesAsync(map.MapId, request.Edges, idMap, cancellationToken);
         var soStats = await SyncSemanticObjectsAsync(map.MapId, request.SemanticObjects, cancellationToken);
 
         logger.LogInformation(
             "Map synced: MapId={MapId}, FloorId={FloorId}, Nodes={Nodes}/{Edges}, Semantics={Semantics}",
-            map.MapId, request.FloorId, stats.nodesCreated + stats.nodesUpdated, edgeStats.nodesCreated + edgeStats.nodesUpdated, soStats.created + soStats.updated);
+            map.MapId, request.FloorId, nodesCreated + nodesUpdated, edgeStats.nodesCreated + edgeStats.nodesUpdated, soStats.created + soStats.updated);
 
         return new MapSyncResponseDto(
             map.MapId,
-            stats.nodesCreated, stats.nodesUpdated,
+            nodesCreated, nodesUpdated,
             edgeStats.nodesCreated, edgeStats.nodesUpdated,
             soStats.created, soStats.updated,
-            stats.nodesDeleted, edgeStats.nodesDeleted, soStats.deleted,
+            nodesDeleted, edgeStats.nodesDeleted, soStats.deleted,
             localizer.Get("MapSyncSuccess"));
     }
 
-    private async Task<(int nodesCreated, int nodesUpdated, int nodesDeleted)> SyncNodesAsync(
+    private async Task<(int nodesCreated, int nodesUpdated, int nodesDeleted, Dictionary<int, int> idMap)> SyncNodesAsync(
         int mapId, List<MapSyncNodeDto> nodes, CancellationToken cancellationToken)
     {
         var existingNodes = await db.NavigationNodes
@@ -65,14 +65,15 @@ public sealed class MapSyncService(
             .ToDictionaryAsync(n => n.NodeId, cancellationToken);
 
         int created = 0, updated = 0, deleted = 0;
+        var idMap = new Dictionary<int, int>();
 
-        var incomingIds = nodes
-            .Where(n => n.NodeId.HasValue)
+        var incomingPositiveIds = nodes
+            .Where(n => n.NodeId.HasValue && n.NodeId.Value > 0)
             .Select(n => n.NodeId!.Value)
             .ToHashSet();
 
         var nodesToDelete = existingNodes.Keys
-            .Except(incomingIds)
+            .Except(incomingPositiveIds)
             .ToList();
 
         if (nodesToDelete.Count > 0)
@@ -111,20 +112,23 @@ public sealed class MapSyncService(
             deleted = toRemove.Count;
         }
 
+        var newNodesList = new List<(int tempId, NavigationNode entity)>();
+
         foreach (var dto in nodes)
         {
-            if (dto.NodeId.HasValue && existingNodes.TryGetValue(dto.NodeId.Value, out var existing))
+            if (dto.NodeId.HasValue && dto.NodeId.Value > 0 && existingNodes.TryGetValue(dto.NodeId.Value, out var existing))
             {
                 existing.NodeName = dto.NodeName;
                 existing.XCoord = dto.XCoord;
                 existing.YCoord = dto.YCoord;
                 existing.NodeType = dto.NodeType;
                 existing.IsBlocked = dto.IsBlocked;
+                idMap[dto.NodeId.Value] = existing.NodeId;
                 updated++;
             }
             else
             {
-                db.NavigationNodes.Add(new NavigationNode
+                var newNode = new NavigationNode
                 {
                     MapId = mapId,
                     NodeName = dto.NodeName,
@@ -132,21 +136,44 @@ public sealed class MapSyncService(
                     YCoord = dto.YCoord,
                     NodeType = dto.NodeType,
                     IsBlocked = dto.IsBlocked
-                });
+                };
+                db.NavigationNodes.Add(newNode);
+                newNodesList.Add((dto.NodeId ?? 0, newNode));
                 created++;
             }
         }
 
         await db.SaveChangesAsync(cancellationToken);
-        return (created, updated, deleted);
+
+        foreach (var item in newNodesList)
+        {
+            idMap[item.tempId] = item.entity.NodeId;
+        }
+
+        return (created, updated, deleted, idMap);
     }
 
     private async Task<(int nodesCreated, int nodesUpdated, int nodesDeleted)> SyncEdgesAsync(
-        int mapId, List<MapSyncEdgeDto> edges, CancellationToken cancellationToken)
+        int mapId, List<MapSyncEdgeDto> edges, Dictionary<int, int> idMap, CancellationToken cancellationToken)
     {
         int created = 0, updated = 0, deleted = 0;
 
-        if (edges.Count == 0)
+        // Map the incoming edge node IDs to the real database node IDs
+        var mappedEdges = new List<MapSyncEdgeDto>();
+        foreach (var e in edges)
+        {
+            if (idMap.TryGetValue(e.FromNodeId, out var realFrom) && idMap.TryGetValue(e.ToNodeId, out var realTo))
+            {
+                mappedEdges.Add(new MapSyncEdgeDto(e.EdgeId, realFrom, realTo, e.Distance, e.IsBidirectional));
+            }
+        }
+
+        var nodeIdsInMap = await db.NavigationNodes
+            .Where(n => n.MapId == mapId)
+            .Select(n => n.NodeId)
+            .ToHashSetAsync(cancellationToken);
+
+        if (mappedEdges.Count == 0)
         {
             var allExistingEdgesForMap = await db.NavigationEdges
                 .Where(e => db.NavigationNodes.Any(n => n.NodeId == e.FromNodeId && n.MapId == mapId))
@@ -160,12 +187,7 @@ public sealed class MapSyncService(
             return (created, updated, deleted);
         }
 
-        var nodeIdsInMap = await db.NavigationNodes
-            .Where(n => n.MapId == mapId)
-            .Select(n => n.NodeId)
-            .ToHashSetAsync(cancellationToken);
-
-        var validEdges = edges
+        var validEdges = mappedEdges
             .Where(e => nodeIdsInMap.Contains(e.FromNodeId) && nodeIdsInMap.Contains(e.ToNodeId))
             .ToList();
 

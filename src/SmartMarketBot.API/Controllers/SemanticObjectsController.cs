@@ -29,23 +29,22 @@ public sealed class SemanticObjectsController(
         return obj is null ? NotFound() : Ok(obj);
     }
 
-    /// <summary>Ghép đôi (Mapping): Admin bấm vào hình chữ nhật "Kệ Sữa" trên Web Manager, gọi API này gán Product vào SemanticObject.
-    /// Từ nay, hệ thống biết: Khách tìm Vinamilk → Chạy đến Node đứng gần kệ này!</summary>
-    [HttpPost("{objectId:int}/assign-product")]
-    public async Task<ActionResult<SemanticObjectDto>> AssignProduct(
+    /// <summary>Ghép đôi (Mapping): Admin bấm vào hình chữ nhật "Kệ Sữa" trên Web Manager, gọi API này gán ProductType vào SemanticObject.</summary>
+    [HttpPost("{objectId:int}/assign-product-type")]
+    public async Task<ActionResult<SemanticObjectDto>> AssignProductType(
         int objectId,
-        [FromBody] AssignProductRequestDto request,
+        [FromBody] AssignProductTypeRequestDto request,
         CancellationToken cancellationToken)
     {
-        var result = await semanticObjectService.AssignProductAsync(objectId, request.ProductId, cancellationToken);
+        var result = await semanticObjectService.AssignProductTypeAsync(objectId, request.ProductTypeId, cancellationToken);
         return Ok(result);
     }
 
-    /// <summary>Xoá mapping: bỏ gán sản phẩm khỏi Semantic Object.</summary>
-    [HttpDelete("{objectId:int}/assign-product")]
-    public async Task<ActionResult<SemanticObjectDto>> UnassignProduct(int objectId, CancellationToken cancellationToken)
+    /// <summary>Xoá mapping: bỏ gán ProductType khỏi Semantic Object.</summary>
+    [HttpDelete("{objectId:int}/assign-product-type")]
+    public async Task<ActionResult<SemanticObjectDto>> UnassignProductType(int objectId, CancellationToken cancellationToken)
     {
-        var result = await semanticObjectService.UnassignProductAsync(objectId, cancellationToken);
+        var result = await semanticObjectService.UnassignProductTypeAsync(objectId, cancellationToken);
         return Ok(result);
     }
 }

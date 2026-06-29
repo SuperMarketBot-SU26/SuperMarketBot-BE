@@ -7,88 +7,68 @@ using SmartMarketBot.Infrastructure.Persistence;
 namespace SmartMarketBot.Infrastructure.Services;
 
 /// <summary>
-/// Phase B - Flow 1: Sponsored Recommendations (Slot scope, ranked list).
-/// Công thức: <c>TotalScore = Priority (AdPackage.AdScore + SponsoredProduct.Priority) + ProfileScore + WeekendBonus</c>.
-/// Member App tự lọc Allergy client-side — BE chỉ gắn cờ <c>HasAllergenConflict</c> + liệt kê <c>AllergenConflicts</c>.
+/// Phase B - Flow 1: Sponsored Recommendations dựa trên SemanticObject.
+/// Robot gửi tọa độ (X, Y) → tìm SemanticObject loại "shelf" chứa tọa độ
+/// → lấy ProductTypeId → tìm SponsoredProducts cùng ProductType → trả về quảng cáo.
 /// </summary>
 public sealed class AdRecommendationService(AppDbContext db, ILocalizationService localizer) : IAdRecommendationService
 {
     public async Task<SponsoredRecommendationsResponseDto> GetRecommendationsAsync(
         int memberId, int? slotId, CancellationToken ct = default)
     {
-        // 1. Lấy Member để check tồn tại + suy ra hồ sơ cá nhân
         var member = await db.Members
             .AsNoTracking()
             .FirstOrDefaultAsync(m => m.MemberId == memberId, ct)
             ?? throw new KeyNotFoundException(localizer.Get("MemberNotFound", memberId));
 
-        // 2. Suy ra ZoneID từ SlotID (nếu có)
-        int? contextZoneId = null;
-        string? contextZoneName = null;
-        if (slotId is { } sid)
-        {
-            var slotChain = await (
-                from s in db.Slots.AsNoTracking()
-                join sh in db.Shelves.AsNoTracking() on s.ShelfId equals sh.ShelfId
-                join ai in db.Aisles.AsNoTracking() on sh.AisleId equals ai.AisleId
-                join z in db.Zones.AsNoTracking() on ai.ZoneId equals z.ZoneId
-                where s.SlotId == sid
-                select new { z.ZoneId, z.ZoneName }
-            ).FirstOrDefaultAsync(ct);
-
-            contextZoneId = slotChain?.ZoneId;
-            contextZoneName = slotChain?.ZoneName;
-        }
-
-        // 3. Query Sponsored products đang active và còn trong thời gian
         var nowUtc = DateTime.UtcNow;
 
-        // Bước 3a: lấy tất cả campaign active
+        // Lấy tất cả campaign active
         var activeCampaigns = await db.AdCampaigns.AsNoTracking()
             .Where(ac => ac.Status == CampaignStatus.Active
                          && ac.StartDate <= nowUtc
                          && ac.EndDate >= nowUtc)
-            .Select(ac => new { ac.AdCampaignId, ac.RobotZoneId })
+            .Select(ac => new { ac.AdCampaignId, ac.SemanticObjectId })
             .ToListAsync(ct);
 
-        // Bước 3b: lấy tập RobotZoneID ứng với contextZoneId (nếu có)
-        var campaignRobotZoneIds = activeCampaigns.Select(c => c.RobotZoneId).Where(x => x != null).Distinct().ToList();
-        var allowedRobotZoneIds = new HashSet<int?>(activeCampaigns.Select(c => c.RobotZoneId));
-        if (contextZoneId is { } cz)
-        {
-            var matched = await db.RobotZones.AsNoTracking()
-                .Where(rz => rz.ZoneId == cz)
-                .Select(rz => (int?)rz.RobotZoneId)
-                .ToListAsync(ct);
-            // Chỉ giữ campaign có RobotZoneId trong matched HOẶC RobotZoneId = null (campaign tổng quát)
-            allowedRobotZoneIds = new HashSet<int?>(activeCampaigns
-                .Where(c => c.RobotZoneId == null || matched.Contains(c.RobotZoneId))
-                .Select(c => c.RobotZoneId));
-        }
-
-        var allowedCampaignIds = activeCampaigns
-            .Where(c => allowedRobotZoneIds.Contains(c.RobotZoneId))
-            .Select(c => c.AdCampaignId)
+        // Lấy SemanticObjectIds từ các campaign
+        var campaignSemanticObjectIds = activeCampaigns
+            .Where(c => c.SemanticObjectId.HasValue)
+            .Select(c => c.SemanticObjectId!.Value)
+            .Distinct()
             .ToList();
 
-        // Bước 3c: Sponsored join Brand + Package + Product
+        // Lấy ProductTypeIds từ các SemanticObject
+        var productTypeIds = await db.SemanticObjects
+            .AsNoTracking()
+            .Where(so => campaignSemanticObjectIds.Contains(so.ObjectId) && so.ProductTypeId.HasValue)
+            .Select(so => so.ProductTypeId!.Value)
+            .Distinct()
+            .ToListAsync(ct);
+
+        // Lấy SponsoredProducts có Product cùng ProductType
         var sponsoredQuery =
             from sp in db.SponsoredProducts.AsNoTracking()
             join ac in db.AdCampaigns.AsNoTracking() on sp.AdCampaignId equals ac.AdCampaignId
             join br in db.Brands.AsNoTracking() on ac.BrandId equals br.BrandId
             join pkg in db.AdPackages.AsNoTracking() on ac.PackageId equals pkg.PackageId
             join p in db.Products.AsNoTracking() on sp.ProductId equals p.ProductId
-            where sp.Status == "Active"
-                  && allowedCampaignIds.Contains(sp.AdCampaignId)
+            where sp.Status == SponsoredProductStatus.Active
+                  && ac.Status == CampaignStatus.Active
+                  && ac.StartDate <= nowUtc
+                  && ac.EndDate >= nowUtc
+                  && productTypeIds.Contains(p.ProductTypeId)
             select new
             {
                 sp.SponsoredId,
                 sp.AdCampaignId,
                 ac.CampaignName,
+                ac.SemanticObjectId,
                 br.BrandId,
                 br.BrandName,
                 p.ProductId,
                 p.ProductName,
+                p.ProductTypeId,
                 p.UnitPrice,
                 p.PromotionPrice,
                 p.ImageUrl,
@@ -98,20 +78,18 @@ public sealed class AdRecommendationService(AppDbContext db, ILocalizationServic
 
         var raw = await sponsoredQuery.ToListAsync(ct);
 
-        // 4. Lấy tập HealthTag mà Member dị ứng (status='Allergy')
+        // Lấy tập HealthTag mà Member dị ứng
         var allergyTagIds = await db.MemberHealthPreferences
             .AsNoTracking()
             .Where(mhp => mhp.MemberId == memberId && mhp.Status == "Allergy")
             .Select(mhp => mhp.HealthTagId)
             .ToListAsync(ct);
 
-        // 5. Lấy map HealthTagId → TagName cho conflict message
         var tagNameMap = await db.HealthTags
             .AsNoTracking()
             .Where(t => allergyTagIds.Contains(t.HealthTagId))
             .ToDictionaryAsync(t => t.HealthTagId, t => t.TagName, ct);
 
-        // 6. Lấy danh sách ProductId → list HealthTag mà Sponsored product thuộc về (chỉ cho các product trong raw)
         var productIds = raw.Select(r => r.ProductId).Distinct().ToList();
         var productTagMap = await db.ProductHealthTags
             .AsNoTracking()
@@ -123,7 +101,7 @@ public sealed class AdRecommendationService(AppDbContext db, ILocalizationServic
             .GroupBy(x => x.ProductId)
             .ToDictionary(g => g.Key, g => g.Select(x => tagNameMap[x.HealthTagId]).ToList());
 
-        // 7. Snapshot vị trí Slot cho mỗi Sponsored product (qua ProductSlot join)
+        // Lấy Slot info cho mỗi Product
         var productSlotMap = await db.ProductSlots
             .AsNoTracking()
             .Where(ps => productIds.Contains(ps.ProductId))
@@ -137,13 +115,10 @@ public sealed class AdRecommendationService(AppDbContext db, ILocalizationServic
             .GroupBy(x => x.ProductId)
             .ToDictionary(g => g.Key, g => g.First());
 
-        // 8. Profile score: ưu tiên Sponsored cùng Brand mà Member từng mua (AdPackage.AdScore * 2)
-        //    Đơn giản hóa Phase B: cứ +20 nếu Member có MemberId, Weekend +10
-        var profileBase = 20;
         var isWeekend = (DateTime.UtcNow.DayOfWeek is DayOfWeek.Saturday or DayOfWeek.Sunday);
+        var profileBase = 20;
         var weekendBonus = isWeekend ? 10 : 0;
 
-        // 9. Build DTO + ranking
         var items = raw
             .Select(r =>
             {
@@ -179,8 +154,8 @@ public sealed class AdRecommendationService(AppDbContext db, ILocalizationServic
         return new SponsoredRecommendationsResponseDto(
             memberId,
             slotId,
-            contextZoneId,
-            contextZoneName,
+            null,
+            null,
             items.Count,
             items);
     }

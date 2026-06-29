@@ -180,17 +180,17 @@ public sealed class ProductService(AppDbContext dbContext) : IProductService
 
     public async Task<IReadOnlyList<ProductDto>> GetUnmappedProductsAsync(CancellationToken cancellationToken = default)
     {
-        // Lấy danh sách ProductID đã được gán vào SemanticObject
-        var mappedProductIds = await dbContext.SemanticObjects
+        // Lấy danh sách ProductTypeID đã được gán vào SemanticObject
+        var mappedProductTypeIds = await dbContext.SemanticObjects
             .AsNoTracking()
-            .Where(s => s.ProductId.HasValue)
-            .Select(s => s.ProductId!.Value)
+            .Where(s => s.ProductTypeId.HasValue)
+            .Select(s => s.ProductTypeId!.Value)
             .Distinct()
             .ToListAsync(cancellationToken);
 
         return await dbContext.Products
             .AsNoTracking()
-            .Where(p => !mappedProductIds.Contains(p.ProductId) && p.Status == "Available")
+            .Where(p => !mappedProductTypeIds.Contains(p.ProductTypeId) && p.Status == "Available")
             .OrderBy(p => p.ProductName)
             .Select(p => new ProductDto(
                 p.ProductId,

@@ -9,5 +9,4 @@ public class Zone
 
     public virtual Floor? Floor { get; set; }
     public virtual ICollection<Aisle> Aisles { get; set; } = new List<Aisle>();
-    public virtual ICollection<RobotZone> RobotZones { get; set; } = new List<RobotZone>();
 }

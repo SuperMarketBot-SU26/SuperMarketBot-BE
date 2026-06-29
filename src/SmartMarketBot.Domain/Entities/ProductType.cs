@@ -8,4 +8,5 @@ public class ProductType
 
     public virtual Subcategory? Subcategory { get; set; }
     public virtual ICollection<Product> Products { get; set; } = new List<Product>();
+    public virtual ICollection<SemanticObject> SemanticObjects { get; set; } = new List<SemanticObject>();
 }

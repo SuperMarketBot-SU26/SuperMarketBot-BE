@@ -9,52 +9,39 @@ namespace SmartMarketBot.Infrastructure.Services;
 internal sealed class ActiveCampaignRow
 {
     public int AdCampaignId { get; set; }
-    public int? RobotZoneId { get; set; }
+    public int? SemanticObjectId { get; set; }
     public decimal PriceRoute { get; set; }
 }
 
 /// <summary>
-/// Phase B - Flow 1: Route-based impression recording.
-/// Mỗi lần robot tới Slot thuộc Zone có <c>AdCampaign.RobotZoneId</c> active,
-/// ghi 1 <c>AdCampaignLog</c> (ActionType='RoutePass') cho từng Sponsored product trong campaign.
-/// Charge = <c>AdPackage.PriceRoute</c> cho 1 lượt chạy qua (Route-based billing).
+/// Phase B - Flow 1: Route-based impression recording dựa trên SemanticObject.
+/// Robot gửi tọa độ (X, Y) → tìm SemanticObject chứa tọa độ
+/// → tìm AdCampaign liên kết → ghi impression cho SponsoredProducts.
 /// </summary>
 public sealed class AdAnalyticsService(AppDbContext db, ILocalizationService localizer) : IAdAnalyticsService
 {
     public async Task<RouteImpressionResponseDto> RecordRoutePassAsync(
         string robotCode, RouteImpressionRequestDto request, CancellationToken ct = default)
     {
-        // 1. Tìm Robot theo code
         var robot = await db.Robots
             .AsNoTracking()
             .FirstOrDefaultAsync(r => r.RobotCode == robotCode, ct)
             ?? throw new KeyNotFoundException(localizer.Get("AdRobotNotFoundByCode", robotCode));
 
-        // 2. Tìm Slot + Zone (Slot → Shelf → Aisle → Zone)
-        var slotInfo = await (
-            from s in db.Slots.AsNoTracking()
-            join sh in db.Shelves.AsNoTracking() on s.ShelfId equals sh.ShelfId
-            join ai in db.Aisles.AsNoTracking() on sh.AisleId equals ai.AisleId
-            join z in db.Zones.AsNoTracking() on ai.ZoneId equals z.ZoneId
-            where s.SlotId == request.SlotId
-            select new { s.SlotId, z.ZoneId, s.SlotCode }
-        ).FirstOrDefaultAsync(ct);
-
-        if (slotInfo is null)
-            throw new KeyNotFoundException(localizer.Get("AdSlotNotFound", request.SlotId));
-
-        // 3. Tìm các AdCampaign.RobotZoneId ứng với Zone này
-        var zoneRobotIds = await db.RobotZones
+        // Tìm SemanticObject chứa tọa độ (X, Y)
+        var semanticObject = await db.SemanticObjects
             .AsNoTracking()
-            .Where(rz => rz.ZoneId == slotInfo.ZoneId)
-            .Select(rz => rz.RobotZoneId)
-            .ToListAsync(ct);
+            .FirstOrDefaultAsync(so =>
+                so.ObjectType == "shelf" &&
+                so.XMin <= request.XCoord && so.XMax >= request.XCoord &&
+                so.YMin <= request.YCoord && so.YMax >= request.YCoord, ct);
 
-        // 4. Tìm AdCampaigns active trong Zone
         var nowUtc = DateTime.UtcNow;
-        var activeCampaigns = new List<ActiveCampaignRow>();
 
-        if (zoneRobotIds.Count > 0)
+        // Tìm các AdCampaign active liên kết với SemanticObject này
+        List<ActiveCampaignRow> activeCampaigns = [];
+
+        if (semanticObject != null)
         {
             activeCampaigns = await (
                 from ac in db.AdCampaigns.AsNoTracking()
@@ -62,12 +49,11 @@ public sealed class AdAnalyticsService(AppDbContext db, ILocalizationService loc
                 where ac.Status == CampaignStatus.Active
                       && ac.StartDate <= nowUtc
                       && ac.EndDate >= nowUtc
-                      && ac.RobotZoneId != null
-                      && zoneRobotIds.Contains(ac.RobotZoneId.Value)
+                      && ac.SemanticObjectId == semanticObject.ObjectId
                 select new ActiveCampaignRow
                 {
                     AdCampaignId = ac.AdCampaignId,
-                    RobotZoneId = ac.RobotZoneId,
+                    SemanticObjectId = ac.SemanticObjectId,
                     PriceRoute = pkg.PriceRoute
                 }
             ).ToListAsync(ct);
@@ -78,22 +64,22 @@ public sealed class AdAnalyticsService(AppDbContext db, ILocalizationService loc
             return new RouteImpressionResponseDto(
                 robotCode,
                 request.SlotId,
-                slotInfo.ZoneId,
+                null,
                 0,
                 0m,
                 [],
-                localizer.Get("AdNoActiveCampaign", slotInfo.ZoneId));
+                localizer.Get("AdNoActiveCampaign", semanticObject?.ObjectId ?? 0));
         }
 
-        // 5. Với mỗi campaign, lấy Sponsored products Active
+        // Lấy SponsoredProducts Active cho các campaign
         var campaignIds = activeCampaigns.Select(c => c.AdCampaignId).ToList();
         var sponsoredList = await db.SponsoredProducts
             .AsNoTracking()
-            .Where(sp => campaignIds.Contains(sp.AdCampaignId) && sp.Status == "Active")
+            .Where(sp => campaignIds.Contains(sp.AdCampaignId) && sp.Status == SponsoredProductStatus.Active)
             .Select(sp => new { sp.SponsoredId, sp.AdCampaignId, sp.ProductId })
             .ToListAsync(ct);
 
-        // 6. Ghi AdCampaignLog (RoutePass) cho từng Sponsored
+        // Ghi AdCampaignLog (RoutePass)
         var logs = new List<AdCampaignLog>();
         var responseItems = new List<RouteImpressionLogItem>();
         var totalCharged = 0m;
@@ -111,9 +97,8 @@ public sealed class AdAnalyticsService(AppDbContext db, ILocalizationService loc
                     SponsoredId = sp.SponsoredId,
                     ProductId = sp.ProductId,
                     RobotId = robot.RobotId,
-                    RobotZoneId = camp.RobotZoneId,
-                    ZoneId = slotInfo.ZoneId,
-                    SlotId = slotInfo.SlotId,
+                    SemanticObjectId = semanticObject?.ObjectId,
+                    SlotId = request.SlotId,
                     MemberId = request.MemberId,
                     XCoord = request.XCoord,
                     YCoord = request.YCoord
@@ -134,7 +119,7 @@ public sealed class AdAnalyticsService(AppDbContext db, ILocalizationService loc
         return new RouteImpressionResponseDto(
             robotCode,
             request.SlotId,
-            slotInfo.ZoneId,
+            semanticObject?.ObjectId,
             responseItems.Count,
             totalCharged,
             responseItems,

@@ -10,7 +10,7 @@ public sealed class AdCampaignLog
     public int? SponsoredId { get; set; }
     public int? ProductId { get; set; }
     public int? RobotId { get; set; }
-    public int? RobotZoneId { get; set; }
+    public int? SemanticObjectId { get; set; }
     public int? ZoneId { get; set; }
     public int? SlotId { get; set; }
     public int? MemberId { get; set; }
@@ -22,7 +22,7 @@ public sealed class AdCampaignLog
     public SponsoredProduct? SponsoredProduct { get; set; }
     public Product? Product { get; set; }
     public Robot? Robot { get; set; }
-    public RobotZone? RobotZone { get; set; }
+    public SemanticObject? SemanticObject { get; set; }
     public Zone? Zone { get; set; }
     public Slot? Slot { get; set; }
     public Member? Member { get; set; }

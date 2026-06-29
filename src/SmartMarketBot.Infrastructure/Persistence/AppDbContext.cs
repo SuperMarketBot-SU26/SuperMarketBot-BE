@@ -49,7 +49,6 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
     // ── Region 6: Robot & Navigation ─────────────────────────────────────────
     public DbSet<Robot> Robots => Set<Robot>();
     public DbSet<RobotLog> RobotLogs => Set<RobotLog>();
-    public DbSet<RobotZone> RobotZones => Set<RobotZone>();
     public DbSet<Map> Maps => Set<Map>();
     public DbSet<NavigationNode> NavigationNodes => Set<NavigationNode>();
     public DbSet<NavigationEdge> NavigationEdges => Set<NavigationEdge>();
@@ -500,12 +499,11 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
             entity.Property(x => x.AdCampaignId).HasColumnName("AdCampaignID");
             entity.Property(x => x.PackageId).HasColumnName("PackageID");
             entity.Property(x => x.BrandId).HasColumnName("BrandID");
-            entity.Property(x => x.RobotZoneId).HasColumnName("RobotZoneID");
+            entity.Property(x => x.SemanticObjectId).HasColumnName("SemanticObjectID");
             entity.Property(x => x.CampaignName).HasColumnName("CampaignName").HasMaxLength(200).IsRequired();
             entity.Property(x => x.StartDate).HasColumnName("StartDate");
             entity.Property(x => x.EndDate).HasColumnName("EndDate");
             entity.Property(x => x.Status).HasColumnName("Status").HasMaxLength(50).IsRequired();
-            // NoAction: chống cascade cycle
             entity.HasOne(x => x.Package)
                 .WithMany(p => p.AdCampaigns)
                 .HasForeignKey(x => x.PackageId)
@@ -514,10 +512,9 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
                 .WithMany(b => b.AdCampaigns)
                 .HasForeignKey(x => x.BrandId)
                 .OnDelete(DeleteBehavior.NoAction);
-            // Nullable FK → RobotZone (SET NULL khi zone bị xoá)
-            entity.HasOne(x => x.RobotZone)
+            entity.HasOne(x => x.SemanticObject)
                 .WithMany()
-                .HasForeignKey(x => x.RobotZoneId)
+                .HasForeignKey(x => x.SemanticObjectId)
                 .IsRequired(false)
                 .OnDelete(DeleteBehavior.SetNull);
         });
@@ -572,7 +569,7 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
             entity.Property(x => x.SponsoredId).HasColumnName("SponsoredID");
             entity.Property(x => x.ProductId).HasColumnName("ProductID");
             entity.Property(x => x.RobotId).HasColumnName("RobotID");
-            entity.Property(x => x.RobotZoneId).HasColumnName("RobotZoneID");
+            entity.Property(x => x.SemanticObjectId).HasColumnName("SemanticObjectID");
             entity.Property(x => x.ZoneId).HasColumnName("ZoneID");
             entity.Property(x => x.SlotId).HasColumnName("SlotID");
             entity.Property(x => x.MemberId).HasColumnName("MemberID");
@@ -596,9 +593,9 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
                 .WithMany()
                 .HasForeignKey(x => x.RobotId)
                 .OnDelete(DeleteBehavior.SetNull);
-            entity.HasOne(x => x.RobotZone)
+            entity.HasOne(x => x.SemanticObject)
                 .WithMany()
-                .HasForeignKey(x => x.RobotZoneId)
+                .HasForeignKey(x => x.SemanticObjectId)
                 .OnDelete(DeleteBehavior.SetNull);
             entity.HasOne(x => x.Zone)
                 .WithMany()
@@ -650,22 +647,6 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
                 .HasForeignKey(x => x.RobotId)
                 .OnDelete(DeleteBehavior.SetNull);
             entity.HasIndex(x => new { x.RobotId, x.Timestamp }).HasDatabaseName("IX_ROBOT_LOG_robot_timestamp");
-        });
-
-        modelBuilder.Entity<RobotZone>(entity =>
-        {
-            entity.ToTable("ROBOT_ZONE");
-            entity.HasKey(x => x.RobotZoneId);
-            entity.Property(x => x.RobotZoneId).HasColumnName("RobotZoneID");
-            entity.Property(x => x.RobotId).HasColumnName("RobotID");
-            entity.Property(x => x.ZoneId).HasColumnName("ZoneID");
-            entity.HasOne(x => x.Robot)
-                .WithMany(r => r.RobotZones)
-                .HasForeignKey(x => x.RobotId)
-                .OnDelete(DeleteBehavior.Cascade);
-            entity.HasOne(x => x.Zone)
-                .WithMany(z => z.RobotZones)
-                .HasForeignKey(x => x.ZoneId);
         });
 
         modelBuilder.Entity<Map>(entity =>
@@ -833,14 +814,14 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
             entity.Property(x => x.Confidence).HasColumnName("Confidence");
             entity.Property(x => x.DetectedAt).HasColumnName("DetectedAt");
             entity.Property(x => x.ImageUrl).HasColumnName("ImageUrl").HasMaxLength(500);
-            entity.Property(x => x.ProductId).HasColumnName("ProductID");
+            entity.Property(x => x.ProductTypeId).HasColumnName("ProductTypeID");
             entity.HasOne(x => x.Map)
                 .WithMany(m => m.SemanticObjects)
                 .HasForeignKey(x => x.MapId)
                 .OnDelete(DeleteBehavior.Cascade);
-            entity.HasOne(x => x.Product)
-                .WithMany()
-                .HasForeignKey(x => x.ProductId)
+            entity.HasOne(x => x.ProductType)
+                .WithMany(pt => pt.SemanticObjects)
+                .HasForeignKey(x => x.ProductTypeId)
                 .OnDelete(DeleteBehavior.SetNull);
         });
     }

@@ -12,8 +12,8 @@ public sealed record CreateCampaignWithProductsRequestDto
     [Range(1, int.MaxValue, ErrorMessage = "BrandId không hợp lệ.")]
     public required int BrandId { get; init; }
 
-    [Range(1, int.MaxValue, ErrorMessage = "RobotZoneId không hợp lệ.")]
-    public int? RobotZoneId { get; init; }
+    [Range(1, int.MaxValue, ErrorMessage = "SemanticObjectId không hợp lệ.")]
+    public int? SemanticObjectId { get; init; }
 
     [Required(ErrorMessage = "CampaignName không được để trống.")]
     [MaxLength(200, ErrorMessage = "CampaignName không được vượt quá 200 ký tự.")]

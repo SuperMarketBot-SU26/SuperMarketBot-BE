@@ -9,7 +9,7 @@ public sealed record CampaignResponseDto(
     string PackageName,
     int BrandId,
     string BrandName,
-    int? RobotZoneId,
+    int? SemanticObjectId,
     DateTime StartDate,
     DateTime EndDate,
     string Status,
@@ -26,8 +26,8 @@ public sealed record CreateCampaignRequestDto
     [Range(1, int.MaxValue, ErrorMessage = "BrandId không hợp lệ.")]
     public required int BrandId { get; init; }
 
-    [Range(1, int.MaxValue, ErrorMessage = "RobotZoneId không hợp lệ.")]
-    public int? RobotZoneId { get; init; }
+    [Range(1, int.MaxValue, ErrorMessage = "SemanticObjectId không hợp lệ.")]
+    public int? SemanticObjectId { get; init; }
 
     [Required(ErrorMessage = "CampaignName không được để trống.")]
     [MaxLength(200, ErrorMessage = "CampaignName không được vượt quá 200 ký tự.")]
@@ -55,8 +55,8 @@ public sealed record UpdateCampaignRequestDto
     [Required(ErrorMessage = "EndDate là bắt buộc.")]
     public required DateTime EndDate { get; init; }
 
-    [Range(1, int.MaxValue, ErrorMessage = "RobotZoneId không hợp lệ.")]
-    public int? RobotZoneId { get; init; }
+    [Range(1, int.MaxValue, ErrorMessage = "SemanticObjectId không hợp lệ.")]
+    public int? SemanticObjectId { get; init; }
 }
 
 public sealed record ActivateCampaignResponseDto(

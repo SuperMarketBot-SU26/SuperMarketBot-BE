@@ -45,7 +45,6 @@ public interface IAppDbContext
     // Region 6: Robot & Navigation (10)
     DbSet<Robot> Robots { get; }
     DbSet<RobotLog> RobotLogs { get; }
-    DbSet<RobotZone> RobotZones { get; }
     DbSet<Map> Maps { get; }
     DbSet<NavigationNode> NavigationNodes { get; }
     DbSet<NavigationEdge> NavigationEdges { get; }

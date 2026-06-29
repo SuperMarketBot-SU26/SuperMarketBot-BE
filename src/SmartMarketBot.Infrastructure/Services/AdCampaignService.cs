@@ -88,11 +88,11 @@ public sealed class AdCampaignService(
         var brand = await db.Brands.FindAsync([request.BrandId], cancellationToken)
             ?? throw new KeyNotFoundException(localizer.Get("BrandNotFound", request.BrandId));
 
-        if (request.RobotZoneId.HasValue)
+        if (request.SemanticObjectId.HasValue)
         {
-            var zoneExists = await db.RobotZones.AnyAsync(z => z.RobotZoneId == request.RobotZoneId.Value, cancellationToken);
-            if (!zoneExists)
-                throw new KeyNotFoundException(localizer.Get("RobotZoneNotFound", request.RobotZoneId.Value));
+            var objExists = await db.SemanticObjects.AnyAsync(o => o.ObjectId == request.SemanticObjectId.Value, cancellationToken);
+            if (!objExists)
+                throw new KeyNotFoundException(localizer.Get("SemanticObjectNotFound", request.SemanticObjectId.Value));
         }
 
         if (request.EndDate <= request.StartDate)
@@ -102,7 +102,7 @@ public sealed class AdCampaignService(
         {
             PackageId = request.PackageId,
             BrandId = request.BrandId,
-            RobotZoneId = request.RobotZoneId,
+            SemanticObjectId = request.SemanticObjectId,
             CampaignName = request.CampaignName,
             StartDate = request.StartDate,
             EndDate = request.EndDate,
@@ -137,11 +137,11 @@ public sealed class AdCampaignService(
         var brand = await db.Brands.FindAsync([request.BrandId], cancellationToken)
             ?? throw new KeyNotFoundException(localizer.Get("BrandNotFound", request.BrandId));
 
-        if (request.RobotZoneId.HasValue)
+        if (request.SemanticObjectId.HasValue)
         {
-            var zoneExists = await db.RobotZones.AnyAsync(z => z.RobotZoneId == request.RobotZoneId.Value, cancellationToken);
-            if (!zoneExists)
-                throw new KeyNotFoundException(localizer.Get("RobotZoneNotFound", request.RobotZoneId.Value));
+            var objExists = await db.SemanticObjects.AnyAsync(o => o.ObjectId == request.SemanticObjectId.Value, cancellationToken);
+            if (!objExists)
+                throw new KeyNotFoundException(localizer.Get("SemanticObjectNotFound", request.SemanticObjectId.Value));
         }
 
         if (request.EndDate <= request.StartDate)
@@ -159,7 +159,7 @@ public sealed class AdCampaignService(
             {
                 PackageId = request.PackageId,
                 BrandId = request.BrandId,
-                RobotZoneId = request.RobotZoneId,
+                SemanticObjectId = request.SemanticObjectId,
                 CampaignName = request.CampaignName,
                 StartDate = request.StartDate,
                 EndDate = request.EndDate,
@@ -226,7 +226,7 @@ public sealed class AdCampaignService(
         campaign.CampaignName = request.CampaignName;
         campaign.StartDate = request.StartDate;
         campaign.EndDate = request.EndDate;
-        campaign.RobotZoneId = request.RobotZoneId;
+        campaign.SemanticObjectId = request.SemanticObjectId;
 
         await db.SaveChangesAsync(cancellationToken);
 
@@ -546,33 +546,26 @@ public sealed class AdCampaignService(
 
     public async Task<RobotPlaylistResponseDto> GetRobotPlaylistAsync(int robotId, CancellationToken cancellationToken = default)
     {
-        var robot = await db.Robots
+        var robotExists = await db.Robots
             .AsNoTracking()
-            .Include(r => r.RobotZones)
-            .FirstOrDefaultAsync(r => r.RobotId == robotId, cancellationToken)
-            ?? throw new KeyNotFoundException(localizer.Get("RobotNotFound", robotId));
-
-        var currentZone = robot.RobotZones.FirstOrDefault();
-        var currentZoneId = currentZone?.ZoneId;
+            .AnyAsync(r => r.RobotId == robotId, cancellationToken);
+        if (!robotExists)
+            throw new KeyNotFoundException(localizer.Get("RobotNotFound", robotId));
 
         var productSlotsQuery = db.ProductSlots
             .AsNoTracking()
             .Include(ps => ps.Product!)
-            .ThenInclude(p => p.SponsoredProducts)
-            .ThenInclude(sp => sp.AdCampaign!)
-            .ThenInclude(ac => ac.Package)
+                .ThenInclude(p => p.SponsoredProducts)
+                    .ThenInclude(sp => sp.AdCampaign!)
+                        .ThenInclude(ac => ac.Package)
             .Include(ps => ps.Product!)
-            .ThenInclude(p => p.SponsoredProducts)
-            .ThenInclude(sp => sp.AdCampaign!)
-            .ThenInclude(ac => ac.AdResources)
+                .ThenInclude(p => p.SponsoredProducts)
+                    .ThenInclude(sp => sp.AdCampaign!)
+                        .ThenInclude(ac => ac.AdResources)
             .Include(ps => ps.Slot!)
-            .ThenInclude(s => s.Shelf!)
-            .ThenInclude(sh => sh.Aisle!)
+                .ThenInclude(s => s.Shelf!)
+                    .ThenInclude(sh => sh.Aisle!)
             .Where(ps => ps.Slot.Quantity > 0);
-
-        if (currentZoneId.HasValue)
-            productSlotsQuery = productSlotsQuery
-                .Where(ps => ps.Slot.Shelf.Aisle.ZoneId == currentZoneId.Value);
 
         var productSlots = await productSlotsQuery.ToListAsync(cancellationToken);
 
@@ -610,7 +603,7 @@ public sealed class AdCampaignService(
             .ThenBy(item => item.EndDate)
             .ToList();
 
-        return new RobotPlaylistResponseDto(robotId, currentZoneId, playlistItems, DateTime.UtcNow);
+        return new RobotPlaylistResponseDto(robotId, null, playlistItems, DateTime.UtcNow);
     }
 
     public async Task<LogInteractionResponseDto> LogInteractionAsync(
@@ -712,7 +705,7 @@ public sealed class AdCampaignService(
             SponsoredId = request.SponsoredId,
             ProductId = request.ProductId,
             RobotId = request.RobotId,
-            RobotZoneId = request.RobotZoneId,
+            SemanticObjectId = request.SemanticObjectId,
             ZoneId = request.ZoneId,
             SlotId = request.SlotId,
             MemberId = request.MemberId,
@@ -840,7 +833,7 @@ public sealed class AdCampaignService(
             c.AdCampaignId, c.CampaignName,
             c.PackageId, c.Package?.PackageName ?? string.Empty,
             c.BrandId, c.Brand?.BrandName ?? string.Empty,
-            c.RobotZoneId, c.StartDate, c.EndDate, c.Status,
+            c.SemanticObjectId, c.StartDate, c.EndDate, c.Status,
             c.SponsoredProducts?.Count ?? 0,
             c.AdCampaignLogs?.Sum(l => l.ChargedAmount) ?? 0);
     }

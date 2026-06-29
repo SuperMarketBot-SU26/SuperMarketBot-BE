@@ -15,7 +15,6 @@ public class Robot
     public string? IPAddress { get; set; }
 
     public virtual ICollection<RobotLog> RobotLogs { get; set; } = new List<RobotLog>();
-    public virtual ICollection<RobotZone> RobotZones { get; set; } = new List<RobotZone>();
     public virtual ICollection<RobotRoute> RobotRoutes { get; set; } = new List<RobotRoute>();
     public virtual ICollection<RouteAssignment> RouteAssignments { get; set; } = new List<RouteAssignment>();
     public virtual ICollection<AisleScan> AisleScans { get; set; } = new List<AisleScan>();

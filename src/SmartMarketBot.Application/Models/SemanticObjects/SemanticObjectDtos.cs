@@ -3,11 +3,11 @@ using SmartMarketBot.Application.Models.Products;
 
 namespace SmartMarketBot.Application.Models.SemanticObjects;
 
-public sealed record AssignProductRequestDto
+public sealed record AssignProductTypeRequestDto
 {
-    [Required(ErrorMessage = "ProductId là bắt buộc.")]
-    [Range(1, int.MaxValue, ErrorMessage = "ProductId không hợp lệ.")]
-    public required int ProductId { get; init; }
+    [Required(ErrorMessage = "ProductTypeId là bắt buộc.")]
+    [Range(1, int.MaxValue, ErrorMessage = "ProductTypeId không hợp lệ.")]
+    public required int ProductTypeId { get; init; }
 }
 
 public sealed record SemanticObjectDto(
@@ -22,10 +22,10 @@ public sealed record SemanticObjectDto(
     double? Confidence,
     DateTime? DetectedAt,
     string? ImageUrl,
-    int? ProductId,
-    string? ProductName,
-    decimal? UnitPrice,
-    string? ProductImageUrl);
+    int? ProductTypeId,
+    string? ProductTypeName,
+    string? SubcategoryName,
+    string? CategoryName);
 
 public sealed record SemanticObjectListResponseDto(
     IReadOnlyList<SemanticObjectDto> Items,

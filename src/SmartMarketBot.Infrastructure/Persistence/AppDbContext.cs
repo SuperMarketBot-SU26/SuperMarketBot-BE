@@ -252,10 +252,11 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
                 .WithMany(p => p.ProductHealthTags)
                 .HasForeignKey(x => x.ProductId)
                 .OnDelete(DeleteBehavior.Cascade);
+            // NoAction: chống multiple cascade paths — PRODUCT_HEALTHTAG đã có Cascade từ PRODUCT
             entity.HasOne(x => x.HealthTag)
                 .WithMany(h => h.ProductHealthTags)
                 .HasForeignKey(x => x.HealthTagId)
-                .OnDelete(DeleteBehavior.Cascade);
+                .OnDelete(DeleteBehavior.NoAction);
         });
 
         // ─────────────────────────────────────────────
@@ -354,10 +355,11 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
                 .HasForeignKey(x => x.CartId)
                 .OnDelete(DeleteBehavior.Cascade);
 
+            // NoAction: chống multiple cascade paths — CART_ITEM đã có Cascade từ CART
             entity.HasOne(x => x.Product)
                 .WithMany()
                 .HasForeignKey(x => x.ProductId)
-                .OnDelete(DeleteBehavior.Cascade);
+                .OnDelete(DeleteBehavior.NoAction);
         });
 
         // ─────────────────────────────────────────────
@@ -564,10 +566,12 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
                 .WithMany(ac => ac.AdCampaignLogs)
                 .HasForeignKey(x => x.AdCampaignId)
                 .OnDelete(DeleteBehavior.Cascade);
+            // NoAction: chống cascade cycle — AD_CAMPAIGN_LOG là log table,
+            // tất cả FK phụ để NoAction, tránh multiple cascade paths trên SQL Server
             entity.HasOne(x => x.SponsoredProduct)
                 .WithMany()
                 .HasForeignKey(x => x.SponsoredId)
-                .OnDelete(DeleteBehavior.SetNull);
+                .OnDelete(DeleteBehavior.NoAction);
             entity.HasOne(x => x.Product)
                 .WithMany()
                 .HasForeignKey(x => x.ProductId)
@@ -575,11 +579,11 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
             entity.HasOne(x => x.Robot)
                 .WithMany()
                 .HasForeignKey(x => x.RobotId)
-                .OnDelete(DeleteBehavior.SetNull);
+                .OnDelete(DeleteBehavior.NoAction);
             entity.HasOne(x => x.RobotZone)
                 .WithMany()
                 .HasForeignKey(x => x.RobotZoneId)
-                .OnDelete(DeleteBehavior.SetNull);
+                .OnDelete(DeleteBehavior.NoAction);
             entity.HasOne(x => x.Zone)
                 .WithMany()
                 .HasForeignKey(x => x.ZoneId)
@@ -591,7 +595,7 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
             entity.HasOne(x => x.Member)
                 .WithMany()
                 .HasForeignKey(x => x.MemberId)
-                .OnDelete(DeleteBehavior.SetNull);
+                .OnDelete(DeleteBehavior.NoAction);
         });
 
         // ─────────────────────────────────────────────
@@ -711,10 +715,11 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
                 .WithMany(a => a.AisleNodes)
                 .HasForeignKey(x => x.AisleId)
                 .OnDelete(DeleteBehavior.Cascade);
+            // NoAction: chống multiple cascade paths — AISLE_NODE đã có Cascade từ AISLE
             entity.HasOne(x => x.Node)
                 .WithMany(n => n.AisleNodes)
                 .HasForeignKey(x => x.NodeId)
-                .OnDelete(DeleteBehavior.Cascade);
+                .OnDelete(DeleteBehavior.NoAction);
         });
 
         modelBuilder.Entity<RobotRoute>(entity =>
@@ -789,10 +794,11 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
             entity.HasOne(x => x.Aisle)
                 .WithMany(a => a.AisleScans)
                 .HasForeignKey(x => x.AisleId);
+            // NoAction: chống multiple cascade paths — AISLE_SCAN đã có Cascade từ AISLE
             entity.HasOne(x => x.AisleNode)
                 .WithMany()
                 .HasForeignKey(x => x.AisleNodeId)
-                .OnDelete(DeleteBehavior.SetNull);
+                .OnDelete(DeleteBehavior.NoAction);
             entity.HasOne(x => x.Robot)
                 .WithMany(r => r.AisleScans)
                 .HasForeignKey(x => x.RobotId);

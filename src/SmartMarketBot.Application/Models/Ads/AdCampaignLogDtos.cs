@@ -15,7 +15,7 @@ public sealed record LogInteractionRequestDto
     public int? SponsoredId { get; init; }
     public int? ProductId { get; init; }
     public int? RobotId { get; init; }
-    public int? RobotZoneId { get; init; }
+    public int? SemanticObjectId { get; init; }
     public int? ZoneId { get; init; }
     public int? SlotId { get; init; }
     public int? MemberId { get; init; }

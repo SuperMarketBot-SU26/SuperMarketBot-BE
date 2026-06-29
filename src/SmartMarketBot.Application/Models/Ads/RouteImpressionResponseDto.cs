@@ -9,7 +9,7 @@ public sealed record RouteImpressionLogItem(
 public sealed record RouteImpressionResponseDto(
     string RobotCode,
     int SlotId,
-    int? ZoneId,
+    int? SemanticObjectId,
     int ImpressionCount,
     decimal TotalChargedAmount,
     IReadOnlyList<RouteImpressionLogItem> Logs,

@@ -12,7 +12,12 @@ public sealed class SemanticObjectService(
     public async Task<SemanticObjectListResponseDto> GetAllAsync(
         int? mapId, int pageNumber, int pageSize, CancellationToken cancellationToken = default)
     {
-        var query = db.SemanticObjects.AsNoTracking().AsQueryable();
+        var query = db.SemanticObjects
+            .AsNoTracking()
+            .Include(s => s.ProductType)
+                .ThenInclude(pt => pt!.Subcategory)
+                    .ThenInclude(sc => sc!.Category)
+            .AsQueryable();
 
         if (mapId.HasValue)
             query = query.Where(s => s.MapId == mapId.Value);
@@ -33,10 +38,10 @@ public sealed class SemanticObjectService(
                 s.Confidence,
                 s.DetectedAt,
                 s.ImageUrl,
-                s.ProductId,
-                s.Product != null ? s.Product.ProductName : null,
-                s.Product != null ? s.Product.UnitPrice : null,
-                s.Product != null ? s.Product.ImageUrl : null))
+                s.ProductTypeId,
+                s.ProductType != null ? s.ProductType.TypeName : null,
+                s.ProductType != null ? s.ProductType.Subcategory != null ? s.ProductType.Subcategory.SubcategoryName : null : null,
+                s.ProductType != null ? s.ProductType.Subcategory != null ? s.ProductType.Subcategory.Category != null ? s.ProductType.Subcategory.Category.CategoryName : null : null : null))
             .ToListAsync(cancellationToken);
 
         return new SemanticObjectListResponseDto(items, totalCount, pageNumber, pageSize, totalPages);
@@ -46,6 +51,9 @@ public sealed class SemanticObjectService(
     {
         return await db.SemanticObjects
             .AsNoTracking()
+            .Include(s => s.ProductType)
+                .ThenInclude(pt => pt!.Subcategory)
+                    .ThenInclude(sc => sc!.Category)
             .Where(s => s.ObjectId == objectId)
             .Select(s => new SemanticObjectDto(
                 s.ObjectId,
@@ -56,23 +64,26 @@ public sealed class SemanticObjectService(
                 s.Confidence,
                 s.DetectedAt,
                 s.ImageUrl,
-                s.ProductId,
-                s.Product != null ? s.Product.ProductName : null,
-                s.Product != null ? s.Product.UnitPrice : null,
-                s.Product != null ? s.Product.ImageUrl : null))
+                s.ProductTypeId,
+                s.ProductType != null ? s.ProductType.TypeName : null,
+                s.ProductType != null ? s.ProductType.Subcategory != null ? s.ProductType.Subcategory.SubcategoryName : null : null,
+                s.ProductType != null ? s.ProductType.Subcategory != null ? s.ProductType.Subcategory.Category != null ? s.ProductType.Subcategory.Category.CategoryName : null : null : null))
             .FirstOrDefaultAsync(cancellationToken);
     }
 
-    public async Task<SemanticObjectDto> AssignProductAsync(
-        int objectId, int productId, CancellationToken cancellationToken = default)
+    public async Task<SemanticObjectDto> AssignProductTypeAsync(
+        int objectId, int productTypeId, CancellationToken cancellationToken = default)
     {
         var semanticObj = await db.SemanticObjects.FindAsync([objectId], cancellationToken)
             ?? throw new KeyNotFoundException(localizer.Get("SemanticObjectNotFound", objectId));
 
-        var product = await db.Products.FindAsync([productId], cancellationToken)
-            ?? throw new KeyNotFoundException(localizer.Get("ProductNotFound", productId));
+        var productType = await db.ProductTypes
+            .Include(pt => pt.Subcategory)
+                .ThenInclude(sc => sc!.Category)
+            .FirstOrDefaultAsync(pt => pt.ProductTypeId == productTypeId, cancellationToken)
+            ?? throw new KeyNotFoundException(localizer.Get("ProductTypeNotFound", productTypeId));
 
-        semanticObj.ProductId = productId;
+        semanticObj.ProductTypeId = productTypeId;
         await db.SaveChangesAsync(cancellationToken);
 
         return new SemanticObjectDto(
@@ -84,18 +95,18 @@ public sealed class SemanticObjectService(
             semanticObj.Confidence,
             semanticObj.DetectedAt,
             semanticObj.ImageUrl,
-            product.ProductId,
-            product.ProductName,
-            product.UnitPrice,
-            product.ImageUrl);
+            productType.ProductTypeId,
+            productType.TypeName,
+            productType.Subcategory?.SubcategoryName,
+            productType.Subcategory?.Category?.CategoryName);
     }
 
-    public async Task<SemanticObjectDto?> UnassignProductAsync(int objectId, CancellationToken cancellationToken = default)
+    public async Task<SemanticObjectDto?> UnassignProductTypeAsync(int objectId, CancellationToken cancellationToken = default)
     {
         var semanticObj = await db.SemanticObjects.FindAsync([objectId], cancellationToken)
             ?? throw new KeyNotFoundException(localizer.Get("SemanticObjectNotFound", objectId));
 
-        semanticObj.ProductId = null;
+        semanticObj.ProductTypeId = null;
         await db.SaveChangesAsync(cancellationToken);
 
         return new SemanticObjectDto(

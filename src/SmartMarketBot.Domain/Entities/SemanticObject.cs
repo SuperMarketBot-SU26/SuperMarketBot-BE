@@ -13,8 +13,8 @@ public class SemanticObject
     public double? Confidence { get; set; }
     public DateTime? DetectedAt { get; set; }
     public string? ImageUrl { get; set; }
-    public int? ProductId { get; set; }
+    public int? ProductTypeId { get; set; }
 
     public virtual Map? Map { get; set; }
-    public virtual Product? Product { get; set; }
+    public virtual ProductType? ProductType { get; set; }
 }

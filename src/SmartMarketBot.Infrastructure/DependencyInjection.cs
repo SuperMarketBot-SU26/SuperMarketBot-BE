@@ -38,6 +38,7 @@ public static class DependencyInjection
         services.AddScoped<IProductService, ProductService>();
         services.AddScoped<IAdminProductService, AdminProductService>();
         services.AddScoped<IRobotService, RobotService>();
+        services.AddScoped<IRobotRouteService, RobotRouteService>();
         services.AddScoped<IAisleScanService, AisleScanService>();
         services.AddScoped<ISearchService, SearchService>();
         services.AddScoped<IMapSyncService, MapSyncService>();

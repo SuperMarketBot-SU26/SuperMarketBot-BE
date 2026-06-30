@@ -739,6 +739,22 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
             entity.HasOne(x => x.Map)
                 .WithMany(m => m.RobotRoutes)
                 .HasForeignKey(x => x.MapId);
+            // === Phase 1: phân loại & liên kết Zone ===
+            entity.Property(x => x.ZoneId).HasColumnName("ZoneID");
+            entity.Property(x => x.RouteType)
+                  .HasColumnName("RouteType")
+                  .HasMaxLength(50)
+                  .HasDefaultValue("patrol")
+                  .IsRequired();
+            entity.Property(x => x.Description)
+                  .HasColumnName("Description")
+                  .HasMaxLength(500);
+            // Navigation property để dùng .Include(r => r.Zone) trong LINQ.
+            // Không dùng .HasForeignKey() để tránh SQL Azure báo "multiple cascade paths".
+            // EF sẽ dùng ZoneId làm shadow FK (không tạo constraint trong DB).
+            entity.HasOne(x => x.Zone).WithMany();
+            entity.HasIndex(x => x.ZoneId);
+            entity.HasIndex(x => x.RouteType);
         });
 
         modelBuilder.Entity<RouteNodeMapping>(entity =>

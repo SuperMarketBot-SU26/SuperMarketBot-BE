@@ -66,7 +66,7 @@ public sealed class StaffService(AppDbContext db, ILocalizationService localizer
     {
         var tasks = await db.AisleScans
             .AsNoTracking()
-            .Where(ss => ss.EmptyPercentage > 30)
+            .Where(ss => ss.NeedsRestock)
             .OrderByDescending(ss => ss.EmptyPercentage)
             .Take(30)
             .Join(db.Aisles, ss => ss.AisleId, a => a.AisleId, (ss, a) => new { ss, a })
@@ -91,14 +91,37 @@ public sealed class StaffService(AppDbContext db, ILocalizationService localizer
 
     public async Task CompleteRestockAsync(CompleteRestockRequestDto request, CancellationToken ct = default)
     {
-        var slot = await db.Slots.FindAsync([request.SlotId], ct)
-            ?? throw new KeyNotFoundException(localizer.Get("SlotNotFound", request.SlotId));
+        // Tìm toàn bộ các bản quét chưa hoàn tất (NeedsRestock = true) tại vị trí lối đi và node được truyền lên
+        var query = db.AisleScans.Where(ss => ss.AisleId == request.AisleId && ss.NeedsRestock);
 
-        if (request.QuantityAdded <= 0)
-            throw new ArgumentException("QuantityAdded must be >= 1.", nameof(request));
+        if (request.AisleNodeId.HasValue)
+        {
+            query = query.Where(ss => ss.AisleNodeId == request.AisleNodeId.Value);
+        }
+        else
+        {
+            query = query.Where(ss => ss.AisleNodeId == null);
+        }
 
-        slot.Quantity += request.QuantityAdded;
-        slot.LastScannedAt = VnDateTime.Now;
+        var activeScans = await query.ToListAsync(ct);
+
+        // Đóng toàn bộ các nhiệm vụ quét kệ tại vị trí này
+        foreach (var scan in activeScans)
+        {
+            scan.NeedsRestock = false;
+        }
+
+        // Nếu client truyền thêm thông tin SlotId và QuantityAdded thì cập nhật số lượng tồn kho của Slot
+        if (request.SlotId.HasValue && request.SlotId.Value > 0 && request.QuantityAdded.HasValue && request.QuantityAdded.Value > 0)
+        {
+            var slot = await db.Slots.FindAsync([request.SlotId.Value], ct);
+            if (slot != null)
+            {
+                slot.Quantity += request.QuantityAdded.Value;
+                slot.LastScannedAt = VnDateTime.Now;
+            }
+        }
+
         await db.SaveChangesAsync(ct);
     }
 }

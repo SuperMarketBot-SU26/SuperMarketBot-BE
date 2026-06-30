@@ -25,14 +25,14 @@ public sealed record RestockTaskListResponseDto(
 
 /// <summary>Nhân viên xác nhận hoàn tất bổ sung hàng.</summary>
 public sealed record CompleteRestockRequestDto(
-    [Range(1, int.MaxValue, ErrorMessage = "ScanId phải hợp lệ (>= 1).")]
-    int ScanId,
+    [Range(1, int.MaxValue, ErrorMessage = "AisleId phải hợp lệ (>= 1).")]
+    int AisleId,
 
-    [Range(1, int.MaxValue, ErrorMessage = "SlotId phải hợp lệ (>= 1).")]
-    int SlotId,
+    int? AisleNodeId = null,
 
-    [Range(1, 10_000, ErrorMessage = "Số lượng bổ sung phải >= 1.")]
-    int QuantityAdded);
+    int? SlotId = null,
+
+    int? QuantityAdded = null);
 
 /// <summary>Request báo cáo kệ trống từ robot hoặc khách hàng.</summary>
 public sealed record ReportOosRequestDto(

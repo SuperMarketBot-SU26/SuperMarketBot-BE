@@ -89,7 +89,7 @@ public sealed class StaffService(AppDbContext db, ILocalizationService localizer
         return new RestockTaskListResponseDto(tasks.Count, tasks);
     }
 
-    public async Task CompleteRestockAsync(CompleteRestockRequestDto request, CancellationToken ct = default)
+    public async Task<int> CompleteRestockAsync(CompleteRestockRequestDto request, CancellationToken ct = default)
     {
         // Tìm toàn bộ các bản quét chưa hoàn tất (NeedsRestock = true) tại vị trí lối đi và node được truyền lên
         var query = db.AisleScans.Where(ss => ss.AisleId == request.AisleId && ss.NeedsRestock);
@@ -123,5 +123,6 @@ public sealed class StaffService(AppDbContext db, ILocalizationService localizer
         }
 
         await db.SaveChangesAsync(ct);
+        return activeScans.Count;
     }
 }

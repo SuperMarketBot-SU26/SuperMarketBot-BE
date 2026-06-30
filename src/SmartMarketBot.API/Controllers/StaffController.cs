@@ -32,7 +32,16 @@ public sealed class StaffController(IStaffService staffService) : ControllerBase
         [FromBody] CompleteRestockRequestDto request,
         CancellationToken cancellationToken)
     {
-        await staffService.CompleteRestockAsync(request, cancellationToken);
-        return NoContent();
+        var resolvedCount = await staffService.CompleteRestockAsync(request, cancellationToken);
+        var locationStr = request.AisleNodeId.HasValue 
+            ? $"Lối đi {request.AisleId} (Node {request.AisleNodeId})" 
+            : $"Lối đi {request.AisleId}";
+
+        return Ok(new
+        {
+            success = true,
+            message = $"Đã xác nhận hoàn tất bổ sung hàng tại vị trí {locationStr}.",
+            resolvedTasksCount = resolvedCount
+        });
     }
 }

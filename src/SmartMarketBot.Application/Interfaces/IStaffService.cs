@@ -15,5 +15,5 @@ public interface IStaffService
     Task<RestockTaskListResponseDto> GetRestockTasksAsync(CancellationToken ct = default);
 
     /// <summary>Nhân viên xác nhận đã bổ sung hàng xong — cập nhật Slot.Quantity.</summary>
-    Task CompleteRestockAsync(CompleteRestockRequestDto request, CancellationToken ct = default);
+    Task<int> CompleteRestockAsync(CompleteRestockRequestDto request, CancellationToken ct = default);
 }

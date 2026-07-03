@@ -544,7 +544,7 @@ public sealed class AdCampaignService(
         }
     }
 
-    public async Task<RobotPlaylistResponseDto> GetRobotPlaylistAsync(int robotId, CancellationToken cancellationToken = default)
+    public async Task<RobotPlaylistResponseDto> GetRobotPlaylistAsync(int robotId, int? semanticObjectId, CancellationToken cancellationToken = default)
     {
         var robotExists = await db.Robots
             .AsNoTracking()
@@ -552,58 +552,55 @@ public sealed class AdCampaignService(
         if (!robotExists)
             throw new KeyNotFoundException(localizer.Get("RobotNotFound", robotId));
 
-        var productSlotsQuery = db.ProductSlots
-            .AsNoTracking()
-            .Include(ps => ps.Product!)
-                .ThenInclude(p => p.SponsoredProducts)
-                    .ThenInclude(sp => sp.AdCampaign!)
-                        .ThenInclude(ac => ac.Package)
-            .Include(ps => ps.Product!)
-                .ThenInclude(p => p.SponsoredProducts)
-                    .ThenInclude(sp => sp.AdCampaign!)
-                        .ThenInclude(ac => ac.AdResources)
-            .Include(ps => ps.Slot!)
-                .ThenInclude(s => s.Shelf!)
-                    .ThenInclude(sh => sh.Aisle!)
-            .Where(ps => ps.Slot.Quantity > 0);
+        if (!semanticObjectId.HasValue)
+        {
+            return new RobotPlaylistResponseDto(robotId, null, [], DateTime.UtcNow, null);
+        }
 
-        var productSlots = await productSlotsQuery.ToListAsync(cancellationToken);
+        var semanticObject = await db.SemanticObjects
+            .AsNoTracking()
+            .FirstOrDefaultAsync(s => s.ObjectId == semanticObjectId.Value, cancellationToken);
+
+        if (semanticObject is null || !semanticObject.ProductTypeId.HasValue)
+        {
+            return new RobotPlaylistResponseDto(robotId, null, [], DateTime.UtcNow, semanticObjectId.Value);
+        }
 
         var now = DateTime.UtcNow;
-        var playlistItems = productSlots
-            .SelectMany(ps => ps.Product!.SponsoredProducts)
-            .Where(sp => sp.AdCampaign is { Status: CampaignStatus.Active }
-                        && sp.AdCampaign.StartDate <= now
-                        && sp.AdCampaign.EndDate >= now
-                        && sp.Status == SponsoredProductStatus.Active)
-            .Select(sp => new RobotPlaylistItemDto
-            {
-                SponsoredId = sp.SponsoredId,
-                AdCampaignId = sp.AdCampaignId,
-                CampaignName = sp.AdCampaign!.CampaignName,
-                ProductId = sp.ProductId,
-                ProductName = sp.Product!.ProductName,
-                ProductPrice = sp.Product!.UnitPrice,
-                Priority = sp.Priority,
-                AdScore = sp.AdCampaign!.Package?.AdScore ?? 0,
-                EndDate = sp.AdCampaign!.EndDate,
-                ImageUrl = sp.Product!.ImageUrl ?? string.Empty,
-                DisplayDurationSeconds = 30,
-                MediaContents = sp.AdCampaign!.AdResources
-                    .Where(r => r.Status == AdResourceStatus.Active)
-                    .Select(r => new MediaContentDto(
-                        r.ResourceType,
-                        r.ResourceUrl,
-                        r.ContentText,
-                        r.Resolution))
-                    .ToList()
-            })
-            .OrderByDescending(item => item.AdScore)
-            .ThenByDescending(item => item.Priority)
-            .ThenBy(item => item.EndDate)
-            .ToList();
+        var productTypeId = semanticObject.ProductTypeId.Value;
 
-        return new RobotPlaylistResponseDto(robotId, null, playlistItems, DateTime.UtcNow);
+        var playlistItems = await (from sp in db.SponsoredProducts.AsNoTracking()
+                                   where sp.Product.ProductTypeId == productTypeId
+                                         && sp.Status == SponsoredProductStatus.Active
+                                         && sp.AdCampaign.Status == CampaignStatus.Active
+                                         && sp.AdCampaign.StartDate <= now
+                                         && sp.AdCampaign.EndDate >= now
+                                   orderby sp.AdCampaign.Package.AdScore descending, sp.Priority descending, sp.AdCampaign.EndDate
+                                   select new RobotPlaylistItemDto
+                                   {
+                                       SponsoredId = sp.SponsoredId,
+                                       AdCampaignId = sp.AdCampaignId,
+                                       CampaignName = sp.AdCampaign.CampaignName,
+                                       ProductId = sp.ProductId,
+                                       ProductName = sp.Product.ProductName,
+                                       ProductPrice = sp.Product.UnitPrice,
+                                       Priority = sp.Priority,
+                                       AdScore = sp.AdCampaign.Package.AdScore,
+                                       EndDate = sp.AdCampaign.EndDate,
+                                       ImageUrl = sp.Product.ImageUrl ?? string.Empty,
+                                       DisplayDurationSeconds = 30,
+                                       MediaContents = sp.AdCampaign.AdResources
+                                           .Where(r => r.Status == AdResourceStatus.Active)
+                                           .Select(r => new MediaContentDto(
+                                               r.ResourceType,
+                                               r.ResourceUrl,
+                                               r.ContentText,
+                                               r.Resolution))
+                                           .ToList()
+                                   })
+                                   .ToListAsync(cancellationToken);
+
+        return new RobotPlaylistResponseDto(robotId, null, playlistItems, DateTime.UtcNow, semanticObjectId.Value);
     }
 
     public async Task<LogInteractionResponseDto> LogInteractionAsync(

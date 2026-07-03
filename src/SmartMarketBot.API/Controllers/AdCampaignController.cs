@@ -15,9 +15,10 @@ public sealed class AdCampaignController(
     [AllowAnonymous]
     public async Task<ActionResult<RobotPlaylistResponseDto>> GetRobotPlaylist(
         int robotId,
+        [FromQuery] int? semanticObjectId,
         CancellationToken cancellationToken)
     {
-        var result = await adCampaignService.GetRobotPlaylistAsync(robotId, cancellationToken);
+        var result = await adCampaignService.GetRobotPlaylistAsync(robotId, semanticObjectId, cancellationToken);
         return Ok(result);
     }
 

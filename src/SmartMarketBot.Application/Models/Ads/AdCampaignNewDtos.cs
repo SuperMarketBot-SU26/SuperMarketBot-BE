@@ -101,4 +101,5 @@ public sealed record RobotPlaylistResponseDto(
     int RobotId,
     int? CurrentZoneId,
     List<RobotPlaylistItemDto> Playlist,
-    DateTime GeneratedAt);
+    DateTime GeneratedAt,
+    int? SemanticObjectId);

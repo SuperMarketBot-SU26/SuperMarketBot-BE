@@ -23,7 +23,7 @@ public interface IAdCampaignService
     Task ProcessWalletLowBalanceAsync(int brandId, CancellationToken cancellationToken = default);
     Task ProcessOutOfStockAsync(int campaignId, CancellationToken cancellationToken = default);
 
-    Task<RobotPlaylistResponseDto> GetRobotPlaylistAsync(int robotId, CancellationToken cancellationToken = default);
+    Task<RobotPlaylistResponseDto> GetRobotPlaylistAsync(int robotId, int? semanticObjectId, CancellationToken cancellationToken = default);
     Task<LogInteractionResponseDto> LogInteractionAsync(LogInteractionRequestDto request, CancellationToken cancellationToken = default);
     Task<PaginatedResponse<AdCampaignLogDto>> GetCampaignLogsAsync(int campaignId, int pageNumber, int pageSize, CancellationToken cancellationToken = default);
 }

@@ -237,4 +237,82 @@ public sealed class ProductService(AppDbContext dbContext) : IProductService
             .Select(x => new HealthTagDto(x.HealthTagId, x.TagName, x.TagType))
             .ToListAsync(cancellationToken);
     }
+
+    public async Task<IReadOnlyList<MobileProductSearchResultDto>> SearchProductsWithLocationAsync(
+        string? keyword,
+        int? categoryId,
+        int? productTypeId,
+        int? floorId,
+        bool? availableOnly,
+        CancellationToken cancellationToken = default)
+    {
+        var query = dbContext.Products.AsNoTracking().AsQueryable();
+
+        if (!string.IsNullOrWhiteSpace(keyword))
+        {
+            var normalized = keyword.Trim();
+            query = query.Where(x => x.ProductName.Contains(normalized)
+                || (x.Description != null && x.Description.Contains(normalized)));
+        }
+
+        if (categoryId.HasValue)
+        {
+            query = query.Where(x => x.ProductType != null
+                && x.ProductType.Subcategory != null
+                && x.ProductType.Subcategory.CategoryId == categoryId.Value);
+        }
+
+        if (productTypeId.HasValue)
+            query = query.Where(x => x.ProductTypeId == productTypeId.Value);
+
+        if (availableOnly == true)
+            query = query.Where(x => x.Status == "Available");
+
+        // Join để lấy location info từ SemanticObject (ObjectType='shelf').
+        // SemanticObject.Label chính là shelfName (được gán khi Web Manager tạo kệ).
+        var results = await (
+            from p in query
+            join pt in dbContext.ProductTypes.AsNoTracking() on p.ProductTypeId equals pt.ProductTypeId into ptGroup
+            from pt in ptGroup.DefaultIfEmpty()
+            join so in dbContext.SemanticObjects.AsNoTracking()
+                on pt.ProductTypeId equals so.ProductTypeId into soGroup
+            from so in soGroup.Where(x => x.ObjectType == "shelf").DefaultIfEmpty()
+            join m in dbContext.Maps.AsNoTracking() on so.MapId equals m.MapId into mGroup
+            from m in mGroup.DefaultIfEmpty()
+            where !floorId.HasValue || (m != null && m.FloorId == floorId.Value)
+            orderby p.ProductName
+            select new
+            {
+                p.ProductId,
+                p.ProductName,
+                p.UnitPrice,
+                p.Status,
+                p.ImageUrl,
+                p.ProductTypeId,
+                SemanticObjectId = so != null ? so.ObjectId : 0,
+                soLabel = so != null ? so.Label : null
+            }
+        ).ToListAsync(cancellationToken);
+
+        // Group by productId để lấy location đầu tiên tìm được
+        return results
+            .GroupBy(x => x.ProductId)
+            .Select(g =>
+            {
+                var first = g.First();
+                var location = first.SemanticObjectId > 0
+                    ? new ProductLocationDto(first.SemanticObjectId, first.soLabel, null)
+                    : null;
+
+                return new MobileProductSearchResultDto(
+                    first.ProductId,
+                    first.ProductName,
+                    first.UnitPrice,
+                    first.Status,
+                    first.ImageUrl,
+                    first.ProductTypeId,
+                    location);
+            })
+            .ToList();
+    }
 }

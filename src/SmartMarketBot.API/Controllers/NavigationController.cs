@@ -12,6 +12,24 @@ public sealed class NavigationController(
     INavigationService navigationService,
     NavigationCommandService navigationCommandService) : ControllerBase
 {
+    /// <summary>
+    /// API Mobile — Tìm đường đi từ tọa độ (startX, startY) đến SemanticObject hoặc NavigationNode đích.
+    /// Mobile App dùng endpoint này để vẽ Polyline chỉ đường trên bản đồ.
+    /// </summary>
+    [HttpGet("route")]
+    [AllowAnonymous]
+    public async Task<ActionResult<MobileRouteResponseDto>> FindMobileRoute(
+        [FromQuery] double startX,
+        [FromQuery] double startY,
+        [FromQuery] int? endObjectId,
+        [FromQuery] int? endNodeId,
+        CancellationToken cancellationToken)
+    {
+        var request = new MobileRouteRequestDto(startX, startY, endObjectId, endNodeId);
+        var result = await navigationService.FindMobileRouteAsync(request, cancellationToken);
+        return Ok(result);
+    }
+
     /// <summary>Tính route Dijkstra (không gửi xuống robot).</summary>
     [HttpPost("route")]
     public async Task<ActionResult<RoutePlanResultDto>> PlanRoute([FromBody] RoutePlanRequestDto request, CancellationToken cancellationToken)

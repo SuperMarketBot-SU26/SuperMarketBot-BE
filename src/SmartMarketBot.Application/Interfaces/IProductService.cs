@@ -29,4 +29,16 @@ public interface IProductService
     Task<IReadOnlyList<SubcategoryDto>> GetSubcategoriesAsync(CancellationToken cancellationToken = default);
     Task<IReadOnlyList<ProductTypeDto>> GetProductTypesAsync(CancellationToken cancellationToken = default);
     Task<IReadOnlyList<HealthTagDto>> GetHealthTagsAsync(CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// API Mobile — Tìm kiếm sản phẩm kèm vị trí kệ hàng (SemanticObject) trên bản đồ.
+    /// Join: Product → ProductType → SemanticObject → Shelf → Aisle → Zone.
+    /// </summary>
+    Task<IReadOnlyList<MobileProductSearchResultDto>> SearchProductsWithLocationAsync(
+        string? keyword,
+        int? categoryId,
+        int? productTypeId,
+        int? floorId,
+        bool? availableOnly,
+        CancellationToken cancellationToken = default);
 }

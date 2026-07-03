@@ -29,6 +29,8 @@ public sealed class MapSyncService(
                 FloorId = request.FloorId,
                 MapName = request.MapName,
                 MapData = request.MapData ?? JsonSerializer.Serialize(new { floorId = request.FloorId }, JsonOptions),
+                WidthMeters = request.WidthMeters,
+                HeightMeters = request.HeightMeters,
                 CreatedAt = DateTime.UtcNow
             };
             db.Maps.Add(map);
@@ -38,6 +40,8 @@ public sealed class MapSyncService(
         {
             map.MapName = request.MapName;
             map.MapData = request.MapData ?? map.MapData;
+            map.WidthMeters = request.WidthMeters;
+            map.HeightMeters = request.HeightMeters;
         }
 
         var (nodesCreated, nodesUpdated, nodesDeleted, idMap) = await SyncNodesAsync(map.MapId, request.Nodes, cancellationToken);
@@ -354,6 +358,7 @@ public sealed class MapSyncService(
         return new MapFloorplanDto(
             map.MapId, map.FloorId, map.MapName, map.CreatedAt,
             map.FloorplanImageUrl,
+            map.WidthMeters, map.HeightMeters,
             nodes, edges, semanticObjects);
     }
 

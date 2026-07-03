@@ -6,6 +6,8 @@ public sealed record MapSyncRequestDto
     public required int FloorId { get; init; }
     public required string MapName { get; init; }
     public string? MapData { get; init; }
+    public double WidthMeters { get; init; }
+    public double HeightMeters { get; init; }
     public List<MapSyncNodeDto> Nodes { get; init; } = [];
     public List<MapSyncEdgeDto> Edges { get; init; } = [];
     public List<MapSyncSemanticObjectDto> SemanticObjects { get; init; } = [];
@@ -58,6 +60,8 @@ public sealed record MapFloorplanDto(
     string MapName,
     DateTime CreatedAt,
     string? FloorplanImageUrl,
+    double WidthMeters,
+    double HeightMeters,
     List<MapSyncNodeDto> Nodes,
     List<MapSyncEdgeDto> Edges,
     List<MapSyncSemanticObjectDto> SemanticObjects);

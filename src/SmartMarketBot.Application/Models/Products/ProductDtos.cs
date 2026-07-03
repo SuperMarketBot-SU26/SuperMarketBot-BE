@@ -49,3 +49,17 @@ public sealed record UpdateProductStatusRequestDto
 {
     public required string Status { get; init; }
 }
+
+public sealed record ProductLocationDto(
+    int SemanticObjectId,
+    string? ShelfName,
+    string? Zone);
+
+public sealed record MobileProductSearchResultDto(
+    int ProductId,
+    string ProductName,
+    decimal UnitPrice,
+    string Status,
+    string? ImageUrl,
+    int ProductTypeId,
+    ProductLocationDto? Location);

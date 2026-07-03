@@ -20,3 +20,24 @@ public sealed record RerouteRequestDto(
 
 /// <summary>Phase 3 — Unblock danh sách nodes sau khi robot đi qua.</summary>
 public sealed record UnblockNodesRequestDto(List<int> NodeIds);
+
+/// <summary>
+/// API Mobile — Tìm đường đi từ tọa độ (startX, startY) đến một SemanticObject (endObjectId).
+/// Mobile App dùng endpoint này để vẽ Polyline chỉ đường.
+/// </summary>
+public sealed record MobileRouteRequestDto(
+    double StartX,
+    double StartY,
+    int? EndObjectId,
+    int? EndNodeId);
+
+public sealed record MobileRoutePointDto(
+    double X,
+    double Y,
+    int? NodeId,
+    string? Description);
+
+public sealed record MobileRouteResponseDto(
+    double TotalDistance,
+    int EstimatedTimeSeconds,
+    IReadOnlyList<MobileRoutePointDto> Path);

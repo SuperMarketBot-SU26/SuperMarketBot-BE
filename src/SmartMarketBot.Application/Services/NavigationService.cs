@@ -196,6 +196,130 @@ public sealed class NavigationService(IAppDbContext dbContext, ILocalizationServ
             $"TSP Nearest-Neighbour + Dijkstra. {obstacleIds.Count} obstacle(s) excluded from graph.");
     }
 
+    // ── FindMobileRouteAsync ─────────────────────────────────────────────────
+
+    private static double DistanceSquared(double x1, double y1, double x2, double y2)
+        => (x1 - x2) * (x1 - x2) + (y1 - y2) * (y1 - y2);
+
+    public async Task<MobileRouteResponseDto> FindMobileRouteAsync(
+        MobileRouteRequestDto request, CancellationToken cancellationToken = default)
+    {
+        var nodes = await LoadNodesWithObstaclesAsync(cancellationToken);
+
+        if (nodes.Count == 0)
+            return new MobileRouteResponseDto(0d, 0, []);
+
+        // Tìm NavigationNode gần nhất với (startX, startY)
+        var startNode = nodes.Values
+            .OrderBy(n => DistanceSquared(n.XCoord, n.YCoord, request.StartX, request.StartY))
+            .First();
+
+        if (startNode.IsBlocked)
+            throw new InvalidOperationException(localizer.Get("StartEndNodeBlocked"));
+
+        int endNodeId;
+
+        if (request.EndNodeId.HasValue)
+        {
+            if (!nodes.TryGetValue(request.EndNodeId.Value, out var endNodeData))
+                throw new KeyNotFoundException(localizer.Get("EndNodeNotFound", request.EndNodeId.Value));
+            endNodeId = request.EndNodeId.Value;
+        }
+        else if (request.EndObjectId.HasValue)
+        {
+            var destObject = await dbContext.SemanticObjects
+                .AsNoTracking()
+                .FirstOrDefaultAsync(so => so.ObjectId == request.EndObjectId.Value, cancellationToken)
+                ?? throw new KeyNotFoundException(localizer.Get("SemanticObjectNotFound", request.EndObjectId.Value));
+
+            // Tìm node gần nhất nằm bên trong/vùng phủ của semantic object
+            var targetNodes = nodes.Values
+                .Where(n => !n.IsBlocked)
+                .ToList();
+
+            var bestNode = targetNodes
+                .Where(n => n.XCoord >= destObject.XMin && n.XCoord <= destObject.XMax
+                         && n.YCoord >= destObject.YMin && n.YCoord <= destObject.YMax)
+                .OrderBy(n => DistanceSquared(n.XCoord, n.YCoord, (destObject.XMin + destObject.XMax) / 2, (destObject.YMin + destObject.YMax) / 2))
+                .FirstOrDefault();
+
+            // Nếu không có node nào bên trong object, lấy node gần tâm object nhất
+            bestNode ??= targetNodes
+                .OrderBy(n => DistanceSquared(n.XCoord, n.YCoord, (destObject.XMin + destObject.XMax) / 2, (destObject.YMin + destObject.YMax) / 2))
+                .First();
+
+            endNodeId = bestNode.NodeId;
+        }
+        else
+        {
+            throw new InvalidOperationException("EndObjectId or EndNodeId is required.");
+        }
+
+        if (nodes[endNodeId].IsBlocked)
+            throw new InvalidOperationException(localizer.Get("StartEndNodeBlocked"));
+
+        var edges = await dbContext.NavigationEdges
+            .AsNoTracking()
+            .Select(e => new EdgeData(e.FromNodeId, e.ToNodeId, e.Distance, e.IsBidirectional))
+            .ToListAsync(cancellationToken);
+
+        var adjacency = BuildAdjacency(edges, nodes);
+        var (distances, previous) = Dijkstra(adjacency, startNode.NodeId);
+
+        if (!distances.TryGetValue(endNodeId, out var totalDistance) || double.IsPositiveInfinity(totalDistance))
+            return new MobileRouteResponseDto(0d, 0, []);
+
+        var pathIds = ReconstructPath(previous, startNode.NodeId, endNodeId);
+
+        // Lấy semantic object info cho điểm đích
+        string? destLabel = null;
+        if (request.EndObjectId.HasValue)
+        {
+            destLabel = await dbContext.SemanticObjects
+                .AsNoTracking()
+                .Where(so => so.ObjectId == request.EndObjectId.Value)
+                .Select(so => so.Label)
+                .FirstOrDefaultAsync(cancellationToken);
+        }
+
+        // Tính khoảng cách từ (startX,startY) đến startNode
+        var distToFirstNode = Math.Sqrt(DistanceSquared(request.StartX, request.StartY, startNode.XCoord, startNode.YCoord));
+
+        var path = new List<MobileRoutePointDto>
+        {
+            new(request.StartX, request.StartY, startNode.NodeId, "Điểm xuất phát")
+        };
+
+        double accumulated = distToFirstNode;
+        foreach (var nodeId in pathIds.Skip(1))
+        {
+            var nd = nodes[nodeId];
+            accumulated += distances.TryGetValue(nodeId, out var d) ? d : 0;
+            path.Add(new MobileRoutePointDto(nd.XCoord, nd.YCoord, nodeId, null));
+        }
+
+        if (request.EndObjectId.HasValue)
+        {
+            // Thêm điểm đích tại tâm của SemanticObject
+            var destObject = await dbContext.SemanticObjects
+                .AsNoTracking()
+                .FirstOrDefaultAsync(so => so.ObjectId == request.EndObjectId.Value, cancellationToken);
+
+            if (destObject is not null)
+            {
+                var centerX = (destObject.XMin + destObject.XMax) / 2;
+                var centerY = (destObject.YMin + destObject.YMax) / 2;
+                path.Add(new MobileRoutePointDto(centerX, centerY, null, destLabel ?? "Đích đến"));
+            }
+        }
+
+        var totalDist = totalDistance + distToFirstNode;
+        // Ước tính: robot đi với vận tốc ~0.5 m/s
+        var estimatedSeconds = (int)Math.Ceiling(totalDist / 0.5);
+
+        return new MobileRouteResponseDto(Math.Round(totalDist, 2), estimatedSeconds, path);
+    }
+
     // ── SetNodeBlockedAsync ───────────────────────────────────────────────────
 
     public async Task SetNodeBlockedAsync(int nodeId, bool isBlocked, string? reason, CancellationToken cancellationToken = default)

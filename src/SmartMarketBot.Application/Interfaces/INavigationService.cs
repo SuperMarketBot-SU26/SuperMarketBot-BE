@@ -14,4 +14,10 @@ public interface INavigationService
 
     /// <summary>Flow 1 — Block/Unblock NavigationNode theo thời gian thực.</summary>
     Task SetNodeBlockedAsync(int nodeId, bool isBlocked, string? reason, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// API Mobile — Tìm đường đi từ tọa độ (startX, startY) đến SemanticObject hoặc NavigationNode đích.
+    /// Tự động tìm NavigationNode gần nhất với (startX, startY) và gần nhất với đích.
+    /// </summary>
+    Task<MobileRouteResponseDto> FindMobileRouteAsync(MobileRouteRequestDto request, CancellationToken cancellationToken = default);
 }

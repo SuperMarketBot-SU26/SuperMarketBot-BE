@@ -88,16 +88,18 @@ GO
 
 -- ═══════════════════════════════════════════════════════════
 -- 1. ACCOUNT (7 accounts: admin/staff/member)
+-- Password cho tất cả accounts: 123456
+-- Hash được tạo bằng scripts/gen-hash (PBKDF2-SHA256, 100000 iterations)
 -- ═══════════════════════════════════════════════════════════
 SET IDENTITY_INSERT dbo.ACCOUNT ON;
 INSERT INTO dbo.ACCOUNT (AccountID, Username, PasswordHash, Email, Phone, FullName, Status, Role, OtpCode, OtpExpiredAt, OtpType, CreatedAt) VALUES
-(1, N'admin', N'pbkdf2$100000$YWFhYWFhYWFhYWFhYWFhYQ==$YjJiMmMzZDRlNWU2ZTcwZjE4MzQ1Njc4OTAxMjM0NTY3', N'admin@smartmarket.local', N'0900000001', N'System Admin', N'Active', N'Admin', NULL, NULL, NULL, DATEADD(hour, 7, GETUTCDATE())),
-(2, N'staff', N'pbkdf2$100000$YWFhYWFhYWFhYWFhYWFhYQ==$YjJiMmMzZDRlNWU2ZTcwZjE4MzQ1Njc4OTAxMjM0NTY3', N'staff@smartmarket.local', N'0900000002', N'Nguyễn Văn Khoa', N'Active', N'Staff', NULL, NULL, NULL, DATEADD(hour, 7, GETUTCDATE())),
-(3, N'member1', N'pbkdf2$100000$YWFhYWFhYWFhYWFhYWFhYQ==$YjJiMmMzZDRlNWU2ZTcwZjE4MzQ1Njc4OTAxMjM0NTY3', N'member1@smartmarket.local', N'0900000003', N'Nguyễn Văn A', N'Active', N'Member', NULL, NULL, NULL, DATEADD(hour, 7, GETUTCDATE())),
-(4, N'member2', N'pbkdf2$100000$YWFhYWFhYWFhYWFhYWFhYQ==$YjJiMmMzZDRlNWU2ZTcwZjE4MzQ1Njc4OTAxMjM0NTY3', N'member2@smartmarket.local', N'0900000004', N'Trần Thị Bình', N'Active', N'Member', NULL, NULL, NULL, DATEADD(hour, 7, GETUTCDATE())),
-(5, N'member3', N'pbkdf2$100000$YWFhYWFhYWFhYWFhYWFhYQ==$YjJiMmMzZDRlNWU2ZTcwZjE4MzQ1Njc4OTAxMjM0NTY3', N'member3@smartmarket.local', N'0900000005', N'Lê Minh Cường', N'Active', N'Member', NULL, NULL, NULL, DATEADD(hour, 7, GETUTCDATE())),
-(6, N'staff2', N'pbkdf2$100000$YWFhYWFhYWFhYWFhYWFhYQ==$YjJiMmMzZDRlNWU2ZTcwZjE4MzQ1Njc4OTAxMjM0NTY3', N'staff2@smartmarket.local', N'0900000006', N'Phạm Thị Dung', N'Active', N'Staff', NULL, NULL, NULL, DATEADD(hour, 7, GETUTCDATE())),
-(7, N'admin2', N'pbkdf2$100000$YWFhYWFhYWFhYWFhYWFhYQ==$YjJiMmMzZDRlNWU2ZTcwZjE4MzQ1Njc4OTAxMjM0NTY3', N'admin2@smartmarket.local', N'0900000007', N'Võ Hoàng Nam', N'Active', N'Admin', NULL, NULL, NULL, DATEADD(hour, 7, GETUTCDATE()));
+(1, N'admin',   N'pbkdf2$100000$aPll+9VmaJBB/fFgfCQVHw==$wfIGdGjOsAPUVM6d0D7NWN3bzYnIKxevJHw4NHkEuHQ=', N'admin@smartmarket.local',   N'0900000001', N'System Admin',     N'Active', N'Admin',  NULL, NULL, NULL, DATEADD(hour, 7, GETUTCDATE())),
+(2, N'staff',   N'pbkdf2$100000$aPll+9VmaJBB/fFgfCQVHw==$wfIGdGjOsAPUVM6d0D7NWN3bzYnIKxevJHw4NHkEuHQ=', N'staff@smartmarket.local',   N'0900000002', N'Nguyễn Văn Khoa',  N'Active', N'Staff',  NULL, NULL, NULL, DATEADD(hour, 7, GETUTCDATE())),
+(3, N'member1', N'pbkdf2$100000$aPll+9VmaJBB/fFgfCQVHw==$wfIGdGjOsAPUVM6d0D7NWN3bzYnIKxevJHw4NHkEuHQ=', N'member1@smartmarket.local', N'0900000003', N'Nguyễn Văn A',     N'Active', N'Member', NULL, NULL, NULL, DATEADD(hour, 7, GETUTCDATE())),
+(4, N'member2', N'pbkdf2$100000$aPll+9VmaJBB/fFgfCQVHw==$wfIGdGjOsAPUVM6d0D7NWN3bzYnIKxevJHw4NHkEuHQ=', N'member2@smartmarket.local', N'0900000004', N'Trần Thị Bình',    N'Active', N'Member', NULL, NULL, NULL, DATEADD(hour, 7, GETUTCDATE())),
+(5, N'member3', N'pbkdf2$100000$aPll+9VmaJBB/fFgfCQVHw==$wfIGdGjOsAPUVM6d0D7NWN3bzYnIKxevJHw4NHkEuHQ=', N'member3@smartmarket.local', N'0900000005', N'Lê Minh Cường',    N'Active', N'Member', NULL, NULL, NULL, DATEADD(hour, 7, GETUTCDATE())),
+(6, N'staff2',  N'pbkdf2$100000$aPll+9VmaJBB/fFgfCQVHw==$wfIGdGjOsAPUVM6d0D7NWN3bzYnIKxevJHw4NHkEuHQ=', N'staff2@smartmarket.local',  N'0900000006', N'Phạm Thị Dung',    N'Active', N'Staff',  NULL, NULL, NULL, DATEADD(hour, 7, GETUTCDATE())),
+(7, N'admin2',  N'pbkdf2$100000$aPll+9VmaJBB/fFgfCQVHw==$wfIGdGjOsAPUVM6d0D7NWN3bzYnIKxevJHw4NHkEuHQ=', N'admin2@smartmarket.local',  N'0900000007', N'Võ Hoàng Nam',     N'Active', N'Admin',  NULL, NULL, NULL, DATEADD(hour, 7, GETUTCDATE()));
 SET IDENTITY_INSERT dbo.ACCOUNT OFF;
 GO
 

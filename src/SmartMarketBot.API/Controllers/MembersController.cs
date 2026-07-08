@@ -23,6 +23,23 @@ public sealed class MembersController(
     // ── Notifications (SignalR) ──────────────────────────────────────────────────────
 
     /// <summary>
+    /// [DEV ONLY] Push thẳng realtime update tới bất kỳ memberId nào — không cần auth.
+    /// Dùng để test Robot→Member flow cục bộ từ browser test page.
+    /// KHÔNG deploy lên production.
+    /// </summary>
+    [HttpPost("{memberId:int}/push-test")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    public async Task<IActionResult> PushTestDev(
+        int memberId,
+        [FromBody] MemberRealtimeUpdateDto update,
+        CancellationToken cancellationToken)
+    {
+        var payload = update with { MemberId = memberId, Timestamp = VnDateTime.Now };
+        await realtimeNotifier.PushToMemberAsync(memberId, payload, cancellationToken);
+        return Ok(new { pushed = true, memberId, updateType = update.UpdateType });
+    }
+
+    /// <summary>
     /// [DEV] Gửi thử một notification realtime tới member đang đăng nhập.
     /// FE dùng để test kết nối SignalR hub /hubs/member.
     /// Flow: connect hub → JoinMemberGroup(memberId) → gọi endpoint này → nhận event "memberUpdate".

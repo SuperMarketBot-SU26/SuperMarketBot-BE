@@ -362,23 +362,35 @@ public sealed class MqttClientService(
             var navCommandService = scope.ServiceProvider.GetRequiredService<Application.Services.NavigationCommandService>();
             var dbCtx = scope.ServiceProvider.GetRequiredService<Infrastructure.Persistence.AppDbContext>();
 
-            /* Lấy destination từ log gần nhất — tạm dùng waypoint cuối cùng trong route */
-            var destNode = await dbCtx.RobotLogs
+            var nodes = await dbCtx.NavigationNodes.AsNoTracking().ToListAsync();
+            if (nodes.Count == 0)
+            {
+                logger.LogWarning("No navigation nodes found in database for rerouting robot {RobotCode}.", robotCode);
+                return;
+            }
+
+            var latestLog = await dbCtx.RobotLogs
                 .AsNoTracking()
-                .Where(l => l.RobotId == robot.RobotId)
+                .Where(l => l.RobotId == robot.RobotId && l.XCoord.HasValue && l.YCoord.HasValue)
                 .OrderByDescending(l => l.Timestamp)
-                .Select(l => (int?)l.RobotId)
                 .FirstOrDefaultAsync();
 
-            /* Fallback: tính lại từ node hiện tại về node tiếp theo đã biết */
-            var startNode = await dbCtx.RobotLogs
-                .AsNoTracking()
-                .Where(l => l.RobotId == robot.RobotId)
-                .OrderByDescending(l => l.Timestamp)
-                .Select(l => (int?)l.RobotId)
-                .FirstOrDefaultAsync() ?? 1;
+            int startNode;
+            if (latestLog != null && latestLog.XCoord.HasValue && latestLog.YCoord.HasValue)
+            {
+                var unblockedNodes = nodes.Where(n => !n.IsBlocked).ToList();
+                var searchList = unblockedNodes.Count > 0 ? unblockedNodes : nodes;
+                startNode = searchList
+                    .OrderBy(n => (n.XCoord - latestLog.XCoord.Value) * (n.XCoord - latestLog.XCoord.Value) + (n.YCoord - latestLog.YCoord.Value) * (n.YCoord - latestLog.YCoord.Value))
+                    .Select(n => n.NodeId)
+                    .First();
+            }
+            else
+            {
+                startNode = nodes.OrderBy(n => n.NodeId).Select(n => n.NodeId).First();
+            }
 
-            int endNode = destNode ?? 5; // Default fallback — cần improve Phase 4
+            int endNode = nodes.OrderByDescending(n => n.NodeId).Select(n => n.NodeId).First();
 
             logger.LogWarning("Rerouting robot {RobotCode} from node {Start} to {End}.",
                               robotCode, startNode, endNode);

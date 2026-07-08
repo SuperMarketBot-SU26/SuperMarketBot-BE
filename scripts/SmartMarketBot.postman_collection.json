@@ -1,0 +1,498 @@
+{
+  "info": {
+    "name": "SmartMarketBot API",
+    "_postman_id": "smb-su26-collection",
+    "description": "Full test collection: Auth → Robot → Member Realtime → Navigation\nBase URL: {{baseUrl}} (default: http://localhost:5000)\nSau khi login admin, token tự động lưu vào {{adminToken}}",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl",     "value": "http://localhost:5000", "type": "string" },
+    { "key": "adminToken",  "value": "", "type": "string" },
+    { "key": "memberToken", "value": "", "type": "string" },
+    { "key": "refreshToken","value": "", "type": "string" },
+    { "key": "robotCode",   "value": "RB001", "type": "string" },
+    { "key": "memberId",    "value": "1", "type": "string" },
+    { "key": "startNodeId", "value": "7", "type": "string" },
+    { "key": "endNodeId",   "value": "9", "type": "string" }
+  ],
+  "item": [
+
+    {
+      "name": "🔐 Auth",
+      "item": [
+        {
+          "name": "Login Admin",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "  const r = pm.response.json();",
+                  "  pm.collectionVariables.set('adminToken', r.accessToken);",
+                  "  pm.collectionVariables.set('refreshToken', r.refreshToken);",
+                  "  pm.test('✅ Login admin thành công', () => pm.response.to.have.status(200));",
+                  "  pm.test('Role = Admin', () => pm.expect(r.roles).to.include('Admin'));",
+                  "  console.log('Token:', r.accessToken.substring(0,40)+'...');",
+                  "} else {",
+                  "  pm.test('❌ Login thất bại', () => pm.response.to.have.status(200));",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"admin@smartmarket.local\",\n  \"password\": \"123456\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/api/auth/login", "host": ["{{baseUrl}}"], "path": ["api","auth","login"] }
+          }
+        },
+        {
+          "name": "Login Member1",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "  const r = pm.response.json();",
+                  "  pm.collectionVariables.set('memberToken', r.accessToken);",
+                  "  pm.test('✅ Login member thành công', () => pm.response.to.have.status(200));",
+                  "  pm.test('Role = Member', () => pm.expect(r.roles).to.include('Member'));",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"member1@smartmarket.local\",\n  \"password\": \"123456\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/api/auth/login", "host": ["{{baseUrl}}"], "path": ["api","auth","login"] }
+          }
+        },
+        {
+          "name": "Login Staff",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"staff@smartmarket.local\",\n  \"password\": \"123456\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/api/auth/login", "host": ["{{baseUrl}}"], "path": ["api","auth","login"] }
+          }
+        },
+        {
+          "name": "Register → Gửi OTP",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"fullName\": \"Test User\",\n  \"email\": \"testuser@gmail.com\",\n  \"phone\": \"0912345678\",\n  \"password\": \"123456\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/api/auth/register", "host": ["{{baseUrl}}"], "path": ["api","auth","register"] }
+          }
+        },
+        {
+          "name": "Verify OTP",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"testuser@gmail.com\",\n  \"otpCode\": \"123456\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/api/auth/verify-otp", "host": ["{{baseUrl}}"], "path": ["api","auth","verify-otp"] }
+          }
+        },
+        {
+          "name": "Refresh Token",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "  const r = pm.response.json();",
+                  "  pm.collectionVariables.set('adminToken', r.accessToken);",
+                  "  pm.collectionVariables.set('refreshToken', r.refreshToken);",
+                  "  pm.test('✅ Refresh thành công', () => pm.response.to.have.status(200));",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refreshToken\": \"{{refreshToken}}\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/api/auth/refresh", "host": ["{{baseUrl}}"], "path": ["api","auth","refresh"] }
+          }
+        },
+        {
+          "name": "Logout",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{adminToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refreshToken\": \"{{refreshToken}}\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/api/auth/logout", "host": ["{{baseUrl}}"], "path": ["api","auth","logout"] }
+          }
+        }
+      ]
+    },
+
+    {
+      "name": "🤖 Robot",
+      "item": [
+        {
+          "name": "GET All Robots",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('✅ Lấy danh sách robot', () => pm.response.to.have.status(200));",
+                  "const r = pm.response.json();",
+                  "if (r.length > 0) {",
+                  "  pm.collectionVariables.set('robotCode', r[0].robotCode);",
+                  "  console.log('Robot code:', r[0].robotCode);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/api/robots", "host": ["{{baseUrl}}"], "path": ["api","robots"] }
+          }
+        },
+        {
+          "name": "GET Robot Status Values",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/api/robots/status-values", "host": ["{{baseUrl}}"], "path": ["api","robots","status-values"] }
+          }
+        },
+        {
+          "name": "GET Robot Pose",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/api/robots/{{robotCode}}/pose", "host": ["{{baseUrl}}"], "path": ["api","robots","{{robotCode}}","pose"] }
+          }
+        },
+        {
+          "name": "POST Update Robot Status → Idle",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('✅ Update status thành công', () => pm.response.to.have.status(200));",
+                  "const r = pm.response.json();",
+                  "pm.test('Status = Idle', () => pm.expect(r.status).to.eql('Idle'));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"Idle\",\n  \"location\": \"Entrance\",\n  \"batteryPct\": 85,\n  \"note\": \"postman-test\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/api/robots/{{robotCode}}/status", "host": ["{{baseUrl}}"], "path": ["api","robots","{{robotCode}}","status"] }
+          }
+        },
+        {
+          "name": "POST Update Robot Status → Moving",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"Moving\",\n  \"location\": \"Aisle-A\",\n  \"batteryPct\": 80,\n  \"note\": \"postman-test\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/api/robots/{{robotCode}}/status", "host": ["{{baseUrl}}"], "path": ["api","robots","{{robotCode}}","status"] }
+          }
+        },
+        {
+          "name": "POST Update Robot Status → Interacting",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"Interacting\",\n  \"location\": \"Aisle-B Shelf-3\",\n  \"batteryPct\": 75,\n  \"note\": \"Robot đang tương tác với khách hàng\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/api/robots/{{robotCode}}/status", "host": ["{{baseUrl}}"], "path": ["api","robots","{{robotCode}}","status"] }
+          }
+        },
+        {
+          "name": "POST Publish MQTT Command",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"robotCode\": \"{{robotCode}}\",\n  \"command\": \"stop\",\n  \"payload\": \"{\\\"reason\\\":\\\"postman-test\\\"}\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/api/robots/command", "host": ["{{baseUrl}}"], "path": ["api","robots","command"] }
+          }
+        },
+        {
+          "name": "POST Navigate Robot",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"robotCode\": \"{{robotCode}}\",\n  \"destinationNodeId\": \"9\",\n  \"waypointNodeIds\": null\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/api/robots/navigate", "host": ["{{baseUrl}}"], "path": ["api","robots","navigate"] }
+          }
+        }
+      ]
+    },
+
+    {
+      "name": "👤 Member Realtime",
+      "item": [
+        {
+          "name": "GET Member Profile (me)",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{memberToken}}" }],
+            "url": { "raw": "{{baseUrl}}/api/members/me", "host": ["{{baseUrl}}"], "path": ["api","members","me"] }
+          }
+        },
+        {
+          "name": "POST Push Realtime → ScanItem [DEV no-auth]",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('✅ Push thành công', () => pm.response.to.have.status(200));",
+                  "const r = pm.response.json();",
+                  "pm.test('pushed = true', () => pm.expect(r.pushed).to.be.true);",
+                  "console.log('>> Mở SignalR client để thấy event memberUpdate <<');"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"memberId\": {{memberId}},\n  \"updateType\": \"ScanItem\",\n  \"title\": \"Robot đã quét sản phẩm\",\n  \"message\": \"Milo 2L — Giá: 45.000đ\",\n  \"payload\": { \"productId\": 5, \"price\": 45000, \"robotCode\": \"{{robotCode}}\" },\n  \"timestamp\": \"2026-01-01T00:00:00Z\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/api/members/{{memberId}}/push-test", "host": ["{{baseUrl}}"], "path": ["api","members","{{memberId}}","push-test"] }
+          }
+        },
+        {
+          "name": "POST Push Realtime → BudgetWarning [DEV no-auth]",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"memberId\": {{memberId}},\n  \"updateType\": \"BudgetWarning\",\n  \"title\": \"⚠️ Gần đạt giới hạn chi tiêu\",\n  \"message\": \"Bạn đã chi 480.000đ / 500.000đ ngân sách\",\n  \"payload\": { \"spent\": 480000, \"limit\": 500000 },\n  \"timestamp\": \"2026-01-01T00:00:00Z\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/api/members/{{memberId}}/push-test", "host": ["{{baseUrl}}"], "path": ["api","members","{{memberId}}","push-test"] }
+          }
+        },
+        {
+          "name": "POST Push Realtime → AllergyAlert [DEV no-auth]",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"memberId\": {{memberId}},\n  \"updateType\": \"AllergyAlert\",\n  \"title\": \"🚨 Cảnh báo dị ứng!\",\n  \"message\": \"Sản phẩm này chứa Gluten — không phù hợp với hồ sơ sức khoẻ của bạn\",\n  \"payload\": { \"productId\": 12, \"allergen\": \"Gluten\" },\n  \"timestamp\": \"2026-01-01T00:00:00Z\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/api/members/{{memberId}}/push-test", "host": ["{{baseUrl}}"], "path": ["api","members","{{memberId}}","push-test"] }
+          }
+        },
+        {
+          "name": "POST Test Notification [Auth required]",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Authorization", "value": "Bearer {{memberToken}}" }],
+            "url": { "raw": "{{baseUrl}}/api/members/me/notifications/test", "host": ["{{baseUrl}}"], "path": ["api","members","me","notifications","test"] }
+          }
+        },
+        {
+          "name": "GET Notifications",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{memberToken}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/api/members/me/notifications?page=1&pageSize=20",
+              "host": ["{{baseUrl}}"], "path": ["api","members","me","notifications"],
+              "query": [{ "key": "page", "value": "1" }, { "key": "pageSize", "value": "20" }]
+            }
+          }
+        },
+        {
+          "name": "GET Unread Count",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{memberToken}}" }],
+            "url": { "raw": "{{baseUrl}}/api/members/me/notifications/unread-count", "host": ["{{baseUrl}}"], "path": ["api","members","me","notifications","unread-count"] }
+          }
+        },
+        {
+          "name": "GET Purchase History",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{memberToken}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/api/members/me/purchase-history?page=1&pageSize=10",
+              "host": ["{{baseUrl}}"], "path": ["api","members","me","purchase-history"],
+              "query": [{ "key": "page", "value": "1" }, { "key": "pageSize", "value": "10" }]
+            }
+          }
+        }
+      ]
+    },
+
+    {
+      "name": "🗺️ Navigation",
+      "item": [
+        {
+          "name": "GET Mobile Route",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/navigation/route?startX=1.794&startY=1.212&endNodeId=9",
+              "host": ["{{baseUrl}}"], "path": ["api","navigation","route"],
+              "query": [
+                { "key": "startX", "value": "1.794" },
+                { "key": "startY", "value": "1.212" },
+                { "key": "endNodeId", "value": "9" },
+                { "key": "endObjectId", "value": "", "disabled": true }
+              ]
+            }
+          }
+        },
+        {
+          "name": "POST Plan Route (Dijkstra)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"startNodeId\": {{startNodeId}},\n  \"endNodeId\": {{endNodeId}}\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/api/navigation/route", "host": ["{{baseUrl}}"], "path": ["api","navigation","route"] }
+          }
+        },
+        {
+          "name": "POST Navigate Robot (Dijkstra + MQTT)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"robotCode\": \"{{robotCode}}\",\n  \"startNodeId\": {{startNodeId}},\n  \"endNodeId\": {{endNodeId}}\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/api/navigation/navigate", "host": ["{{baseUrl}}"], "path": ["api","navigation","navigate"] }
+          }
+        },
+        {
+          "name": "POST Optimize Shopping Route",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"robotId\": 1,\n  \"startNodeId\": {{startNodeId}},\n  \"productIds\": [1, 2]\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/api/navigation/optimize-shopping-route", "host": ["{{baseUrl}}"], "path": ["api","navigation","optimize-shopping-route"] }
+          }
+        },
+        {
+          "name": "POST Block Node (NodeID=8)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"isBlocked\": true,\n  \"reason\": \"postman-test obstacle\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/api/navigation/nodes/8/block", "host": ["{{baseUrl}}"], "path": ["api","navigation","nodes","8","block"] }
+          }
+        },
+        {
+          "name": "POST Unblock Node (NodeID=8)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"isBlocked\": false,\n  \"reason\": \"cleared\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/api/navigation/nodes/8/block", "host": ["{{baseUrl}}"], "path": ["api","navigation","nodes","8","block"] }
+          }
+        }
+      ]
+    },
+
+    {
+      "name": "🏥 Health Check",
+      "item": [
+        {
+          "name": "GET Health",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('✅ API đang chạy', () => pm.response.to.have.status(200));",
+                  "console.log('Response time:', pm.response.responseTime + 'ms');"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/api/health", "host": ["{{baseUrl}}"], "path": ["api","health"] }
+          }
+        }
+      ]
+    }
+
+  ]
+}

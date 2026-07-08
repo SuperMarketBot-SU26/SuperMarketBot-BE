@@ -95,14 +95,19 @@ SuperMarketBot-BE/
 - OTP email 6 số (bảng `EMAIL_OTP`) cho đăng ký / quên mật khẩu
 - PBKDF2-SHA256 hashing
 
-Tài khoản demo (sau khi seed `erd_database.sql`):
+Tài khoản demo (sau khi seed `seed_combined.sql`):
 
-| Username        | Password              | Role   |
-| --------------- | --------------------- | ------ |
-| `admin_lth`     | `hash_pbkdf2_code_123`| Admin  |
-| `staff_dtnhan`  | `hash_pbkdf2_code_123`| Staff  |
-| `member_qhuy`   | `hash_pbkdf2_code_123`| Member |
-| `member_ahung`  | `hash_pbkdf2_code_123`| Member |
+| Email                          | Password  | Role   | FullName          |
+| ------------------------------ | --------- | ------ | ----------------- |
+| `admin@smartmarket.local`      | `123456`  | Admin  | System Admin      |
+| `admin2@smartmarket.local`     | `123456`  | Admin  | Võ Hoàng Nam      |
+| `staff@smartmarket.local`      | `123456`  | Staff  | Nguyễn Văn Khoa   |
+| `staff2@smartmarket.local`     | `123456`  | Staff  | Phạm Thị Dung     |
+| `member1@smartmarket.local`    | `123456`  | Member | Nguyễn Văn A      |
+| `member2@smartmarket.local`    | `123456`  | Member | Trần Thị Bình     |
+| `member3@smartmarket.local`    | `123456`  | Member | Lê Minh Cường     |
+
+> ⚠️ **Lưu ý**: Seed file gốc chứa hash cố định (fake). Sau khi seed, cần chạy script reset password hoặc dùng `scripts/gen-hash` để tạo hash hợp lệ và UPDATE lên DB.
 
 ---
 

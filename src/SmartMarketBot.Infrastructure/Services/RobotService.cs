@@ -84,12 +84,34 @@ public sealed class RobotService(
                 throw new ArgumentException(localizer.Get("DestNodeInvalid"));
             }
 
-            var currentNodeId = await dbContext.RobotLogs
+            var nodes = await dbContext.NavigationNodes.AsNoTracking().ToListAsync(cancellationToken);
+            if (nodes.Count == 0)
+            {
+                throw new InvalidOperationException("Không tìm thấy bất kỳ node điều hướng nào trên sơ đồ.");
+            }
+
+            var latestLog = await dbContext.RobotLogs
                 .AsNoTracking()
-                .Where(l => l.RobotId == robot.RobotId)
+                .Where(l => l.RobotId == robot.RobotId && l.XCoord.HasValue && l.YCoord.HasValue)
                 .OrderByDescending(l => l.Timestamp)
-                .Select(l => (int?)l.RobotId)
-                .FirstOrDefaultAsync(cancellationToken) ?? 1;
+                .FirstOrDefaultAsync(cancellationToken);
+
+            int currentNodeId;
+            if (latestLog != null && latestLog.XCoord.HasValue && latestLog.YCoord.HasValue)
+            {
+                var unblockedNodes = nodes.Where(n => !n.IsBlocked).ToList();
+                var searchList = unblockedNodes.Count > 0 ? unblockedNodes : nodes;
+                currentNodeId = searchList
+                    .OrderBy(n => (n.XCoord - latestLog.XCoord.Value) * (n.XCoord - latestLog.XCoord.Value) + (n.YCoord - latestLog.YCoord.Value) * (n.YCoord - latestLog.YCoord.Value))
+                    .Select(n => n.NodeId)
+                    .First();
+            }
+            else
+            {
+                var unblockedNodes = nodes.Where(n => !n.IsBlocked).ToList();
+                var searchList = unblockedNodes.Count > 0 ? unblockedNodes : nodes;
+                currentNodeId = searchList.OrderBy(n => n.NodeId).Select(n => n.NodeId).First();
+            }
 
             var routeResult = await navigationService.PlanRouteAsync(
                 new RoutePlanRequestDto(currentNodeId, destId),

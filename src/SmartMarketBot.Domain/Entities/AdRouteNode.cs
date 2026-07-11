@@ -1,13 +1,13 @@
 namespace SmartMarketBot.Domain.Entities;
 
-public class RouteNodeMapping
+public class AdRouteNode
 {
-    public int RouteNodeMappingId { get; set; }
-    public int RobotRouteId { get; set; }
+    public int AdRouteNodeId { get; set; }
+    public int AdRouteId { get; set; }
     public int NodeId { get; set; }
     public int SequenceOrder { get; set; }
     public int DwellTimeSeconds { get; set; } = 30;
 
-    public virtual RobotRoute? RobotRoute { get; set; }
+    public virtual AdRoute? AdRoute { get; set; }
     public virtual NavigationNode? Node { get; set; }
 }

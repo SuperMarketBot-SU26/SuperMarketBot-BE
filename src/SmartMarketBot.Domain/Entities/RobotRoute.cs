@@ -21,4 +21,5 @@ public class RobotRoute
     public virtual Zone? Zone { get; set; }
     public virtual ICollection<RouteNodeMapping> RouteNodeMappings { get; set; } = new List<RouteNodeMapping>();
     public virtual ICollection<RouteAssignment> RouteAssignments { get; set; } = new List<RouteAssignment>();
+    public virtual ICollection<AdCampaignRoute> AdCampaignRoutes { get; set; } = new List<AdCampaignRoute>();
 }

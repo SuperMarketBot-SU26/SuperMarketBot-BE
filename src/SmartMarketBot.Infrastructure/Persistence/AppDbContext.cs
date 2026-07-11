@@ -45,6 +45,11 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
     public DbSet<SponsoredProduct> SponsoredProducts => Set<SponsoredProduct>();
     public DbSet<AdCampaignLog> AdCampaignLogs => Set<AdCampaignLog>();
     public DbSet<AdResource> AdResources => Set<AdResource>();
+    public DbSet<AdCampaignZone> AdCampaignZones => Set<AdCampaignZone>();
+    public DbSet<AdRoute> AdRoutes => Set<AdRoute>();
+    public DbSet<AdRouteNode> AdRouteNodes => Set<AdRouteNode>();
+    public DbSet<AdRouteCampaign> AdRouteCampaigns => Set<AdRouteCampaign>();
+    public DbSet<AdCampaignRoute> AdCampaignRoutes => Set<AdCampaignRoute>();
 
     // ── Region 6: Robot & Navigation ─────────────────────────────────────────
     public DbSet<Robot> Robots => Set<Robot>();
@@ -489,6 +494,8 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
             entity.Property(x => x.PackageName).HasColumnName("PackageName").HasMaxLength(100).IsRequired();
             entity.Property(x => x.PricePackage).HasColumnName("PricePackage").HasPrecision(18, 2).HasDefaultValue(0m);
             entity.Property(x => x.PriceRoute).HasColumnName("PriceRoute").HasPrecision(18, 2).HasDefaultValue(0m);
+            entity.Property(x => x.PriceZone).HasColumnName("PriceZone").HasPrecision(18, 2).HasDefaultValue(0m);
+            entity.Property(x => x.PriceShelf).HasColumnName("PriceShelf").HasPrecision(18, 2).HasDefaultValue(0m);
             entity.Property(x => x.BasePriceClick).HasColumnName("BasePriceClick").HasPrecision(18, 2).HasDefaultValue(0m);
             entity.Property(x => x.AdScore).HasColumnName("AdScore").HasDefaultValue(0);
             entity.Property(x => x.Status).HasColumnName("Status").HasMaxLength(50).IsRequired();
@@ -506,6 +513,8 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
             entity.Property(x => x.StartDate).HasColumnName("StartDate");
             entity.Property(x => x.EndDate).HasColumnName("EndDate");
             entity.Property(x => x.Status).HasColumnName("Status").HasMaxLength(50).IsRequired();
+            entity.Property(x => x.ShelfPriceCharged).HasColumnName("ShelfPriceCharged").HasPrecision(18, 2).HasDefaultValue(0m);
+            entity.Property(x => x.ShelfPurchasedAt).HasColumnName("ShelfPurchasedAt");
             entity.HasOne(x => x.Package)
                 .WithMany(p => p.AdCampaigns)
                 .HasForeignKey(x => x.PackageId)
@@ -613,6 +622,90 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
                 .WithMany()
                 .HasForeignKey(x => x.MemberId)
                 .OnDelete(DeleteBehavior.NoAction);
+        });
+
+        modelBuilder.Entity<AdCampaignZone>(entity =>
+        {
+            entity.ToTable("AD_CAMPAIGN_ZONE");
+            entity.HasKey(x => new { x.AdCampaignId, x.ZoneId });
+            entity.Property(x => x.AdCampaignId).HasColumnName("AdCampaignID");
+            entity.Property(x => x.ZoneId).HasColumnName("ZoneID");
+            entity.Property(x => x.ZonePriceCharged).HasColumnName("ZonePriceCharged").HasPrecision(18, 2).HasDefaultValue(0m);
+            entity.Property(x => x.PurchasedAt).HasColumnName("PurchasedAt").HasDefaultValueSql("DATEADD(hour, 7, GETUTCDATE())");
+            entity.HasOne(x => x.AdCampaign)
+                .WithMany(ac => ac.AdCampaignZones)
+                .HasForeignKey(x => x.AdCampaignId)
+                .OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne(x => x.Zone)
+                .WithMany()
+                .HasForeignKey(x => x.ZoneId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<AdRoute>(entity =>
+        {
+            entity.ToTable("AD_ROUTE");
+            entity.HasKey(x => x.AdRouteId);
+            entity.Property(x => x.AdRouteId).HasColumnName("AdRouteID");
+            entity.Property(x => x.RouteName).HasColumnName("RouteName").HasMaxLength(100).IsRequired();
+            entity.Property(x => x.Description).HasColumnName("Description").HasMaxLength(500);
+            entity.Property(x => x.IsActive).HasColumnName("IsActive").HasDefaultValue(true);
+            entity.Property(x => x.CreatedAt).HasColumnName("CreatedAt").HasDefaultValueSql("DATEADD(hour, 7, GETUTCDATE())");
+        });
+
+        modelBuilder.Entity<AdRouteNode>(entity =>
+        {
+            entity.ToTable("AD_ROUTE_NODE");
+            entity.HasKey(x => x.AdRouteNodeId);
+            entity.Property(x => x.AdRouteNodeId).HasColumnName("AdRouteNodeID");
+            entity.Property(x => x.AdRouteId).HasColumnName("AdRouteID");
+            entity.Property(x => x.NodeId).HasColumnName("NodeID");
+            entity.Property(x => x.SequenceOrder).HasColumnName("SequenceOrder").HasDefaultValue(0);
+            entity.Property(x => x.DwellTimeSeconds).HasColumnName("DwellTimeSeconds").HasDefaultValue(30);
+            entity.HasOne(x => x.AdRoute)
+                .WithMany(r => r.Nodes)
+                .HasForeignKey(x => x.AdRouteId)
+                .OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne(x => x.Node)
+                .WithMany()
+                .HasForeignKey(x => x.NodeId)
+                .OnDelete(DeleteBehavior.NoAction);
+        });
+
+        modelBuilder.Entity<AdRouteCampaign>(entity =>
+        {
+            entity.ToTable("AD_ROUTE_CAMPAIGN");
+            entity.HasKey(x => new { x.AdRouteId, x.AdCampaignId });
+            entity.Property(x => x.AdRouteId).HasColumnName("AdRouteID");
+            entity.Property(x => x.AdCampaignId).HasColumnName("AdCampaignID");
+            entity.HasOne(x => x.AdRoute)
+                .WithMany(r => r.Campaigns)
+                .HasForeignKey(x => x.AdRouteId)
+                .OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne(x => x.AdCampaign)
+                .WithMany()
+                .HasForeignKey(x => x.AdCampaignId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<AdCampaignRoute>(entity =>
+        {
+            entity.ToTable("AD_CAMPAIGN_ROUTE");
+            entity.HasKey(x => new { x.AdCampaignId, x.RobotRouteId });
+            entity.Property(x => x.AdCampaignId).HasColumnName("AdCampaignID");
+            entity.Property(x => x.RobotRouteId).HasColumnName("RobotRouteID");
+            entity.Property(x => x.RoutePriceCharged).HasColumnName("RoutePriceCharged").HasPrecision(18, 2).HasDefaultValue(0m);
+            entity.Property(x => x.PurchasedAt).HasColumnName("PurchasedAt").HasDefaultValueSql("DATEADD(hour, 7, GETUTCDATE())");
+            // Cascade từ AdCampaign + Cascade từ RobotRoute: an toàn vì 2 bảng cha là khác nhau.
+            entity.HasOne(x => x.AdCampaign)
+                .WithMany(ac => ac.AdCampaignRoutes)
+                .HasForeignKey(x => x.AdCampaignId)
+                .OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne(x => x.RobotRoute)
+                .WithMany(rr => rr.AdCampaignRoutes)
+                .HasForeignKey(x => x.RobotRouteId)
+                .OnDelete(DeleteBehavior.Cascade);
+            entity.HasIndex(x => x.RobotRouteId).HasDatabaseName("IX_ACR_RobotRouteID");
         });
 
         // ─────────────────────────────────────────────
@@ -765,6 +858,7 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
             entity.Property(x => x.RobotRouteId).HasColumnName("RobotRouteID");
             entity.Property(x => x.NodeId).HasColumnName("NodeID");
             entity.Property(x => x.SequenceOrder).HasColumnName("SequenceOrder").HasDefaultValue(0);
+            entity.Property(x => x.DwellTimeSeconds).HasColumnName("DwellTimeSeconds").HasDefaultValue(30);
             entity.HasOne(x => x.RobotRoute)
                 .WithMany(rr => rr.RouteNodeMappings)
                 .HasForeignKey(x => x.RobotRouteId)

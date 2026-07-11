@@ -58,6 +58,8 @@ public static class DependencyInjection
         services.AddScoped<IAdCampaignService, AdCampaignService>();
         services.AddScoped<ISponsoredProductService, SponsoredProductService>();
         services.AddScoped<IAdResourceService, AdResourceService>();
+        services.AddScoped<IAdAnalyticsService, AdAnalyticsService>();
+        services.AddScoped<IAdRouteService, AdRouteService>();
 
         // Realtime (skeleton — 3 bạn fill logic)
         services.AddScoped<IStaffRealtimeService, StaffRealtimeService>();

@@ -23,6 +23,8 @@ DELETE FROM dbo.AISLE_NODE;
 DELETE FROM dbo.NAVIGATION_EDGE;
 DELETE FROM dbo.NAVIGATION_NODE;
 DELETE FROM dbo.MAP;
+DELETE FROM dbo.AD_CAMPAIGN_ROUTE;
+DELETE FROM dbo.AD_CAMPAIGN_ZONE;
 DELETE FROM dbo.AD_CAMPAIGN_LOG;
 DELETE FROM dbo.SPONSORED_PRODUCT;
 DELETE FROM dbo.AD_RESOURCE;
@@ -394,10 +396,10 @@ GO
 -- 14. AD_PACKAGE
 -- ═══════════════════════════════════════════════════════════
 SET IDENTITY_INSERT dbo.AD_PACKAGE ON;
-INSERT INTO dbo.AD_PACKAGE (PackageID, PackageName, PricePackage, PriceRoute, BasePriceClick, AdScore, Status) VALUES
-(1, N'Gói Cơ Bản', 1000000.00, 200000.00, 5000.00, 50, N'Active'),
-(2, N'Gói Tiêu Chuẩn', 3000000.00, 500000.00, 8000.00, 100, N'Active'),
-(3, N'Gói Cao Cấp', 8000000.00, 1000000.00, 15000.00, 200, N'Active');
+INSERT INTO dbo.AD_PACKAGE (PackageID, PackageName, PricePackage, PriceRoute, PriceZone, PriceShelf, BasePriceClick, AdScore, Status) VALUES
+(1, N'Gói Cơ Bản',      1000000.00, 200000.00,  30000.00, 15000.00,  5000.00,  50, N'Active'),
+(2, N'Gói Tiêu Chuẩn', 3000000.00, 500000.00,  50000.00, 25000.00,  8000.00, 100, N'Active'),
+(3, N'Gói Cao Cấp',    8000000.00, 1000000.00, 80000.00, 40000.00, 15000.00, 200, N'Active');
 SET IDENTITY_INSERT dbo.AD_PACKAGE OFF;
 GO
 
@@ -405,11 +407,29 @@ GO
 -- 15. AD_CAMPAIGN
 -- ═══════════════════════════════════════════════════════════
 SET IDENTITY_INSERT dbo.AD_CAMPAIGN ON;
-INSERT INTO dbo.AD_CAMPAIGN (AdCampaignID, PackageID, BrandID, RobotZoneID, CampaignName, StartDate, EndDate, Status) VALUES
-(1, 1, 1, 1, N'Coca mùa hè 2026', DATEADD(hour, 7, GETUTCDATE()), DATEADD(month, 3, DATEADD(hour, 7, GETUTCDATE())), N'Active'),
-(2, 2, 4, 2, N'Vinamilk tươi sạch', DATEADD(hour, 7, GETUTCDATE()), DATEADD(month, 6, DATEADD(hour, 7, GETUTCDATE())), N'Active'),
-(3, 3, 3, NULL, N'Nestle dinh dưỡng', DATEADD(hour, 7, GETUTCDATE()), DATEADD(month, 2, DATEADD(hour, 7, GETUTCDATE())), N'Inactive');
+INSERT INTO dbo.AD_CAMPAIGN (AdCampaignID, PackageID, BrandID, SemanticObjectID, CampaignName, StartDate, EndDate, Status, ShelfPriceCharged, ShelfPurchasedAt) VALUES
+(1, 1, 1, 1,    N'Coca mùa hè 2026',   DATEADD(hour, 7, GETUTCDATE()), DATEADD(month, 3, DATEADD(hour, 7, GETUTCDATE())), N'Active', 15000.00, DATEADD(hour, 7, GETUTCDATE())),
+(2, 2, 4, 2,    N'Vinamilk tươi sạch', DATEADD(hour, 7, GETUTCDATE()), DATEADD(month, 6, DATEADD(hour, 7, GETUTCDATE())), N'Active', 25000.00, DATEADD(hour, 7, GETUTCDATE())),
+(3, 3, 3, NULL, N'Nestle dinh dưỡng',  DATEADD(hour, 7, GETUTCDATE()), DATEADD(month, 2, DATEADD(hour, 7, GETUTCDATE())), N'Inactive', 0,       NULL);
 SET IDENTITY_INSERT dbo.AD_CAMPAIGN OFF;
+GO
+
+-- 15a. AD_CAMPAIGN_ZONE — Mỗi Active campaign mua 2 Zone (PriceZone * 2).
+-- Charge = PricePackage + (PriceZone × 2) cho mỗi impression tại các zone này.
+INSERT INTO dbo.AD_CAMPAIGN_ZONE (AdCampaignID, ZoneID, ZonePriceCharged, PurchasedAt) VALUES
+(1, 1, 30000.00, DATEADD(hour, 7, GETUTCDATE())),
+(1, 2, 30000.00, DATEADD(hour, 7, GETUTCDATE())),
+(2, 3, 50000.00, DATEADD(hour, 7, GETUTCDATE())),
+(2, 4, 50000.00, DATEADD(hour, 7, GETUTCDATE()));
+GO
+
+-- 15b. AD_CAMPAIGN_ROUTE — Mỗi Active campaign mua 2 RobotRoute (PriceRoute * 2).
+-- Charge = PricePackage + (PriceRoute × 2) cho mỗi impression trên các route này.
+INSERT INTO dbo.AD_CAMPAIGN_ROUTE (AdCampaignID, RobotRouteID, RoutePriceCharged, PurchasedAt) VALUES
+(1, 1, 200000.00, DATEADD(hour, 7, GETUTCDATE())),
+(1, 2, 200000.00, DATEADD(hour, 7, GETUTCDATE())),
+(2, 3, 500000.00, DATEADD(hour, 7, GETUTCDATE())),
+(2, 4, 500000.00, DATEADD(hour, 7, GETUTCDATE()));
 GO
 
 -- ═══════════════════════════════════════════════════════════

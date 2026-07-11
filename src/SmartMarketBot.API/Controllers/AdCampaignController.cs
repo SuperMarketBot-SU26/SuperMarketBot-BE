@@ -11,7 +11,7 @@ namespace SmartMarketBot.API.Controllers;
 public sealed class AdCampaignController(
     IAdCampaignService adCampaignService) : ControllerBase
 {
-    [HttpGet("robot-playlist/{robotId:int}")]
+    [HttpGet("robot-playlist/{robotId}")]
     [AllowAnonymous]
     public async Task<ActionResult<RobotPlaylistResponseDto>> GetRobotPlaylist(
         int robotId,
@@ -19,6 +19,40 @@ public sealed class AdCampaignController(
         CancellationToken cancellationToken)
     {
         var result = await adCampaignService.GetRobotPlaylistAsync(robotId, semanticObjectId, cancellationToken);
+        return Ok(result);
+    }
+
+    [HttpGet("robot-playlist/{robotId}/zone/{zoneId:int}")]
+    [AllowAnonymous]
+    public async Task<ActionResult<ZonePlaylistResponseDto>> GetZonePlaylist(
+        int robotId,
+        int zoneId,
+        CancellationToken cancellationToken)
+    {
+        var result = await adCampaignService.GetZonePlaylistAsync(robotId, zoneId, cancellationToken);
+        return Ok(result);
+    }
+
+    [HttpGet("robot-playlist/{robotId}/autonomous")]
+    [AllowAnonymous]
+    public async Task<ActionResult<AutonomousRouteDto>> GetAutonomousRoute(
+        int robotId,
+        CancellationToken cancellationToken)
+    {
+        var result = await adCampaignService.GetAutonomousRouteAsync(robotId, cancellationToken);
+        if (result == null)
+            return NotFound(new { message = "No active route assigned to this robot." });
+        return Ok(result);
+    }
+
+    [HttpGet("robot-playlist/{robotId}/node/{nodeId:int}")]
+    [AllowAnonymous]
+    public async Task<ActionResult<RobotPlaylistResponseDto>> GetPlaylistForNode(
+        int robotId,
+        int nodeId,
+        CancellationToken cancellationToken)
+    {
+        var result = await adCampaignService.GetPlaylistForNodeAsync(robotId, nodeId, cancellationToken);
         return Ok(result);
     }
 

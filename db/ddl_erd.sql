@@ -257,8 +257,10 @@ CREATE TABLE BRAND (
 CREATE TABLE AD_PACKAGE (
     PackageID      INT IDENTITY(1,1) PRIMARY KEY,
     PackageName    NVARCHAR(100)  NOT NULL,
-    PricePackage   DECIMAL(18,2) NOT NULL DEFAULT 0,   -- giá gói cố định
-    PriceRoute     DECIMAL(18,2) NOT NULL DEFAULT 0,   -- giá theo lộ trình
+    PricePackage   DECIMAL(18,2) NOT NULL DEFAULT 0,   -- giá gói cố định (charge 1 lần)
+    PriceRoute     DECIMAL(18,2) NOT NULL DEFAULT 0,   -- đơn giá / 1 route (charge = PriceRoute × count)
+    PriceZone      DECIMAL(18,2) NOT NULL DEFAULT 0,   -- đơn giá / 1 zone  (charge = PriceZone × count)
+    PriceShelf     DECIMAL(18,2) NOT NULL DEFAULT 0,   -- đơn giá / 1 shelf (charge = PriceShelf × 1 nếu có SemanticObjectId)
     BasePriceClick DECIMAL(18,2) NOT NULL DEFAULT 0,
     AdScore        INT           NOT NULL DEFAULT 0,
     Status         NVARCHAR(50)  NOT NULL DEFAULT N'Active'
@@ -290,6 +292,18 @@ CREATE TABLE AD_CAMPAIGN (
     CONSTRAINT FK_ADC_ROBOTZONE  FOREIGN KEY (RobotZoneID) REFERENCES ROBOT_ZONE(RobotZoneID) ON DELETE SET NULL
 );
 CREATE INDEX IX_ADC_Status_Dates ON AD_CAMPAIGN(Status, StartDate, EndDate);
+
+-- Liên kết N-N giữa AdCampaign và RobotRoute. PriceRoute = đơn giá/1 route, charge lúc activate.
+CREATE TABLE AD_CAMPAIGN_ROUTE (
+    AdCampaignID        INT            NOT NULL,
+    RobotRouteID        INT            NOT NULL,
+    RoutePriceCharged   DECIMAL(18,2)  NOT NULL DEFAULT 0,
+    PurchasedAt         DATETIME2      NOT NULL DEFAULT DATEADD(hour, 7, GETUTCDATE()),
+    CONSTRAINT PK_AD_CAMPAIGN_ROUTE PRIMARY KEY (AdCampaignID, RobotRouteID),
+    CONSTRAINT FK_ACR_ADCAMPAIGN FOREIGN KEY (AdCampaignID) REFERENCES AD_CAMPAIGN(AdCampaignID) ON DELETE CASCADE,
+    CONSTRAINT FK_ACR_ROBOT_ROUTE FOREIGN KEY (RobotRouteID) REFERENCES ROBOT_ROUTE(RobotRouteID) ON DELETE CASCADE
+);
+CREATE INDEX IX_ACR_RobotRouteID ON AD_CAMPAIGN_ROUTE(RobotRouteID);
 
 CREATE TABLE SPONSORED_PRODUCT (
     SponsoredID    INT IDENTITY(1,1) PRIMARY KEY,

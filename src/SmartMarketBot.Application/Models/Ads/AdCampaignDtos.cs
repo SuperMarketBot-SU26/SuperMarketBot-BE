@@ -14,7 +14,8 @@ public sealed record CampaignResponseDto(
     DateTime EndDate,
     string Status,
     int SponsoredProductCount,
-    decimal TotalSpent);
+    decimal TotalSpent,
+    IReadOnlyList<int> RouteIds);
 
 public sealed record CreateCampaignRequestDto
 {
@@ -28,6 +29,14 @@ public sealed record CreateCampaignRequestDto
 
     [Range(1, int.MaxValue, ErrorMessage = "SemanticObjectId không hợp lệ.")]
     public int? SemanticObjectId { get; init; }
+
+    public List<int>? ZoneIds { get; init; }
+
+    /// <summary>
+    /// Danh sách RobotRouteId mà campaign muốn phát. Activate sẽ charge
+    /// <c>PriceRoute * RouteIds.Count</c>. Bắt buộc có ít nhất 1 route khi activate.
+    /// </summary>
+    public List<int>? RouteIds { get; init; }
 
     [Required(ErrorMessage = "CampaignName không được để trống.")]
     [MaxLength(200, ErrorMessage = "CampaignName không được vượt quá 200 ký tự.")]
@@ -57,7 +66,31 @@ public sealed record UpdateCampaignRequestDto
 
     [Range(1, int.MaxValue, ErrorMessage = "SemanticObjectId không hợp lệ.")]
     public int? SemanticObjectId { get; init; }
+
+    public List<int>? ZoneIds { get; init; }
+
+    public List<int>? RouteIds { get; init; }
 }
+
+public sealed record AssignCampaignRoutesRequestDto
+{
+    [Required(ErrorMessage = "Danh sách RobotRouteId là bắt buộc.")]
+    [MinLength(1, ErrorMessage = "Phải có ít nhất 1 route.")]
+    public required List<int> RouteIds { get; init; }
+}
+
+public sealed record CampaignRouteDto(
+    int RobotRouteId,
+    string RouteName,
+    decimal RoutePriceCharged,
+    DateTime PurchasedAt);
+
+public sealed record CampaignRoutesResponseDto(
+    int AdCampaignId,
+    int BrandId,
+    int RouteCount,
+    decimal TotalRouteCharge,
+    IReadOnlyList<CampaignRouteDto> Routes);
 
 public sealed record ActivateCampaignResponseDto(
     int AdCampaignId,

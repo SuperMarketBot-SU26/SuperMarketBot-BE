@@ -98,6 +98,12 @@ public sealed class AdCampaignService(
         if (request.EndDate <= request.StartDate)
             throw new ArgumentException(localizer.Get("EndDateMustBeAfterStartDate"));
 
+        // Snapshot giá shelf tại lúc tạo (nếu có SemanticObjectId)
+        // Lưu ngay tại Create để Charge mỗi impression chính xác khi robot đến kệ.
+        // Khi brand đổi Package, cần update cả 3 snapshot (RoutePriceCharged / ZonePriceCharged / ShelfPriceCharged).
+        var packageForSnapshot = await db.AdPackages.AsNoTracking()
+            .FirstOrDefaultAsync(p => p.PackageId == request.PackageId, cancellationToken);
+
         var campaign = new AdCampaign
         {
             PackageId = request.PackageId,
@@ -109,8 +115,33 @@ public sealed class AdCampaignService(
             Status = CampaignStatus.Inactive
         };
 
+        if (request.SemanticObjectId.HasValue)
+        {
+            campaign.ShelfPriceCharged = packageForSnapshot?.PriceShelf ?? 0m;
+            campaign.ShelfPurchasedAt = DateTime.UtcNow;
+        }
+
         db.AdCampaigns.Add(campaign);
         await db.SaveChangesAsync(cancellationToken);
+
+        if (request.ZoneIds is { Count: > 0 })
+        {
+            var zonePrice = packageForSnapshot?.PriceZone ?? 0m;
+            var adCampaignZones = request.ZoneIds.Distinct().Select(zoneId => new AdCampaignZone
+            {
+                AdCampaignId = campaign.AdCampaignId,
+                ZoneId = zoneId,
+                ZonePriceCharged = zonePrice,
+                PurchasedAt = DateTime.UtcNow
+            });
+            db.AdCampaignZones.AddRange(adCampaignZones);
+            await db.SaveChangesAsync(cancellationToken);
+        }
+
+        if (request.RouteIds is { Count: > 0 })
+        {
+            await AssignRoutesInternalAsync(campaign, request.RouteIds, cancellationToken);
+        }
 
         if (request.ProductIds is { Count: > 0 })
         {
@@ -122,6 +153,7 @@ public sealed class AdCampaignService(
             .Include(c => c.Package)
             .Include(c => c.Brand)
             .Include(c => c.SponsoredProducts)
+            .Include(c => c.AdCampaignRoutes)
             .FirstAsync(c => c.AdCampaignId == campaign.AdCampaignId, cancellationToken);
 
         return MapCampaignToDto(result);
@@ -166,8 +198,33 @@ public sealed class AdCampaignService(
                 Status = CampaignStatus.Inactive
             };
 
+            // Snapshot giá tại lúc tạo (route + zone + shelf)
+            if (request.SemanticObjectId.HasValue)
+            {
+                campaign.ShelfPriceCharged = package.PriceShelf;
+                campaign.ShelfPurchasedAt = DateTime.UtcNow;
+            }
+
             db.AdCampaigns.Add(campaign);
             await db.SaveChangesAsync(cancellationToken);
+
+            if (request.ZoneIds is { Count: > 0 })
+            {
+                var adCampaignZones = request.ZoneIds.Distinct().Select(zoneId => new AdCampaignZone
+                {
+                    AdCampaignId = campaign.AdCampaignId,
+                    ZoneId = zoneId,
+                    ZonePriceCharged = package.PriceZone,
+                    PurchasedAt = DateTime.UtcNow
+                });
+                db.AdCampaignZones.AddRange(adCampaignZones);
+                await db.SaveChangesAsync(cancellationToken);
+            }
+
+            if (request.RouteIds is { Count: > 0 })
+            {
+                await AssignRoutesInternalAsync(campaign, request.RouteIds, cancellationToken);
+            }
 
             var sponsoredProducts = request.ProductIds
                 .Distinct()
@@ -214,6 +271,8 @@ public sealed class AdCampaignService(
             .Include(c => c.Brand)
             .Include(c => c.SponsoredProducts)
             .Include(c => c.AdCampaignLogs)
+            .Include(c => c.AdCampaignZones)
+            .Include(c => c.AdCampaignRoutes)
             .FirstOrDefaultAsync(c => c.AdCampaignId == campaignId, cancellationToken)
             ?? throw new KeyNotFoundException(localizer.Get("CampaignNotFound", campaignId));
 
@@ -226,7 +285,48 @@ public sealed class AdCampaignService(
         campaign.CampaignName = request.CampaignName;
         campaign.StartDate = request.StartDate;
         campaign.EndDate = request.EndDate;
-        campaign.SemanticObjectId = request.SemanticObjectId;
+
+        // Cập nhật SemanticObjectId kèm snapshot giá shelf (nếu có thay đổi).
+        if (campaign.SemanticObjectId != request.SemanticObjectId)
+        {
+            campaign.SemanticObjectId = request.SemanticObjectId;
+            campaign.ShelfPriceCharged = request.SemanticObjectId.HasValue && campaign.Package is not null
+                ? campaign.Package.PriceShelf
+                : 0m;
+            campaign.ShelfPurchasedAt = request.SemanticObjectId.HasValue ? DateTime.UtcNow : null;
+        }
+
+        // Update zones if provided
+        if (request.ZoneIds != null)
+        {
+            // Remove existing zones
+            db.AdCampaignZones.RemoveRange(campaign.AdCampaignZones);
+
+            // Add new zones (snapshot ZonePriceCharged từ package hiện tại)
+            if (request.ZoneIds.Count > 0)
+            {
+                var zonePrice = campaign.Package?.PriceZone ?? 0m;
+                var newZones = request.ZoneIds.Distinct().Select(zoneId => new AdCampaignZone
+                {
+                    AdCampaignId = campaignId,
+                    ZoneId = zoneId,
+                    ZonePriceCharged = zonePrice,
+                    PurchasedAt = DateTime.UtcNow
+                });
+                db.AdCampaignZones.AddRange(newZones);
+            }
+        }
+
+        // Update routes if provided (chỉ khi Inactive — đã check ở trên)
+        if (request.RouteIds != null)
+        {
+            db.AdCampaignRoutes.RemoveRange(campaign.AdCampaignRoutes);
+            campaign.AdCampaignRoutes.Clear();
+            if (request.RouteIds.Count > 0)
+            {
+                await AssignRoutesInternalAsync(campaign, request.RouteIds, cancellationToken);
+            }
+        }
 
         await db.SaveChangesAsync(cancellationToken);
 
@@ -251,6 +351,8 @@ public sealed class AdCampaignService(
         var campaign = await db.AdCampaigns
             .Include(c => c.Package)
             .Include(c => c.Brand)
+            .Include(c => c.AdCampaignRoutes)
+            .Include(c => c.AdCampaignZones)
             .FirstOrDefaultAsync(c => c.AdCampaignId == campaignId, cancellationToken)
             ?? throw new KeyNotFoundException(localizer.Get("CampaignNotFound", campaignId));
 
@@ -265,7 +367,23 @@ public sealed class AdCampaignService(
             if (campaign.Package is null)
                 throw new InvalidOperationException(localizer.Get("CampaignNoPackage"));
 
-            var totalCost = campaign.Package.PricePackage + campaign.Package.PriceRoute;
+            // Charge 3 luồng targeting (nếu có) + phí cố định:
+            //   PricePackage                                       (cố định)
+            // + PriceRoute × AdCampaignRoutes.Count               (theo route)
+            // + PriceZone  × AdCampaignZones.Count                (theo zone)
+            // + PriceShelf × (SemanticObjectId.HasValue ? 1 : 0)  (theo kệ cụ thể)
+            // Bắt buộc ≥ 1 loại targeting để tránh "đi phát miễn phí".
+            var routeCount = campaign.AdCampaignRoutes.Select(r => r.RobotRouteId).Distinct().Count();
+            var zoneCount = campaign.AdCampaignZones.Select(z => z.ZoneId).Distinct().Count();
+            var hasShelf = campaign.SemanticObjectId.HasValue;
+            if (routeCount == 0 && zoneCount == 0 && !hasShelf)
+                throw new InvalidOperationException(localizer.Get("CampaignNoTargeting"));
+
+            var routeCost = campaign.Package.PriceRoute * routeCount;
+            var zoneCost = campaign.Package.PriceZone * zoneCount;
+            var shelfCost = hasShelf ? campaign.Package.PriceShelf : 0m;
+            var totalCost = campaign.Package.PricePackage + routeCost + zoneCost + shelfCost;
+
             var isInMemory = db.Database.ProviderName?.Contains("InMemory", StringComparison.OrdinalIgnoreCase) == true;
 
             if (isInMemory)
@@ -291,8 +409,12 @@ public sealed class AdCampaignService(
                 await db.SaveChangesAsync(cancellationToken);
 
                 logger.LogInformation(
-                    "Campaign {CampaignId} activated (InMemory). Charged {Amount}. Remaining: {Balance}",
-                    campaignId, totalCost, campaign.Brand!.Wallet);
+                    "Campaign {CampaignId} activated (InMemory). Charged {Amount} (Pkg={Pkg}+R{routeCount}*{priceRoute}+Z{zoneCount}*{priceZone}+Shelf={priceShelf}). Remaining: {Balance}",
+                    campaignId, totalCost,
+                    campaign.Package.PricePackage, routeCount, campaign.Package.PriceRoute,
+                    zoneCount, campaign.Package.PriceZone,
+                    campaign.Package.PriceShelf,
+                    campaign.Brand!.Wallet);
 
                 campaign.Status = CampaignStatus.Active;
                 return new ActivateCampaignResponseDto(
@@ -328,8 +450,8 @@ public sealed class AdCampaignService(
                 await transaction.CommitAsync(cancellationToken);
 
                 logger.LogInformation(
-                    "Campaign {CampaignId} activated. Charged {Amount} from Brand {BrandId} wallet. Remaining: {Balance}",
-                    campaignId, totalCost, campaign.BrandId, newBalance);
+                    "Campaign {CampaignId} activated. Charged {Amount} (R={routeCount}, Z={zoneCount}, Shelf={hasShelf}) from Brand {BrandId}. Remaining: {Balance}",
+                    campaignId, totalCost, routeCount, zoneCount, hasShelf, campaign.BrandId, newBalance);
 
                 campaign.Status = CampaignStatus.Active;
                 return new ActivateCampaignResponseDto(
@@ -826,12 +948,321 @@ public sealed class AdCampaignService(
 
     private static CampaignResponseDto MapCampaignToDto(AdCampaign c)
     {
+        var routeIds = c.AdCampaignRoutes?.Select(r => r.RobotRouteId).ToList()
+                       ?? (IReadOnlyList<int>)Array.Empty<int>();
         return new CampaignResponseDto(
             c.AdCampaignId, c.CampaignName,
             c.PackageId, c.Package?.PackageName ?? string.Empty,
             c.BrandId, c.Brand?.BrandName ?? string.Empty,
             c.SemanticObjectId, c.StartDate, c.EndDate, c.Status,
             c.SponsoredProducts?.Count ?? 0,
-            c.AdCampaignLogs?.Sum(l => l.ChargedAmount) ?? 0);
+            c.AdCampaignLogs?.Sum(l => l.ChargedAmount) ?? 0,
+            routeIds);
+    }
+
+    /// <summary>
+    /// Validate route ids tồn tại và insert row AdCampaignRoute. Charge PriceRoute/row.
+    /// Dùng trong Create / Update / AssignRoutes. Snapshot giá tại thời điểm mua.
+    /// </summary>
+    private async Task AssignRoutesInternalAsync(
+        AdCampaign campaign,
+        List<int> routeIds,
+        CancellationToken cancellationToken)
+    {
+        var distinctIds = routeIds.Distinct().ToList();
+        var existingRouteIds = await db.RobotRoutes
+            .Where(r => distinctIds.Contains(r.RobotRouteId))
+            .Select(r => r.RobotRouteId)
+            .ToListAsync(cancellationToken);
+        var missing = distinctIds.Except(existingRouteIds).ToList();
+        if (missing.Count != 0)
+            throw new KeyNotFoundException(localizer.Get("RobotRouteNotFound", string.Join(", ", missing)));
+
+        var existingOnCampaign = campaign.AdCampaignRoutes
+            .Select(r => r.RobotRouteId)
+            .ToHashSet();
+        var newIds = distinctIds.Where(id => !existingOnCampaign.Contains(id)).ToList();
+
+        var pricePerRoute = campaign.Package?.PriceRoute ?? 0m;
+        var newRows = newIds.Select(id => new AdCampaignRoute
+        {
+            AdCampaignId = campaign.AdCampaignId,
+            RobotRouteId = id,
+            RoutePriceCharged = pricePerRoute,
+            PurchasedAt = DateTime.UtcNow
+        });
+        db.AdCampaignRoutes.AddRange(newRows);
+        await db.SaveChangesAsync(cancellationToken);
+
+        logger.LogInformation(
+            "Campaign {CampaignId} assigned {Count} new routes. PricePerRoute={Price}",
+            campaign.AdCampaignId, newIds.Count, pricePerRoute);
+    }
+
+    public async Task<CampaignRoutesResponseDto> AssignRoutesAsync(
+        int campaignId,
+        AssignCampaignRoutesRequestDto request,
+        CancellationToken cancellationToken = default)
+    {
+        var campaign = await db.AdCampaigns
+            .Include(c => c.Package)
+            .Include(c => c.AdCampaignRoutes)
+                .ThenInclude(acr => acr.RobotRoute)
+            .FirstOrDefaultAsync(c => c.AdCampaignId == campaignId, cancellationToken)
+            ?? throw new KeyNotFoundException(localizer.Get("CampaignNotFound", campaignId));
+
+        // Chỉ cho assign khi chưa Active hoặc Paused (tránh chi phí phát sinh giữa chừng)
+        if (campaign.Status == CampaignStatus.Active)
+            throw new InvalidOperationException(localizer.Get("CampaignAlreadyActive"));
+
+        await AssignRoutesInternalAsync(campaign, request.RouteIds, cancellationToken);
+
+        return await GetAssignedRoutesInternalAsync(campaignId, cancellationToken);
+    }
+
+    public async Task<CampaignRoutesResponseDto> GetAssignedRoutesAsync(
+        int campaignId,
+        CancellationToken cancellationToken = default)
+    {
+        var exists = await db.AdCampaigns.AnyAsync(c => c.AdCampaignId == campaignId, cancellationToken);
+        if (!exists)
+            throw new KeyNotFoundException(localizer.Get("CampaignNotFound", campaignId));
+
+        return await GetAssignedRoutesInternalAsync(campaignId, cancellationToken);
+    }
+
+    private async Task<CampaignRoutesResponseDto> GetAssignedRoutesInternalAsync(
+        int campaignId,
+        CancellationToken cancellationToken)
+    {
+        var campaign = await db.AdCampaigns
+            .AsNoTracking()
+            .Include(c => c.Brand)
+            .Include(c => c.AdCampaignRoutes)
+                .ThenInclude(acr => acr.RobotRoute)
+            .FirstAsync(c => c.AdCampaignId == campaignId, cancellationToken);
+
+        var routes = campaign.AdCampaignRoutes
+            .Select(acr => new CampaignRouteDto(
+                acr.RobotRouteId,
+                acr.RobotRoute?.RouteName ?? string.Empty,
+                acr.RoutePriceCharged,
+                acr.PurchasedAt))
+            .ToList();
+
+        return new CampaignRoutesResponseDto(
+            campaign.AdCampaignId,
+            campaign.BrandId,
+            routes.Count,
+            routes.Sum(r => r.RoutePriceCharged),
+            routes);
+    }
+
+    public async Task<ZonePlaylistResponseDto> GetZonePlaylistAsync(
+        int robotId, int zoneId, CancellationToken cancellationToken = default)
+    {
+        var robotExists = await db.Robots
+            .AsNoTracking()
+            .AnyAsync(r => r.RobotId == robotId, cancellationToken);
+        if (!robotExists)
+            throw new KeyNotFoundException(localizer.Get("RobotNotFound", robotId));
+
+        var zoneExists = await db.Zones
+            .AsNoTracking()
+            .AnyAsync(z => z.ZoneId == zoneId, cancellationToken);
+        if (!zoneExists)
+            throw new KeyNotFoundException(localizer.Get("ZoneNotFound", zoneId));
+
+        var now = DateTime.UtcNow;
+
+        var playlistItems = await (from sp in db.SponsoredProducts.AsNoTracking()
+                                   join acz in db.AdCampaignZones.AsNoTracking()
+                                       on sp.AdCampaignId equals acz.AdCampaignId
+                                   where acz.ZoneId == zoneId
+                                         && sp.Status == SponsoredProductStatus.Active
+                                         && sp.AdCampaign.Status == CampaignStatus.Active
+                                         && sp.AdCampaign.StartDate <= now
+                                         && sp.AdCampaign.EndDate >= now
+                                   orderby sp.AdCampaign.Package.AdScore descending,
+                                           sp.Priority descending,
+                                           sp.AdCampaign.EndDate
+                                   select new RobotPlaylistItemDto
+                                   {
+                                       SponsoredId = sp.SponsoredId,
+                                       AdCampaignId = sp.AdCampaignId,
+                                       CampaignName = sp.AdCampaign.CampaignName,
+                                       ProductId = sp.ProductId,
+                                       ProductName = sp.Product.ProductName,
+                                       ProductPrice = sp.Product.UnitPrice,
+                                       Priority = sp.Priority,
+                                       AdScore = sp.AdCampaign.Package.AdScore,
+                                       EndDate = sp.AdCampaign.EndDate,
+                                       ImageUrl = sp.Product.ImageUrl ?? string.Empty,
+                                       DisplayDurationSeconds = 30,
+                                       MediaContents = sp.AdCampaign.AdResources
+                                           .Where(r => r.Status == AdResourceStatus.Active)
+                                           .Select(r => new MediaContentDto(
+                                               r.ResourceType,
+                                               r.ResourceUrl,
+                                               r.ContentText,
+                                               r.Resolution))
+                                           .ToList()
+                                   })
+                                   .ToListAsync(cancellationToken);
+
+        return new ZonePlaylistResponseDto(robotId, zoneId, null, playlistItems, DateTime.UtcNow);
+    }
+
+    public async Task<AutonomousRouteDto?> GetAutonomousRouteAsync(
+        int robotId, CancellationToken cancellationToken = default)
+    {
+        var robotExists = await db.Robots
+            .AsNoTracking()
+            .AnyAsync(r => r.RobotId == robotId, cancellationToken);
+        if (!robotExists)
+            throw new KeyNotFoundException(localizer.Get("RobotNotFound", robotId));
+
+        var routeAssignment = await db.RouteAssignments
+            .AsNoTracking()
+            .Include(ra => ra.RobotRoute)
+                .ThenInclude(rr => rr!.RouteNodeMappings.OrderBy(n => n.SequenceOrder))
+                    .ThenInclude(n => n.Node)
+            .Where(ra => ra.RobotId == robotId && ra.Status == "Active")
+            .OrderByDescending(ra => ra.AssignedAt)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        if (routeAssignment?.RobotRoute == null)
+            return null;
+
+        var robotRoute = routeAssignment.RobotRoute;
+        var now = DateTime.UtcNow;
+
+        var stops = new List<AutonomousRouteStopDto>();
+        foreach (var routeNode in robotRoute.RouteNodeMappings.OrderBy(n => n.SequenceOrder))
+        {
+            var aisleNode = await db.AisleNodes
+                .AsNoTracking()
+                .Include(an => an.Aisle)
+                .FirstOrDefaultAsync(an => an.NodeId == routeNode.NodeId, cancellationToken);
+
+            List<RobotPlaylistItemDto> playlistItems;
+
+            if (aisleNode?.Aisle?.ZoneId != null)
+            {
+                playlistItems = await (from sp in db.SponsoredProducts.AsNoTracking()
+                                      join acz in db.AdCampaignZones.AsNoTracking()
+                                          on sp.AdCampaignId equals acz.AdCampaignId
+                                      where acz.ZoneId == aisleNode.Aisle.ZoneId
+                                            && sp.Status == SponsoredProductStatus.Active
+                                            && sp.AdCampaign.Status == CampaignStatus.Active
+                                            && sp.AdCampaign.StartDate <= now
+                                            && sp.AdCampaign.EndDate >= now
+                                      orderby sp.AdCampaign.Package.AdScore descending,
+                                              sp.Priority descending
+                                      select new RobotPlaylistItemDto
+                                      {
+                                          SponsoredId = sp.SponsoredId,
+                                          AdCampaignId = sp.AdCampaignId,
+                                          CampaignName = sp.AdCampaign.CampaignName,
+                                          ProductId = sp.ProductId,
+                                          ProductName = sp.Product.ProductName,
+                                          ProductPrice = sp.Product.UnitPrice,
+                                          Priority = sp.Priority,
+                                          AdScore = sp.AdCampaign.Package.AdScore,
+                                          EndDate = sp.AdCampaign.EndDate,
+                                          ImageUrl = sp.Product.ImageUrl ?? string.Empty,
+                                          DisplayDurationSeconds = 30,
+                                          MediaContents = sp.AdCampaign.AdResources
+                                              .Where(r => r.Status == AdResourceStatus.Active)
+                                              .Select(r => new MediaContentDto(
+                                                  r.ResourceType,
+                                                  r.ResourceUrl,
+                                                  r.ContentText,
+                                                  r.Resolution))
+                                              .ToList()
+                                      })
+                                      .ToListAsync(cancellationToken);
+            }
+            else
+            {
+                playlistItems = [];
+            }
+
+            stops.Add(new AutonomousRouteStopDto(
+                routeNode.SequenceOrder,
+                routeNode.NodeId,
+                routeNode.Node?.NodeName,
+                routeNode.DwellTimeSeconds,
+                playlistItems));
+        }
+
+        return new AutonomousRouteDto(
+            robotRoute.RobotRouteId,
+            robotRoute.RouteName ?? string.Empty,
+            robotRoute.Description,
+            stops,
+            DateTime.UtcNow);
+    }
+
+    public async Task<RobotPlaylistResponseDto> GetPlaylistForNodeAsync(
+        int robotId, int nodeId, CancellationToken cancellationToken = default)
+    {
+        var robotExists = await db.Robots
+            .AsNoTracking()
+            .AnyAsync(r => r.RobotId == robotId, cancellationToken);
+        if (!robotExists)
+            throw new KeyNotFoundException(localizer.Get("RobotNotFound", robotId));
+
+        var now = DateTime.UtcNow;
+
+        var aisleNode = await db.AisleNodes
+            .AsNoTracking()
+            .Include(an => an.Aisle)
+            .FirstOrDefaultAsync(an => an.NodeId == nodeId, cancellationToken);
+
+        List<RobotPlaylistItemDto> playlistItems;
+
+        if (aisleNode?.Aisle?.ZoneId != null)
+        {
+            playlistItems = await (from sp in db.SponsoredProducts.AsNoTracking()
+                                   join acz in db.AdCampaignZones.AsNoTracking()
+                                       on sp.AdCampaignId equals acz.AdCampaignId
+                                   where acz.ZoneId == aisleNode.Aisle.ZoneId
+                                         && sp.Status == SponsoredProductStatus.Active
+                                         && sp.AdCampaign.Status == CampaignStatus.Active
+                                         && sp.AdCampaign.StartDate <= now
+                                         && sp.AdCampaign.EndDate >= now
+                                   orderby sp.AdCampaign.Package.AdScore descending,
+                                           sp.Priority descending
+                                   select new RobotPlaylistItemDto
+                                   {
+                                       SponsoredId = sp.SponsoredId,
+                                       AdCampaignId = sp.AdCampaignId,
+                                       CampaignName = sp.AdCampaign.CampaignName,
+                                       ProductId = sp.ProductId,
+                                       ProductName = sp.Product.ProductName,
+                                       ProductPrice = sp.Product.UnitPrice,
+                                       Priority = sp.Priority,
+                                       AdScore = sp.AdCampaign.Package.AdScore,
+                                       EndDate = sp.AdCampaign.EndDate,
+                                       ImageUrl = sp.Product.ImageUrl ?? string.Empty,
+                                       DisplayDurationSeconds = 30,
+                                       MediaContents = sp.AdCampaign.AdResources
+                                           .Where(r => r.Status == AdResourceStatus.Active)
+                                           .Select(r => new MediaContentDto(
+                                               r.ResourceType,
+                                               r.ResourceUrl,
+                                               r.ContentText,
+                                               r.Resolution))
+                                           .ToList()
+                                   })
+                                   .ToListAsync(cancellationToken);
+        }
+        else
+        {
+            playlistItems = [];
+        }
+
+        return new RobotPlaylistResponseDto(robotId, aisleNode?.Aisle?.ZoneId, playlistItems, DateTime.UtcNow, null);
     }
 }

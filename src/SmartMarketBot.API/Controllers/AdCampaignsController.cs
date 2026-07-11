@@ -101,6 +101,32 @@ public sealed class AdCampaignsController(
         var result = await adCampaignService.GetCampaignLogsAsync(campaignId, pageNumber, pageSize, cancellationToken);
         return Ok(result);
     }
+
+    /// <summary>
+    /// Gán danh sách RobotRoute (đã mua quyền phát) cho campaign hiện tại.
+    /// Chỉ thao tác được khi campaign ở trạng thái Inactive / Paused.
+    /// </summary>
+    [HttpPost("{campaignId:int}/routes")]
+    public async Task<ActionResult<CampaignRoutesResponseDto>> AssignRoutes(
+        int campaignId,
+        [FromBody] AssignCampaignRoutesRequestDto request,
+        CancellationToken cancellationToken)
+    {
+        var result = await adCampaignService.AssignRoutesAsync(campaignId, request, cancellationToken);
+        return Ok(result);
+    }
+
+    /// <summary>
+    /// Xem danh sách RobotRoute mà campaign đã mua quyền phát.
+    /// </summary>
+    [HttpGet("{campaignId:int}/routes")]
+    public async Task<ActionResult<CampaignRoutesResponseDto>> GetRoutes(
+        int campaignId,
+        CancellationToken cancellationToken)
+    {
+        var result = await adCampaignService.GetAssignedRoutesAsync(campaignId, cancellationToken);
+        return Ok(result);
+    }
 }
 
 public sealed record PauseCampaignRequestDto(string? Reason);

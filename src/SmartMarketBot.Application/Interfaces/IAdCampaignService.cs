@@ -24,6 +24,20 @@ public interface IAdCampaignService
     Task ProcessOutOfStockAsync(int campaignId, CancellationToken cancellationToken = default);
 
     Task<RobotPlaylistResponseDto> GetRobotPlaylistAsync(int robotId, int? semanticObjectId, CancellationToken cancellationToken = default);
+    Task<ZonePlaylistResponseDto> GetZonePlaylistAsync(int robotId, int zoneId, CancellationToken cancellationToken = default);
+    Task<AutonomousRouteDto?> GetAutonomousRouteAsync(int robotId, CancellationToken cancellationToken = default);
+    Task<RobotPlaylistResponseDto> GetPlaylistForNodeAsync(int robotId, int nodeId, CancellationToken cancellationToken = default);
     Task<LogInteractionResponseDto> LogInteractionAsync(LogInteractionRequestDto request, CancellationToken cancellationToken = default);
     Task<PaginatedResponse<AdCampaignLogDto>> GetCampaignLogsAsync(int campaignId, int pageNumber, int pageSize, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Gán danh sách RobotRoute vào campaign. Charge thêm PriceRoute cho mỗi route mới.
+    /// Chỉ thao tác được khi campaign đang Inactive / Paused và đã mua package.
+    /// </summary>
+    Task<CampaignRoutesResponseDto> AssignRoutesAsync(int campaignId, AssignCampaignRoutesRequestDto request, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Lấy danh sách route mà campaign đã mua quyền phát.
+    /// </summary>
+    Task<CampaignRoutesResponseDto> GetAssignedRoutesAsync(int campaignId, CancellationToken cancellationToken = default);
 }

@@ -432,41 +432,67 @@ CREATE TABLE dbo.BRAND (
 CREATE TABLE dbo.AD_PACKAGE (
     PackageID       INT IDENTITY(1,1) PRIMARY KEY,
     PackageName     NVARCHAR(100)  NOT NULL,
-    PricePackage    DECIMAL(18,2)  NOT NULL DEFAULT 0,
-    PriceRoute      DECIMAL(18,2)  NOT NULL DEFAULT 0,
+    PricePackage    DECIMAL(18,2)  NOT NULL DEFAULT 0, -- phí cố định / campaign (charge 1 lần)
+    PriceRoute      DECIMAL(18,2)  NOT NULL DEFAULT 0, -- đơn giá / 1 route (charge × count)
+    PriceZone       DECIMAL(18,2)  NOT NULL DEFAULT 0, -- đơn giá / 1 zone  (charge × count)
+    PriceShelf      DECIMAL(18,2)  NOT NULL DEFAULT 0, -- đơn giá / 1 shelf (charge × 1 nếu có SemanticObjectID)
     BasePriceClick  DECIMAL(18,2)  NOT NULL DEFAULT 0,
     AdScore         INT            NOT NULL DEFAULT 0,
     Status          NVARCHAR(50)   NOT NULL  -- enum
 );
 
 CREATE TABLE dbo.AD_CAMPAIGN (
-    AdCampaignID    INT IDENTITY(1,1) PRIMARY KEY,
-    PackageID       INT            NOT NULL REFERENCES dbo.AD_PACKAGE(PackageID),
-    BrandID         INT            NOT NULL REFERENCES dbo.BRAND(BrandID),
-    RobotZoneID     INT            NULL REFERENCES dbo.ROBOT_ZONE(RobotZoneID) ON DELETE SET NULL, -- Cho phép NULL để tăng linh hoạt (Đã sửa)
-    CampaignName    NVARCHAR(200)  NOT NULL,
-    StartDate       DATETIME2      NOT NULL,
-    EndDate         DATETIME2      NOT NULL,
-    Status          NVARCHAR(50)   NOT NULL  -- enum
+    AdCampaignID      INT IDENTITY(1,1) PRIMARY KEY,
+    PackageID         INT            NOT NULL REFERENCES dbo.AD_PACKAGE(PackageID),
+    BrandID           INT            NOT NULL REFERENCES dbo.BRAND(BrandID),
+    SemanticObjectID  INT            NULL REFERENCES dbo.SEMANTIC_OBJECT(ObjectID) ON DELETE SET NULL, -- Kệ (shelf) cụ thể để phát quảng cáo
+    CampaignName      NVARCHAR(200)  NOT NULL,
+    StartDate         DATETIME2      NOT NULL,
+    EndDate           DATETIME2      NOT NULL,
+    Status            NVARCHAR(50)   NOT NULL,  -- enum: Inactive | Active | Paused | Completed | Canceled
+    -- Snapshot giá shelf tại lúc brand mua:
+    ShelfPriceCharged DECIMAL(18,2)  NOT NULL DEFAULT 0,
+    ShelfPurchasedAt  DATETIME2      NULL
 );
+CREATE INDEX IX_AD_CAMPAIGN_Status_Dates ON dbo.AD_CAMPAIGN(Status, StartDate, EndDate);
+
+-- Liên kết N-N: AdCampaign ↔ Zone (đơn giá × số zone)
+CREATE TABLE dbo.AD_CAMPAIGN_ZONE (
+    AdCampaignID      INT            NOT NULL REFERENCES dbo.AD_CAMPAIGN(AdCampaignID) ON DELETE CASCADE,
+    ZoneID            INT            NOT NULL REFERENCES dbo.ZONE(ZoneID)              ON DELETE CASCADE,
+    ZonePriceCharged  DECIMAL(18,2)  NOT NULL DEFAULT 0, -- snapshot giá tại lúc mua zone
+    PurchasedAt       DATETIME2      NOT NULL DEFAULT DATEADD(hour, 7, GETUTCDATE()),
+    CONSTRAINT PK_AD_CAMPAIGN_ZONE PRIMARY KEY (AdCampaignID, ZoneID)
+);
+CREATE INDEX IX_AD_CAMPAIGN_ZONE_ZoneID ON dbo.AD_CAMPAIGN_ZONE(ZoneID);
+
+-- Liên kết N-N: AdCampaign ↔ RobotRoute (đơn giá × số route)
+CREATE TABLE dbo.AD_CAMPAIGN_ROUTE (
+    AdCampaignID        INT            NOT NULL REFERENCES dbo.AD_CAMPAIGN(AdCampaignID) ON DELETE CASCADE,
+    RobotRouteID        INT            NOT NULL REFERENCES dbo.ROBOT_ROUTE(RobotRouteID)   ON DELETE CASCADE,
+    RoutePriceCharged   DECIMAL(18,2)  NOT NULL DEFAULT 0, -- snapshot giá tại lúc mua route
+    PurchasedAt         DATETIME2      NOT NULL DEFAULT DATEADD(hour, 7, GETUTCDATE()),
+    CONSTRAINT PK_AD_CAMPAIGN_ROUTE PRIMARY KEY (AdCampaignID, RobotRouteID)
+);
+CREATE INDEX IX_AD_CAMPAIGN_ROUTE_RouteID ON dbo.AD_CAMPAIGN_ROUTE(RobotRouteID);
 
 CREATE TABLE dbo.AD_CAMPAIGN_LOG (
-    LogID           INT IDENTITY(1,1) PRIMARY KEY,
-    AdCampaignID    INT            NOT NULL REFERENCES dbo.AD_CAMPAIGN(AdCampaignID) ON DELETE CASCADE,
-    ActionType      NVARCHAR(50)   NOT NULL,  -- Click | Navigation | Impression | FraudDetected
-    ChargedAmount   DECIMAL(18,2)  NOT NULL DEFAULT 0, -- Số tiền thực tế bị trừ của lượt tương tác
-    Timestamp       DATETIME2      NOT NULL DEFAULT DATEADD(hour, 7, GETUTCDATE()), -- Múi giờ Việt Nam (UTC+7)
+    LogID            INT IDENTITY(1,1) PRIMARY KEY,
+    AdCampaignID     INT            NOT NULL REFERENCES dbo.AD_CAMPAIGN(AdCampaignID) ON DELETE CASCADE,
+    ActionType       NVARCHAR(50)   NOT NULL,  -- Click | Navigation | Impression | RoutePass | FraudDetected
+    ChargedAmount    DECIMAL(18,2)  NOT NULL DEFAULT 0, -- Số tiền thực tế bị trừ của lượt tương tác
+    Timestamp        DATETIME2      NOT NULL DEFAULT DATEADD(hour, 7, GETUTCDATE()), -- Múi giờ Việt Nam (UTC+7)
     -- Chi tiết bổ sung theo loại tương tác (nullable để không phá dữ liệu cũ)
-    SponsoredID     INT            NULL,
-    ProductID       INT            NULL REFERENCES dbo.PRODUCT(ProductID),
-    RobotID         INT            NULL REFERENCES dbo.ROBOT(RobotID),
-    RobotZoneID     INT            NULL REFERENCES dbo.ROBOT_ZONE(RobotZoneID) ON DELETE SET NULL,
-    ZoneID          INT            NULL REFERENCES dbo.ZONE(ZoneID),
-    SlotID          INT            NULL REFERENCES dbo.SLOT(SlotID),
-    MemberID        INT            NULL REFERENCES dbo.MEMBER(MemberID) ON DELETE SET NULL,
-    SessionID       NVARCHAR(100)  NULL, -- Mã phiên tự sinh từ Robot để chống click-tặc ẩn danh
-    XCoord          INT            NULL,
-    YCoord          INT            NULL
+    SponsoredID      INT            NULL,
+    ProductID        INT            NULL REFERENCES dbo.PRODUCT(ProductID),
+    RobotID          INT            NULL REFERENCES dbo.ROBOT(RobotID),
+    SemanticObjectID INT            NULL REFERENCES dbo.SEMANTIC_OBJECT(ObjectID) ON DELETE SET NULL,
+    ZoneID           INT            NULL REFERENCES dbo.ZONE(ZoneID),
+    SlotID           INT            NULL REFERENCES dbo.SLOT(SlotID),
+    MemberID         INT            NULL REFERENCES dbo.MEMBER(MemberID) ON DELETE SET NULL,
+    SessionID        NVARCHAR(100)  NULL, -- Mã phiên tự sinh từ Robot để chống click-tặc ẩn danh
+    XCoord           INT            NULL,
+    YCoord           INT            NULL
 );
 CREATE INDEX IX_AD_CAMPAIGN_LOG_CAMPAIGN ON dbo.AD_CAMPAIGN_LOG(AdCampaignID);
 CREATE INDEX IX_AD_CAMPAIGN_LOG_ZONE     ON dbo.AD_CAMPAIGN_LOG(ZoneID, Timestamp DESC);

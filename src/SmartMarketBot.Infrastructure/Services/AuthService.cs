@@ -272,7 +272,7 @@ public sealed class AuthService(
     private async Task<(Member Member, double Similarity)?> FindBestFaceMatchAsync(
         List<double> probe, CancellationToken ct)
     {
-        const double Threshold = 0.85;
+        const double Threshold = 0.60;
 
         var members = await db.Members
             .Include(m => m.Account)

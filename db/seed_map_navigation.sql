@@ -3,6 +3,10 @@
 -- (Chạy SAU khi đã chạy erd_database.sql trên DB trống)
 -- ============================================================
 
+SET QUOTED_IDENTIFIER ON;
+SET ANSI_NULLS ON;
+GO
+
 USE SuperMarketBot;
 GO
 
@@ -28,29 +32,6 @@ DELETE FROM dbo.MEMBERSHIP;
 DELETE FROM dbo.MEMBER;
 DELETE FROM dbo.ACCOUNT;
 DELETE FROM dbo.ROBOT;
-GO
-
--- ─── 1. ACCOUNT (Admin + Staff + Member mẫu) ─────────────────
-SET IDENTITY_INSERT dbo.ACCOUNT ON;
-INSERT INTO dbo.ACCOUNT (AccountID, Username, PasswordHash, Email, Phone, FullName, Status, Role, OtpCode, OtpExpiredAt, OtpType, CreatedAt) VALUES
-(1, N'admin', N'pbkdf2$100000$YWFhYWFhYWFhYWFhYWFhYQ==$YjJiMmMzZDRlNWU2ZTcwZjE4MzQ1Njc4OTAxMjM0NTY3', N'admin@smartmarket.local', N'0900000001', N'System Admin', N'Active', N'Admin', NULL, NULL, NULL, DATEADD(hour, 7, GETUTCDATE())),
-(2, N'staff', N'pbkdf2$100000$YWFhYWFhYWFhYWFhYWFhYQ==$YjJiMmMzZDRlNWU2ZTcwZjE4MzQ1Njc4OTAxMjM0NTY3', N'staff@smartmarket.local', N'0900000002', N'Nguyễn Văn Khoa', N'Active', N'Staff', NULL, NULL, NULL, DATEADD(hour, 7, GETUTCDATE())),
-(3, N'member1', N'pbkdf2$100000$YWFhYWFhYWFhYWFhYWFhYQ==$YjJiMmMzZDRlNWU2ZTcwZjE4MzQ1Njc4OTAxMjM0NTY3', N'member1@smartmarket.local', N'0900000003', N'Nguyễn Văn A', N'Active', N'Member', NULL, NULL, NULL, DATEADD(hour, 7, GETUTCDATE())),
-(4, N'member2', N'pbkdf2$100000$YWFhYWFhYWFhYWFhYWFhYQ==$YjJiMmMzZDRlNWU2ZTcwZjE4MzQ1Njc4OTAxMjM0NTY3', N'member2@smartmarket.local', N'0900000004', N'Trần Thị Bình', N'Active', N'Member', NULL, NULL, NULL, DATEADD(hour, 7, GETUTCDATE())),
-(5, N'member3', N'pbkdf2$100000$YWFhYWFhYWFhYWFhYWFhYQ==$YjJiMmMzZDRlNWU2ZTcwZjE4MzQ1Njc4OTAxMjM0NTY3', N'member3@smartmarket.local', N'0900000005', N'Lê Minh Cường', N'Active', N'Member', NULL, NULL, NULL, DATEADD(hour, 7, GETUTCDATE())),
-(6, N'staff2', N'pbkdf2$100000$YWFhYWFhYWFhYWFhYWFhYQ==$YjJiMmMzZDRlNWU2ZTcwZjE4MzQ1Njc4OTAxMjM0NTY3', N'staff2@smartmarket.local', N'0900000006', N'Phạm Thị Dung', N'Active', N'Staff', NULL, NULL, NULL, DATEADD(hour, 7, GETUTCDATE())),
-(7, N'admin2', N'pbkdf2$100000$YWFhYWFhYWFhYWFhYWFhYQ==$YjJiMmMzZDRlNWU2ZTcwZjE4MzQ1Njc4OTAxMjM0NTY3', N'admin2@smartmarket.local', N'0900000007', N'Võ Hoàng Nam', N'Active', N'Admin', NULL, NULL, NULL, DATEADD(hour, 7, GETUTCDATE()));
-SET IDENTITY_INSERT dbo.ACCOUNT OFF;
-GO
-
--- ─── 2. MEMBER (mapping với Account #3-5) ────────────────────────
-SET IDENTITY_INSERT dbo.MEMBER ON;
-INSERT INTO dbo.MEMBER (MemberID, AccountID, FullName, FacePath, FaceVector, SpendingLimit, TotalPoints) VALUES
-(1, 3, N'Nguyễn Văn A', NULL, NULL, 500000.00, 100),
-(2, 4, N'Trần Thị Bình', NULL, NULL, 300000.00, 50),
-(3, 5, N'Lê Minh Cường', NULL, NULL, 1000000.00, 200),
-(4, NULL, N'Khách vãng lai', NULL, NULL, 0.00, 0);
-SET IDENTITY_INSERT dbo.MEMBER OFF;
 GO
 
 -- ─── 3. FLOOR + ZONE + AISLE + SHELF + SLOT (layout tối thiểu) ─
@@ -111,10 +92,10 @@ GO
 
 -- ─── 5. PRODUCT (3 sản phẩm mẫu) ─────────────────────────────
 SET IDENTITY_INSERT dbo.PRODUCT ON;
-INSERT INTO dbo.PRODUCT (ProductID, ProductTypeID, ProductName, UnitPrice, PromotionPrice, AdCampaignID, ExpiredDate, ImageUrl, WeightOrVolume, Unit, Description, Status, SubstituteProductID) VALUES
-(1, 1, N'Rau muống', 8000.00, NULL, NULL, NULL, NULL, 1.000, N'kg', N'Rau muống tươi', N'Available', NULL),
-(2, 1, N'Cải bó xôi', 12000.00, NULL, NULL, NULL, NULL, 0.500, N'kg', N'Cải bó xôi Đà Lạt', N'Available', NULL),
-(3, 2, N'Coca Cola', 10000.00, NULL, NULL, NULL, NULL, 330.000, N'ml', N'Nước ngọt có ga', N'Available', NULL);
+INSERT INTO dbo.PRODUCT (ProductID, ProductTypeID, ProductName, UnitPrice, PromotionPrice, ExpiredDate, ImageUrl, WeightOrVolume, Unit, Description, Status, SubstituteProductID) VALUES
+(1, 1, N'Rau muống', 8000.00, NULL, NULL, NULL, 1.000, N'kg', N'Rau muống tươi', N'Available', NULL),
+(2, 1, N'Cải bó xôi', 12000.00, NULL, NULL, NULL, 0.500, N'kg', N'Cải bó xôi Đà Lạt', N'Available', NULL),
+(3, 2, N'Coca Cola', 10000.00, NULL, NULL, NULL, 330.000, N'ml', N'Nước ngọt có ga', N'Available', NULL);
 SET IDENTITY_INSERT dbo.PRODUCT OFF;
 GO
 
@@ -144,7 +125,7 @@ SET IDENTITY_INSERT dbo.AD_PACKAGE OFF;
 GO
 
 SET IDENTITY_INSERT dbo.AD_CAMPAIGN ON;
-INSERT INTO dbo.AD_CAMPAIGN (AdCampaignID, PackageID, BrandID, RobotZoneID, CampaignName, StartDate, EndDate, Status) VALUES
+INSERT INTO dbo.AD_CAMPAIGN (AdCampaignID, PackageID, BrandID, SemanticObjectID, CampaignName, StartDate, EndDate, Status) VALUES
 (1, 1, 1, NULL, N'Coca mùa hè 2026', DATEADD(hour, 7, GETUTCDATE()), DATEADD(month, 3, DATEADD(hour, 7, GETUTCDATE())), N'Inactive');
 SET IDENTITY_INSERT dbo.AD_CAMPAIGN OFF;
 GO
@@ -164,25 +145,6 @@ INSERT INTO dbo.HEALTH_TAG (HealthTagID, TagName, TagType) VALUES
 SET IDENTITY_INSERT dbo.HEALTH_TAG OFF;
 GO
 
-INSERT INTO dbo.MEMBERHEALTH_PREFERENCE (MemberID, HealthTagID, status) VALUES
-(1, 1, N'Allergy');
-GO
-
--- ─── 10. MEMBERSHIP (phân hạng Bronze/Silver) ───────────────
-SET IDENTITY_INSERT dbo.MEMBERSHIP ON;
-INSERT INTO dbo.MEMBERSHIP (MembershipID, MemberID, TierName, Status) VALUES
-(1, 1, N'Bronze', N'Active'),
-(2, 2, N'Bronze', N'Active'),
-(3, 3, N'Silver', N'Active'),
-(4, NULL, N'Guest', N'Active');
-SET IDENTITY_INSERT dbo.MEMBERSHIP OFF;
-GO
-
--- ─── 11. ROBOT (1 robot mẫu cho smoke test IoT) ──────────────
-SET IDENTITY_INSERT dbo.ROBOT ON;
-INSERT INTO dbo.ROBOT (RobotID, RobotName, RobotCode, BatteryPct, Mode, Status, LastSeenAt) VALUES
-(1, N'Robot 01', N'RB001', 100, N'idle', N'Online', DATEADD(hour, 7, GETUTCDATE()));
-SET IDENTITY_INSERT dbo.ROBOT OFF;
 GO
 
 PRINT '✅ Seed data inserted successfully.';

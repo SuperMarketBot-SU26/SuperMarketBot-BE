@@ -320,7 +320,18 @@ INSERT INTO dbo.HEALTH_TAG (HealthTagID, TagName, TagType) VALUES
 (7, N'Keto', N'diet'),
 (8, N'Nhiều Vitamin C', N'nutrition'),
 (9, N'Giàu chất xơ', N'nutrition'),
-(10, N'Ít calo', N'nutrition');
+(10, N'Ít calo', N'nutrition'),
+(11, N'Đậu nành', N'allergy'),
+(12, N'Các loại hạt', N'allergy'),
+(13, N'Cá', N'allergy'),
+(14, N'Sữa', N'allergy'),
+(15, N'Organic', N'diet'),
+(16, N'Không chứa Gluten', N'diet'),
+(17, N'Eat Clean', N'diet'),
+(18, N'Địa Trung Hải', N'diet'),
+(19, N'DASH', N'diet'),
+(20, N'Ít béo', N'diet'),
+(21, N'Ít calo', N'diet');
 SET IDENTITY_INSERT dbo.HEALTH_TAG OFF;
 GO
 
@@ -332,17 +343,34 @@ INSERT INTO dbo.MEMBERHEALTH_PREFERENCE (MemberID, HealthTagID, status) VALUES
 (1, 5, N'Prefer'),
 (2, 2, N'Allergy'),
 (2, 6, N'Prefer'),
-(3, 3, N'Allergy');
+(3, 3, N'Allergy'),
+(4, 14, N'Allergy'),
+(5, 11, N'Allergy'),
+(6, 12, N'Allergy'),
+(7, 4, N'Allergy'),
+(8, 13, N'Allergy'),
+(9, 14, N'Allergy'),
+(10, 1, N'Allergy'),
+(11, 2, N'Allergy'),
+(12, 14, N'Allergy');
 GO
 
 -- ═══════════════════════════════════════════════════════════
 -- 9. PRODUCT_HEALTHTAG
 -- ═══════════════════════════════════════════════════════════
 INSERT INTO dbo.PRODUCT_HEALTHTAG (ProductID, HealthTagID) VALUES
+-- Mẫu ban đầu
 (1, 5), (1, 9), (2, 5), (2, 8), (3, 5),
 (4, 5), (5, 5), (6, 8), (13, 8), (14, 8),
 (16, 6), (24, 6), (25, 6), (35, 6), (36, 6),
-(29, 2), (30, 2), (31, 2), (32, 2);
+(29, 2), (30, 2), (31, 2), (32, 2),
+-- Mì gói chứa Gluten (bột mì) và hải sản (Hảo Hảo tôm chua cay)
+(4, 2), (4, 4), (5, 2),
+-- Nhóm Sữa (Milk/Lactose)
+(35, 14), (35, 3), (36, 14), (36, 3), (37, 14), (37, 3), (38, 14), (38, 3),
+(39, 14), (39, 3), (40, 14), (40, 3), (41, 14), (41, 3), (42, 14), (42, 3),
+-- Gạo hữu cơ/organic
+(9, 15), (12, 15), (12, 5);
 GO
 
 -- ═══════════════════════════════════════════════════════════

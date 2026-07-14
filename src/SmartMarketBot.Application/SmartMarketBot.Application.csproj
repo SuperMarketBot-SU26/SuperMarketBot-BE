@@ -13,6 +13,9 @@
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
+    <!-- SYSLIB0020 đến từ System.Text.Json source generator (gọi IgnoreNullValues obsolete).
+         Đây là generated code của .NET 10 SDK, ta suppress tạm thời cho tới khi SDK cập nhật. -->
+    <NoWarn>$(NoWarn);SYSLIB0020</NoWarn>
   </PropertyGroup>
 
 </Project>

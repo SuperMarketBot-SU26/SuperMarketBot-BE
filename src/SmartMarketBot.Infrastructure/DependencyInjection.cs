@@ -52,6 +52,7 @@ public static class DependencyInjection
         services.AddScoped<IMemberService, MemberService>();
         services.AddScoped<ICartService, CartService>();
         services.AddScoped<IStaffService, StaffService>();
+        services.AddScoped<IMemberNotificationWriter, MemberNotificationWriter>();
 
         // Brand & Ad Campaign Services
         services.AddScoped<IBrandService, BrandService>();

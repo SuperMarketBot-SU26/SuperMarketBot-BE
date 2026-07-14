@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using SmartMarketBot.Application.Interfaces;
@@ -20,6 +21,7 @@ public sealed class MemberService(
     ICloudStorageService cloudStorage,
     IOptions<CloudinaryOptions> cloudinaryOptions,
     IMemberRealtimeNotifier realtimeNotifier,
+    IServiceScopeFactory scopeFactory,
     ILogger<MemberService> logger) : IMemberService
 {
     private readonly CloudinaryOptions _cloudinaryOpts = cloudinaryOptions.Value;
@@ -107,42 +109,46 @@ public sealed class MemberService(
         // Push realtime notification nếu có cảnh báo
         if (alertType is not null)
         {
-            _ = Task.Run(async () =>
+            // Tạo scope riêng để tránh dùng DbContext của request (đã dispose khi response trả về).
+            // Bỏ Task.Run để await theo response — response sẽ trả về sau khi notification được
+            // push + lưu DB xong, tránh race condition trên EF Core change tracker.
+            var alertTitle = alertType switch
             {
-                try
-                {
-                    await realtimeNotifier.PushToMemberAsync(memberId, new Application.Models.Realtime.MemberRealtimeUpdateDto(
-                        MemberId:   memberId,
-                        UpdateType: alertType,
-                        Title:      alertType switch
-                        {
-                            "Allergy"          => "⚠️ Cảnh báo dị ứng",
-                            "BudgetExceeded"   => "💰 Vượt ngân sách",
-                            "DuplicatePurchase"=> "🔄 Sản phẩm đã mua",
-                            _                  => "Thông báo"
-                        },
-                        Message:    alertMessage!,
-                        Payload:    new { ProductId = product.ProductId, ProductName = product.ProductName },
-                        Timestamp:  Domain.Common.VnDateTime.Now));
+                "Allergy"           => "⚠️ Cảnh báo dị ứng",
+                "BudgetExceeded"    => "💰 Vượt ngân sách",
+                "DuplicatePurchase" => "🔄 Sản phẩm đã mua",
+                _                   => "Thông báo"
+            };
 
-                    // Lưu vào DB để member xem lại
-                    await SaveNotificationAsync(
-                        memberId:    memberId,
-                        notifType:   alertType,
-                        title:       alertType switch
-                        {
-                            "Allergy"           => "⚠️ Cảnh báo dị ứng",
-                            "BudgetExceeded"    => "💰 Vượt ngân sách",
-                            "DuplicatePurchase" => "🔄 Sản phẩm đã mua",
-                            _                   => "Thông báo"
-                        },
-                        message:     alertMessage!,
-                        payloadJson: System.Text.Json.JsonSerializer.Serialize(
-                            new { ProductId = product.ProductId, ProductName = product.ProductName }),
-                        ct: default); // không truyền ct để tránh cancel khi client disconnect
-                }
-                catch { /* fire-and-forget: không fail transaction chính */ }
-            });
+            try
+            {
+                await realtimeNotifier.PushToMemberAsync(memberId, new Application.Models.Realtime.MemberRealtimeUpdateDto(
+                    MemberId:   memberId,
+                    UpdateType: alertType,
+                    Title:      alertTitle,
+                    Message:    alertMessage!,
+                    Payload:    new { ProductId = product.ProductId, ProductName = product.ProductName },
+                    Timestamp:  Domain.Common.VnDateTime.Now));
+
+                // Lưu vào DB trong scope riêng, không truyền ct (tránh cancel khi client disconnect)
+                await using var scope = scopeFactory.CreateAsyncScope();
+                var notifier = scope.ServiceProvider.GetRequiredService<IMemberNotificationWriter>();
+                await notifier.SaveAsync(
+                    memberId:    memberId,
+                    notifType:   alertType,
+                    title:       alertTitle,
+                    message:     alertMessage!,
+                    payloadJson: System.Text.Json.JsonSerializer.Serialize(
+                        new { ProductId = product.ProductId, ProductName = product.ProductName }),
+                    ct:          default);
+            }
+            catch (Exception ex)
+            {
+                // Không fail transaction chính — chỉ log để debug
+                logger.LogWarning(ex,
+                    "[MemberService] Không thể push/lưu notification cho MemberId={Id} Type={Type}",
+                    memberId, alertType);
+            }
         }
 
         // Lấy sản phẩm thay thế nếu bị block
@@ -482,10 +488,10 @@ public sealed class MemberService(
 
         IQueryable<InvoiceHistoryItem> query = db.InvoiceHistoryItems
             .AsNoTracking()
-            .Where(x => x.InvoiceHistory.MemberId == member.MemberId);
+            .Where(x => x.InvoiceHistory!.MemberId == member.MemberId);
 
         query = query
-            .OrderByDescending(x => x.InvoiceHistory.PurchaseDate)
+            .OrderByDescending(x => x.InvoiceHistory!.PurchaseDate)
             .ThenByDescending(x => x.InvoiceHistoryItemId);
 
         if (limit > 0)
@@ -496,10 +502,10 @@ public sealed class MemberService(
         return await query
             .Select(x => new PurchaseHistoryItemDto(
                 x.ProductId,
-                x.Product.ProductName,
+                x.Product!.ProductName,
                 x.UnitPrice,
                 x.Product.ImageUrl,
-                x.InvoiceHistory.PurchaseDate,
+                x.InvoiceHistory!.PurchaseDate,
                 x.Quantity))
             .ToListAsync(ct);
     }
@@ -805,35 +811,5 @@ public sealed class MemberService(
     }
 
     // ── Internal Helper ───────────────────────────────────────────────────────
-
-    /// <summary>
-    /// Lưu notification vào DB (fire-and-forget safe).
-    /// Gọi sau khi đã SaveChanges() cho transaction chính.
-    /// </summary>
-    internal async Task SaveNotificationAsync(
-        int memberId, string notifType, string title, string message,
-        string? payloadJson = null, CancellationToken ct = default)
-    {
-        try
-        {
-            db.MemberNotifications.Add(new MemberNotification
-            {
-                MemberId    = memberId,
-                NotifType   = notifType,
-                Title       = title,
-                Message     = message,
-                PayloadJson = payloadJson,
-                IsRead      = false,
-                CreatedAt   = VnDateTime.Now
-            });
-            await db.SaveChangesAsync(ct);
-        }
-        catch (Exception ex)
-        {
-            logger.LogWarning(ex,
-                "[MemberService] Không thể lưu notification (MemberId={Id}, Type={Type})",
-                memberId, notifType);
-        }
-    }
 }
 

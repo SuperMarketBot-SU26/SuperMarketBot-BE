@@ -84,11 +84,15 @@ public sealed class RobotService(
                 throw new ArgumentException(localizer.Get("DestNodeInvalid"));
             }
 
+            // [P0-3/4 FIX] Lấy current node (trên bản đồ) từ log gần nhất — KHÔNG lấy RobotId.
+            // Trước đây `Select(l => (int?)l.RobotId)` trả về Robot ID thay vì Node ID
+            // → PlanRouteAsync fail hoặc trả route sai → navigate lệch sang node khác.
+            // Nếu chưa có log nào có CurrentNodeId → fallback về node 1 (start node mặc định).
             var currentNodeId = await dbContext.RobotLogs
                 .AsNoTracking()
-                .Where(l => l.RobotId == robot.RobotId)
+                .Where(l => l.RobotId == robot.RobotId && l.CurrentNodeId != null)
                 .OrderByDescending(l => l.Timestamp)
-                .Select(l => (int?)l.RobotId)
+                .Select(l => (int?)l.CurrentNodeId)
                 .FirstOrDefaultAsync(cancellationToken) ?? 1;
 
             var routeResult = await navigationService.PlanRouteAsync(

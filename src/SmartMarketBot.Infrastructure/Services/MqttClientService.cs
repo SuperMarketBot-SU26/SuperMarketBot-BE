@@ -156,7 +156,9 @@ public sealed class MqttClientService(
             var robotCode = topicParts[2];
             var eventType = topicParts[3];
 
-            logger.LogInformation("MQTT recv [{Topic}] {Bytes}B: {Payload}", topic, payloadJson.Length, payloadJson);
+            // [P1-6 FIX] Hạ log payload xuống LogDebug — telemetry ~5-10Hz sẽ đầy disk rất nhanh.
+            // Khi cần debug đặt LogLevel:Default=Debug trong appsettings để bật lại.
+            logger.LogDebug("MQTT recv [{Topic}] {Bytes}B: {Payload}", topic, payloadJson.Length, payloadJson);
 
             await using var scope = scopeFactory.CreateAsyncScope();
             var notifier = scope.ServiceProvider.GetRequiredService<IRobotHubNotifier>();
@@ -196,11 +198,14 @@ public sealed class MqttClientService(
                 RobotId = robot?.RobotId,
                 Battery = payload.Battery,
                 Location = payload.Location,
-                Status = payload.Status,
+                Status = payload.Status ?? "Unknown",
                 Timestamp = timestamp,
                 XCoord = payload.XCoord,
                 YCoord = payload.YCoord,
-                HeadingRad = payload.HeadingRad
+                HeadingRad = payload.HeadingRad,
+                // [P0-3/4 FIX] Lưu CurrentNodeId từ telemetry để HandleAutoDockAsync / HandleRerouteAsync
+                // lấy được đúng node trên bản đồ (thay vì nhầm với RobotId như trước).
+                CurrentNodeId = payload.CurrentNodeId
             };
 
             dbContext.RobotLogs.Add(log);
@@ -302,13 +307,15 @@ public sealed class MqttClientService(
             var navService = scope.ServiceProvider.GetRequiredService<INavigationService>();
             var dbCtx = scope.ServiceProvider.GetRequiredService<Infrastructure.Persistence.AppDbContext>();
 
-            // Lấy current node từ log gần nhất
+            // [P0-3 FIX] Lấy current node (trên bản đồ) từ log gần nhất — KHÔNG lấy RobotId.
+            // Trước đây `Select(l => (int?)l.RobotId)` trả về Robot ID thay vì Node ID
+            // → PlanRouteAsync fail hoặc trả route sai → auto-dock không hoạt động.
             var startNode = robot != null
                 ? await dbCtx.RobotLogs
                     .AsNoTracking()
-                    .Where(l => l.RobotId == robot.RobotId)
+                    .Where(l => l.RobotId == robot.RobotId && l.CurrentNodeId != null)
                     .OrderByDescending(l => l.Timestamp)
-                    .Select(l => (int?)l.RobotId)
+                    .Select(l => l.CurrentNodeId)
                     .FirstOrDefaultAsync() ?? 1
                 : 1;
 
@@ -362,30 +369,40 @@ public sealed class MqttClientService(
             var navCommandService = scope.ServiceProvider.GetRequiredService<Application.Services.NavigationCommandService>();
             var dbCtx = scope.ServiceProvider.GetRequiredService<Infrastructure.Persistence.AppDbContext>();
 
-            /* Lấy destination từ log gần nhất — tạm dùng waypoint cuối cùng trong route */
-            var destNode = await dbCtx.RobotLogs
-                .AsNoTracking()
-                .Where(l => l.RobotId == robot.RobotId)
-                .OrderByDescending(l => l.Timestamp)
-                .Select(l => (int?)l.RobotId)
-                .FirstOrDefaultAsync();
-
-            /* Fallback: tính lại từ node hiện tại về node tiếp theo đã biết */
+            // [P0-4 FIX] Lấy node hiện tại từ log (CurrentNodeId, KHÔNG phải RobotId).
+            // Trước đây cả 2 đều chọn l.CurrentNodeId từ cùng log → cùng giá trị → vô nghĩa.
+            // ĐÚNG: startNode = CurrentNodeId (vị trí hiện tại của robot),
+            //        endNode   = node CUỐI cùng của RouteAssignment đang Active (đích đến ban đầu).
             var startNode = await dbCtx.RobotLogs
                 .AsNoTracking()
-                .Where(l => l.RobotId == robot.RobotId)
+                .Where(l => l.RobotId == robot.RobotId && l.CurrentNodeId != null)
                 .OrderByDescending(l => l.Timestamp)
-                .Select(l => (int?)l.RobotId)
+                .Select(l => (int?)l.CurrentNodeId)
                 .FirstOrDefaultAsync() ?? 1;
 
-            int endNode = destNode ?? 5; // Default fallback — cần improve Phase 4
+            // Tìm route đang được gán Active cho robot → lấy node cuối (ca SequenceOrder nhất)
+            // làm destination. Fallback về node 1 nếu không tìm thấy assignment.
+            int? endNode = await (
+                from ra in dbCtx.RouteAssignments.AsNoTracking()
+                join nm in dbCtx.RouteNodeMappings.AsNoTracking()
+                    on ra.RobotRouteId equals nm.RobotRouteId
+                where ra.RobotId == robot.RobotId && ra.Status == "Active"
+                orderby nm.SequenceOrder descending
+                select (int?)nm.NodeId
+            ).FirstOrDefaultAsync();
+
+            if (endNode is null)
+            {
+                // Không có assignment active → robot rảnh → chỉ đến node 1 (dock/home mặc định)
+                endNode = 1;
+            }
 
             logger.LogWarning("Rerouting robot {RobotCode} from node {Start} to {End}.",
                               robotCode, startNode, endNode);
 
             await navCommandService.RerouteAsync(
                 new Application.Models.Navigation.RerouteRequestDto(
-                    robotCode, startNode, endNode, null),
+                    robotCode, startNode, endNode.Value, null),
                 CancellationToken.None);
         }
         catch (Exception ex)

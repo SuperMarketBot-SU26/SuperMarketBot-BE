@@ -224,8 +224,8 @@ public sealed class AuthService(
 
         // 3. Truy vấn các sản phẩm mua nhiều nhất từ lịch sử mua hàng
         var topProductsList = await db.InvoiceHistoryItems
-            .Where(i => i.InvoiceHistory.MemberId == member.MemberId)
-            .GroupBy(i => i.Product.ProductName)
+            .Where(i => i.InvoiceHistory!.MemberId == member.MemberId)
+            .GroupBy(i => i.Product!.ProductName)
             .OrderByDescending(g => g.Count())
             .Select(g => g.Key)
             .Take(3)

@@ -17,11 +17,15 @@ public sealed class StaffService(AppDbContext db, ILocalizationService localizer
         var slot = await db.Slots
             .AsNoTracking()
             .Include(s => s.Shelf)
-                .ThenInclude(sl => sl.Aisle)
+                .ThenInclude(sl => sl!.Aisle)
             .FirstOrDefaultAsync(s => s.SlotId == request.SlotId, ct)
             ?? throw new KeyNotFoundException(localizer.Get("SlotNotFound", request.SlotId));
 
-        int aisleId = slot.Shelf.Aisle.AisleId;
+        var shelf = slot.Shelf
+            ?? throw new InvalidOperationException(localizer.Get("SlotHasNoShelf", slot.SlotId));
+        var aisle = shelf.Aisle
+            ?? throw new InvalidOperationException(localizer.Get("ShelfHasNoAisle", shelf.ShelfId));
+        int aisleId = aisle.AisleId;
 
         // Tính tổng tồn kho còn lại của sản phẩm này trên toàn bộ kệ
         // Lấy ProductId qua ProductSlot (N-N)

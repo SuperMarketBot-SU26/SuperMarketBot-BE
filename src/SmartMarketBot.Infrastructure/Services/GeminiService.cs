@@ -64,7 +64,7 @@ public sealed class GeminiService(
         }
     }
 
-    public async Task<string> RerankAndExplainAsync(string query, IReadOnlyList<string> productIdAndNames, CancellationToken ct = default)
+    public async Task<string> RerankAndExplainAsync(string query, IReadOnlyList<string> productIdAndNames, string? personalizedContext = null, CancellationToken ct = default)
     {
         // Fallback: nếu không có API key hoặc lỗi → trả nguyên thứ tự ban đầu
         var fallback = string.Join(",", productIdAndNames.Select(s => s.Split(':')[0]));
@@ -75,11 +75,16 @@ public sealed class GeminiService(
         try
         {
             var listStr = string.Join("\n", productIdAndNames.Select((p, i) => $"{i + 1}. {p}"));
+            var contextPrompt = !string.IsNullOrEmpty(personalizedContext)
+                ? $"Thông tin ngữ cảnh người dùng: {personalizedContext}\n"
+                : string.Empty;
+
             var prompt =
                 $"Bạn là hệ thống tìm kiếm sản phẩm siêu thị thông minh.\n" +
+                contextPrompt +
                 $"Người dùng tìm kiếm với từ khóa: \"{query}\"\n\n" +
                 $"Danh sách sản phẩm (id:tên):\n{listStr}\n\n" +
-                $"Hãy sắp xếp lại danh sách trên theo mức độ phù hợp giảm dần với từ khóa.\n" +
+                $"Hãy sắp xếp lại danh sách trên theo mức độ phù hợp giảm dần với từ khóa và ngữ cảnh người dùng (nếu có).\n" +
                 $"CHỈ trả về danh sách id theo thứ tự, phân tách bằng dấu phẩy, KHÔNG kèm giải thích.\n" +
                 $"Ví dụ: 12,5,8,1";
 

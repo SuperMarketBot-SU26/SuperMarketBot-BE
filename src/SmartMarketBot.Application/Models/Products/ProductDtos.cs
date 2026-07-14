@@ -31,6 +31,7 @@ public sealed record CreateProductRequestDto
     public string? Description { get; init; }
     public string Status { get; init; } = "Available";
     public int? SubstituteProductId { get; init; }
+    public List<int>? HealthTagIds { get; init; }
 }
 
 public sealed record UpdateProductRequestDto
@@ -43,6 +44,7 @@ public sealed record UpdateProductRequestDto
     public string? Description { get; init; }
     public string? Status { get; init; }
     public int? SubstituteProductId { get; init; }
+    public List<int>? HealthTagIds { get; init; }
 }
 
 public sealed record UpdateProductStatusRequestDto

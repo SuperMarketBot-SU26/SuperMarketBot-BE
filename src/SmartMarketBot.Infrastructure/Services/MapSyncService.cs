@@ -11,6 +11,7 @@ namespace SmartMarketBot.Infrastructure.Services;
 public sealed class MapSyncService(
     AppDbContext db,
     IFileStorageService fileStorage,
+    ICloudStorageService cloudStorage,
     ILocalizationService localizer,
     ILogger<MapSyncService> logger) : IMapSyncService
 {
@@ -390,12 +391,30 @@ public sealed class MapSyncService(
         var map = await db.Maps.FindAsync([mapId], cancellationToken)
             ?? throw new KeyNotFoundException(localizer.Get("MapNotFound", mapId));
 
-        var imageUrl = await fileStorage.SaveAsync(stream, fileName, FloorplanFolder, cancellationToken);
+        // Đọc stream thành bytes để upload lên Cloudinary
+        using var ms = new MemoryStream();
+        await stream.CopyToAsync(ms, cancellationToken);
+        var bytes = ms.ToArray();
+
+        string imageUrl;
+        try
+        {
+            // Upload lên Cloudinary (tự động fallback về local nếu chưa cấu hình)
+            var publicId = $"map_{mapId}_{Path.GetFileNameWithoutExtension(fileName)}";
+            imageUrl = await cloudStorage.UploadImageAsync(bytes, FloorplanFolder, publicId, cancellationToken);
+            logger.LogInformation("[MapSync] Floorplan uploaded to Cloudinary: MapId={MapId}, URL={Url}", mapId, imageUrl);
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "[MapSync] Cloudinary upload failed, fallback to local: {Msg}", ex.Message);
+            // Fallback: lưu local nếu Cloudinary lỗi
+            imageUrl = await fileStorage.SaveAsync(new MemoryStream(bytes), fileName, FloorplanFolder, cancellationToken);
+        }
 
         map.FloorplanImageUrl = imageUrl;
         await db.SaveChangesAsync(cancellationToken);
 
-        logger.LogInformation("Floorplan image uploaded for MapId={MapId}, URL={Url}", mapId, imageUrl);
+        logger.LogInformation("[MapSync] FloorplanImageUrl updated: MapId={MapId}, URL={Url}", mapId, imageUrl);
 
         return new UploadFloorplanImageResponseDto(mapId, imageUrl, localizer.Get("FloorplanImageUploaded"));
     }

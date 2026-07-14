@@ -107,4 +107,22 @@ public sealed class RobotRoutesController(
 
         return NoContent();
     }
+
+    /// <summary>
+    /// Trả về danh sách tất cả RouteType hợp lệ kèm mô tả ngắn.
+    /// Frontend dùng để render dropdown thay vì tự nhập string.
+    /// GET /api/v1/routes/types
+    /// </summary>
+    [HttpGet("types")]
+    public ActionResult<IReadOnlyList<object>> GetRouteTypes()
+    {
+        var types = new[]
+        {
+            new { value = "patrol",   label = "Tuần tra",    description = "Robot di chuyển dọc các kệ để quét mật độ hàng hoá." },
+            new { value = "restock",  label = "Bổ sung hàng", description = "Lộ trình dẫn đến các kệ cần bổ sung." },
+            new { value = "delivery", label = "Giao hàng",   description = "Vận chuyển hàng từ kho đến vị trí quy định." },
+            new { value = "custom",   label = "Tùy chỉnh",   description = "Lộ trình do admin tự định nghĩa." },
+        };
+        return Ok(types);
+    }
 }

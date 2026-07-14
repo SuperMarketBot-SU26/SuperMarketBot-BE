@@ -3,12 +3,14 @@ using SmartMarketBot.Application.Models.Search;
 namespace SmartMarketBot.Application.Interfaces;
 
 /// <summary>
-/// Tìm kiếm sản phẩm thông minh theo DB khách hàng:
-/// - Hỗ trợ free-text query (tên sản phẩm, mô tả)
-/// - Lọc theo MemberId: bỏ sản phẩm chứa dị ứng / theo lịch sử mua
-/// - Có thể bật/tắt AI ranking (Gemini) để sắp xếp theo ngữ nghĩa
+/// Tìm kiếm sản phẩm thông minh:
+/// - SearchAllAsync: Tìm kiếm công cộng
+/// - SearchPersonalizedAsync: Tìm kiếm cá nhân hóa theo chế độ ăn và ngân sách của Member (qua AccountId)
+/// - SearchPersonalizedByMemberIdAsync: Tìm kiếm cá nhân hóa theo MemberId (tương thích ngược)
 /// </summary>
 public interface ISearchService
 {
-    Task<SearchResponseDto> SearchAsync(SearchRequestDto request, CancellationToken ct = default);
+    Task<SearchResponseDto> SearchAllAsync(string query, int limit, string sortBy, bool useAi, CancellationToken ct = default);
+    Task<SearchResponseDto> SearchPersonalizedAsync(int accountId, string query, int limit, string sortBy, bool useAi, CancellationToken ct = default);
+    Task<SearchResponseDto> SearchPersonalizedByMemberIdAsync(int memberId, string query, int limit, string sortBy, bool useAi, CancellationToken ct = default);
 }

@@ -31,6 +31,23 @@ public sealed class AdminProductService(AppDbContext dbContext) : IAdminProductS
             SubstituteProductId = request.SubstituteProductId
         };
 
+        if (request.HealthTagIds is { Count: > 0 })
+        {
+            var validTagIds = await dbContext.HealthTags
+                .AsNoTracking()
+                .Where(t => request.HealthTagIds.Contains(t.HealthTagId))
+                .Select(t => t.HealthTagId)
+                .ToListAsync(cancellationToken);
+
+            foreach (var tagId in validTagIds)
+            {
+                product.ProductHealthTags.Add(new ProductHealthTag
+                {
+                    HealthTagId = tagId
+                });
+            }
+        }
+
         dbContext.Products.Add(product);
         await dbContext.SaveChangesAsync(cancellationToken);
 
@@ -62,6 +79,32 @@ public sealed class AdminProductService(AppDbContext dbContext) : IAdminProductS
         if (request.Description is not null) product.Description = request.Description;
         if (!string.IsNullOrWhiteSpace(request.Status)) product.Status = request.Status;
         product.SubstituteProductId = request.SubstituteProductId;
+
+        if (request.HealthTagIds is not null)
+        {
+            var existingTags = await dbContext.ProductHealthTags
+                .Where(pht => pht.ProductId == productId)
+                .ToListAsync(cancellationToken);
+            dbContext.ProductHealthTags.RemoveRange(existingTags);
+
+            if (request.HealthTagIds.Count > 0)
+            {
+                var validTagIds = await dbContext.HealthTags
+                    .AsNoTracking()
+                    .Where(t => request.HealthTagIds.Contains(t.HealthTagId))
+                    .Select(t => t.HealthTagId)
+                    .ToListAsync(cancellationToken);
+
+                foreach (var tagId in validTagIds)
+                {
+                    dbContext.ProductHealthTags.Add(new ProductHealthTag
+                    {
+                        ProductId = productId,
+                        HealthTagId = tagId
+                    });
+                }
+            }
+        }
 
         await dbContext.SaveChangesAsync(cancellationToken);
         return ToDto(product);

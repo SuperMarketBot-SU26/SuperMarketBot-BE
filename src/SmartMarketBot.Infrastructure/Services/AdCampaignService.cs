@@ -397,6 +397,7 @@ public sealed class AdCampaignService(
                 }
 
                 campaign.StartDate = DateTime.UtcNow;
+                campaign.Status = CampaignStatus.Active;
 
                 db.AdCampaignLogs.Add(new AdCampaignLog
                 {
@@ -416,7 +417,6 @@ public sealed class AdCampaignService(
                     campaign.Package.PriceShelf,
                     campaign.Brand!.Wallet);
 
-                campaign.Status = CampaignStatus.Active;
                 return new ActivateCampaignResponseDto(
                     campaign.AdCampaignId, campaign.CampaignName,
                     CampaignStatus.Inactive, CampaignStatus.Active,
@@ -437,6 +437,7 @@ public sealed class AdCampaignService(
                 }
 
                 campaign.StartDate = DateTime.UtcNow;
+                campaign.Status = CampaignStatus.Active;
 
                 db.AdCampaignLogs.Add(new AdCampaignLog
                 {
@@ -453,7 +454,6 @@ public sealed class AdCampaignService(
                     "Campaign {CampaignId} activated. Charged {Amount} (R={routeCount}, Z={zoneCount}, Shelf={hasShelf}) from Brand {BrandId}. Remaining: {Balance}",
                     campaignId, totalCost, routeCount, zoneCount, hasShelf, campaign.BrandId, newBalance);
 
-                campaign.Status = CampaignStatus.Active;
                 return new ActivateCampaignResponseDto(
                     campaign.AdCampaignId, campaign.CampaignName,
                     CampaignStatus.Inactive, CampaignStatus.Active,

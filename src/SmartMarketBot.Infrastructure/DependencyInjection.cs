@@ -42,6 +42,7 @@ public static class DependencyInjection
         services.AddScoped<IAisleScanService, AisleScanService>();
         services.AddScoped<ISearchService, SearchService>();
         services.AddScoped<IMapSyncService, MapSyncService>();
+        services.AddScoped<IZoneAisleService, ZoneAisleService>();
         services.AddScoped<ISemanticObjectService, SemanticObjectService>();
 
         services.AddScoped<IAdminUserService, AdminUserService>();
@@ -51,6 +52,7 @@ public static class DependencyInjection
         services.AddScoped<IMemberService, MemberService>();
         services.AddScoped<ICartService, CartService>();
         services.AddScoped<IStaffService, StaffService>();
+        services.AddScoped<IMemberNotificationWriter, MemberNotificationWriter>();
 
         // Brand & Ad Campaign Services
         services.AddScoped<IBrandService, BrandService>();

@@ -75,7 +75,7 @@ public sealed class AdResourceService(
         {
             AdCampaignId = request.AdCampaignId,
             ResourceType = request.ResourceType,
-            ResourceUrl = request.ResourceUrl,
+            ResourceUrl = request.ResourceUrl ?? string.Empty,
             ContentText = request.ContentText,
             Resolution = request.Resolution,
             Status = AdResourceStatus.Active

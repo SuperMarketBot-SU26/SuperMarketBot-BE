@@ -1,19 +1,23 @@
 -- ============================================================
--- SmartMarketBot — FE Dev Seed (~500 records)
--- Chạy SAU khi đã chạy erd_database.sql + seed_erd_v4.sql.
--- Không touch: MAP, NAVIGATION_NODE, NAVIGATION_EDGE, AISLE_NODE,
---   ROBOT_ROUTE, ROUTE_NODE_MAPPING, ROUTE_ASSIGNMENT, SEMANTIC_OBJECT.
--- Giữ nguyên AccountID 1-3 (admin/staff/member1), chỉ thêm từ ID 4+.
+-- SmartMarketBot — Unified FE Dev Seed Data
+-- Hợp nhất từ seed_fe_dev.sql và tất cả các bản sửa lỗi (fix1, fix2, fix3, patch)
+-- Yêu cầu: Chạy SAU khi đã chạy erd_database.sql + seed_map_navigation.sql
 -- ============================================================
 
 USE SuperMarketBot;
 GO
+SET QUOTED_IDENTIFIER ON;
+SET ANSI_NULLS ON;
+GO
 
 -- ══════════════════════════════════════════════════════════════
--- 1. ACCOUNT (12 record mới: ID 4-15) — 1 staff + 11 members
+-- 1. ACCOUNT (12 record mới: ID 4-15)
 -- ══════════════════════════════════════════════════════════════
 SET IDENTITY_INSERT dbo.ACCOUNT ON;
 INSERT INTO dbo.ACCOUNT (AccountID, Username, PasswordHash, Email, Phone, FullName, Status, Role, OtpCode, OtpExpiredAt, OtpType, CreatedAt) VALUES
+(1, N'admin', N'pbkdf2$100000$YWFhYWFhYWFhYWFhYWFhYQ==$YjJiMmMzZDRlNWU2ZTcwZjE4MzQ1Njc4OTAxMjM0NTY3', N'admin@smartmarket.local', N'0900000001', N'System Admin', N'Active', N'Admin', NULL, NULL, NULL, DATEADD(hour, 7, GETUTCDATE())),
+(2, N'staff', N'pbkdf2$100000$YWFhYWFhYWFhYWFhYWFhYQ==$YjJiMmMzZDRlNWU2ZTcwZjE4MzQ1Njc4OTAxMjM0NTY3', N'staff@smartmarket.local', N'0900000002', N'Nguyễn Văn Khoa', N'Active', N'Staff', NULL, NULL, NULL, DATEADD(hour, 7, GETUTCDATE())),
+(3, N'member1', N'pbkdf2$100000$YWFhYWFhYWFhYWFhYWFhYQ==$YjJiMmMzZDRlNWU2ZTcwZjE4MzQ1Njc4OTAxMjM0NTY3', N'member1@smartmarket.local', N'0900000003', N'Nguyễn Văn A', N'Active', N'Member', NULL, NULL, NULL, DATEADD(hour, 7, GETUTCDATE())),
 (4, N'staff2', N'pbkdf2$100000$YWFhYWFhYWFhYWFhYWFhYQ==$YjJiMmMzZDRlNWU2ZTcwZjE4MzQ1Njc4OTAxMjM0NTY3', N'staff2@smartmarket.local', N'0901000002', N'Trần Thị Bích Ngọc', N'Active', N'Staff', NULL, NULL, NULL, DATEADD(hour, 7, GETUTCDATE())),
 (5, N'member2', N'pbkdf2$100000$YWFhYWFhYWFhYWFhYWFhYQ==$YjJiMmMzZDRlNWU2ZTcwZjE4MzQ1Njc4OTAxMjM0NTY3', N'member2@smartmarket.local', N'0902000002', N'Lê Hoàng Anh', N'Active', N'Member', NULL, NULL, NULL, DATEADD(hour, 7, GETUTCDATE())),
 (6, N'member3', N'pbkdf2$100000$YWFhYWFhYWFhYWFhYWFhYQ==$YjJiMmMzZDRlNWU2ZTcwZjE4MzQ1Njc4OTAxMjM0NTY3', N'member3@smartmarket.local', N'0902000003', N'Phạm Thị Mai', N'Active', N'Member', NULL, NULL, NULL, DATEADD(hour, 7, GETUTCDATE())),
@@ -30,10 +34,11 @@ SET IDENTITY_INSERT dbo.ACCOUNT OFF;
 GO
 
 -- ══════════════════════════════════════════════════════════════
--- 2. MEMBER (12 record mới: MemberID 2-13) — 1-to-1 với Account 4-15
+-- 2. MEMBER (12 record mới: MemberID 2-13)
 -- ══════════════════════════════════════════════════════════════
 SET IDENTITY_INSERT dbo.MEMBER ON;
 INSERT INTO dbo.MEMBER (MemberID, AccountID, FullName, FacePath, FaceVector, SpendingLimit, TotalPoints) VALUES
+(1, 3, N'Nguyễn Văn A', NULL, NULL, 500000.00, 100),
 (2, 5, N'Lê Hoàng Anh', NULL, NULL, 800000.00, 250),
 (3, 6, N'Phạm Thị Mai', NULL, NULL, 1500000.00, 480),
 (4, 7, N'Đỗ Quang Minh', NULL, NULL, 300000.00, 80),
@@ -49,10 +54,11 @@ SET IDENTITY_INSERT dbo.MEMBER OFF;
 GO
 
 -- ══════════════════════════════════════════════════════════════
--- 3. MEMBERSHIP (6 record) — tier phân bổ
+-- 3. MEMBERSHIP (6 record)
 -- ══════════════════════════════════════════════════════════════
 SET IDENTITY_INSERT dbo.MEMBERSHIP ON;
 INSERT INTO dbo.MEMBERSHIP (MembershipID, MemberID, TierName, Status) VALUES
+(1, 1, N'Bronze', N'Active'),
 (2, 2, N'Silver', N'Active'),
 (3, 3, N'Gold', N'Active'),
 (4, 5, N'Platinum', N'Active'),
@@ -62,8 +68,7 @@ INSERT INTO dbo.MEMBERSHIP (MembershipID, MemberID, TierName, Status) VALUES
 SET IDENTITY_INSERT dbo.MEMBERSHIP OFF;
 GO
 
--- ══════════════════════════════════════════════════════════════
--- 4. HEALTH_TAG (8 record mới: ID 3-10) — mix allergy + diet
+-- 4. HEALTH_TAG (19 record mới: ID 3-21) — mix allergy + diet
 -- ══════════════════════════════════════════════════════════════
 SET IDENTITY_INSERT dbo.HEALTH_TAG ON;
 INSERT INTO dbo.HEALTH_TAG (HealthTagID, TagName, TagType) VALUES
@@ -74,12 +79,23 @@ INSERT INTO dbo.HEALTH_TAG (HealthTagID, TagName, TagType) VALUES
 (7, N'High-protein', N'diet'),
 (8, N'Vegan', N'diet'),
 (9, N'Keto', N'diet'),
-(10, N'Halal', N'lifestyle');
+(10, N'Halal', N'lifestyle'),
+(11, N'Đậu nành', N'allergy'),
+(12, N'Các loại hạt', N'allergy'),
+(13, N'Cá', N'allergy'),
+(14, N'Sữa tươi', N'allergy'),
+(15, N'Organic', N'diet'),
+(16, N'Không chứa Gluten', N'diet'),
+(17, N'Eat Clean', N'diet'),
+(18, N'Địa Trung Hải', N'diet'),
+(19, N'DASH', N'diet'),
+(20, N'Ít béo', N'diet'),
+(21, N'Ít calo', N'diet');
 SET IDENTITY_INSERT dbo.HEALTH_TAG OFF;
 GO
 
 -- ══════════════════════════════════════════════════════════════
--- 5. MEMBERHEALTH_PREFERENCE (15 record)
+-- 5. MEMBERHEALTH_PREFERENCE (24 record)
 -- ══════════════════════════════════════════════════════════════
 INSERT INTO dbo.MEMBERHEALTH_PREFERENCE (MemberID, HealthTagID, status) VALUES
 (2, 6, N'Diet'),
@@ -88,15 +104,25 @@ INSERT INTO dbo.MEMBERHEALTH_PREFERENCE (MemberID, HealthTagID, status) VALUES
 (3, 4, N'Allergy'),
 (4, 1, N'Allergy'),
 (4, 3, N'Allergy'),
+(4, 14, N'Allergy'),
 (5, 9, N'Diet'),
 (5, 7, N'Diet'),
+(5, 11, N'Allergy'),
 (6, 10, N'Lifestyle'),
+(6, 12, N'Allergy'),
 (7, 2, N'Allergy'),
 (7, 6, N'Diet'),
+(7, 4, N'Allergy'),
 (8, 5, N'Allergy'),
+(8, 13, N'Allergy'),
 (9, 8, N'Diet'),
 (9, 7, N'Diet'),
-(10, 1, N'Allergy');
+(9, 14, N'Allergy'),
+(10, 1, N'Allergy'),
+(11, 2, N'Allergy'),
+(11, 14, N'Allergy'),
+(12, 3, N'Allergy'),
+(12, 11, N'Allergy');
 GO
 
 -- ══════════════════════════════════════════════════════════════
@@ -158,75 +184,106 @@ SET IDENTITY_INSERT dbo.PRODUCT_TYPE OFF;
 GO
 
 -- ══════════════════════════════════════════════════════════════
--- 9. PRODUCT (50 record mới: ID 4-53) — đủ data cho search/pagination
+-- 9. PRODUCT (50 record mới: ID 4-53)
 -- ══════════════════════════════════════════════════════════════
 SET IDENTITY_INSERT dbo.PRODUCT ON;
-INSERT INTO dbo.PRODUCT (ProductID, ProductTypeID, ProductName, UnitPrice, PromotionPrice, AdCampaignID, ExpiredDate, ImageUrl, WeightOrVolume, Unit, Description, Status, SubstituteProductID) VALUES
+INSERT INTO dbo.PRODUCT (ProductID, ProductTypeID, ProductName, UnitPrice, PromotionPrice, ExpiredDate, ImageUrl, WeightOrVolume, Unit, Description, Status, SubstituteProductID) VALUES
 -- Nhóm mì/phở
-(4, 3, N'Hảo Hảo Tôm Chua Cay', 4500.00, 3800.00, NULL, DATEADD(month, 12, DATEADD(hour, 7, GETUTCDATE())), NULL, 75.000, N'g', N'Mì tôm chua cay', N'Available', NULL),
-(5, 3, N'Omachi Xốt Thịt Thăn', 5500.00, NULL, NULL, DATEADD(month, 18, DATEADD(hour, 7, GETUTCDATE())), NULL, 80.000, N'g', N'Mì Omachi thịt thăn', N'Available', NULL),
-(6, 3, N'Miến Phú Hương', 18000.00, NULL, NULL, DATEADD(month, 24, DATEADD(hour, 7, GETUTCDATE())), NULL, 200.000, N'g', N'Miến dong', N'Available', NULL),
-(7, 4, N'Phở bò Vifon', 12000.00, 9900.00, NULL, DATEADD(month, 12, DATEADD(hour, 7, GETUTCDATE())), NULL, 65.000, N'g', N'Phở bò ăn liền', N'Available', NULL),
-(8, 4, N'Phở gà A-One', 11000.00, NULL, NULL, DATEADD(month, 12, DATEADD(hour, 7, GETUTCDATE())), NULL, 60.000, N'g', N'Phở gà ăn liền', N'Available', NULL),
+(4, 3, N'Hảo Hảo Tôm Chua Cay', 4500.00, 3800.00, DATEADD(month, 12, DATEADD(hour, 7, GETUTCDATE())), NULL, 75.000, N'g', N'Mì tôm chua cay', N'Available', NULL),
+(5, 3, N'Omachi Xốt Thịt Thăn', 5500.00, NULL, DATEADD(month, 18, DATEADD(hour, 7, GETUTCDATE())), NULL, 80.000, N'g', N'Mì Omachi thịt thăn', N'Available', NULL),
+(6, 3, N'Miến Phú Hương', 18000.00, NULL, DATEADD(month, 24, DATEADD(hour, 7, GETUTCDATE())), NULL, 200.000, N'g', N'Miến dong', N'Available', NULL),
+(7, 4, N'Phở bò Vifon', 12000.00, 9900.00, DATEADD(month, 12, DATEADD(hour, 7, GETUTCDATE())), NULL, 65.000, N'g', N'Phở bò ăn liền', N'Available', NULL),
+(8, 4, N'Phở gà A-One', 11000.00, NULL, DATEADD(month, 12, DATEADD(hour, 7, GETUTCDATE())), NULL, 60.000, N'g', N'Phở gà ăn liền', N'Available', NULL),
 -- Nhóm gạo/bột
-(9, 5, N'Gạo ST25 Lúa Tôm', 32000.00, 28000.00, NULL, NULL, NULL, 5.000, N'kg', N'Gạo ST25 đặc sản', N'Available', NULL),
-(10, 5, N'Gạo Jasmine Đồng Bằng', 22000.00, NULL, NULL, NULL, NULL, 5.000, N'kg', N'Gạo Jasmine', N'Available', NULL),
-(11, 5, N'Gạo Tám Xoan Hải Hậu', 45000.00, NULL, NULL, NULL, NULL, 1.000, N'kg', N'Gạo Tám thơm', N'Available', NULL),
-(12, 6, N'Gạo lứt hữu cơ', 38000.00, 35000.00, NULL, NULL, NULL, 1.000, N'kg', N'Gạo lứt organic', N'Available', NULL),
-(13, 7, N'Bột mì đa dụng Meizan', 22000.00, NULL, NULL, DATEADD(month, 8, DATEADD(hour, 7, GETUTCDATE())), NULL, 1.000, N'kg', N'Bột mì Meizan', N'Available', NULL),
+(9, 5, N'Gạo ST25 Lúa Tôm', 32000.00, 28000.00, NULL, NULL, 5.000, N'kg', N'Gạo ST25 đặc sản', N'Available', NULL),
+(10, 5, N'Gạo Jasmine Đồng Bằng', 22000.00, NULL, NULL, NULL, 5.000, N'kg', N'Gạo Jasmine', N'Available', NULL),
+(11, 5, N'Gạo Tám Xoan Hải Hậu', 45000.00, NULL, NULL, NULL, 1.000, N'kg', N'Gạo Tám thơm', N'Available', NULL),
+(12, 6, N'Gạo lứt hữu cơ', 38000.00, 35000.00, NULL, NULL, 1.000, N'kg', N'Gạo lứt organic', N'Available', NULL),
+(13, 7, N'Bột mì đa dụng Meizan', 22000.00, NULL, DATEADD(month, 8, DATEADD(hour, 7, GETUTCDATE())), NULL, 1.000, N'kg', N'Bột mì Meizan', N'Available', NULL),
 -- Nhóm gia vị
-(14, 8, N'Nước mắm Nam Ngư 500ml', 35000.00, 29000.00, NULL, DATEADD(month, 24, DATEADD(hour, 7, GETUTCDATE())), NULL, 500.000, N'ml', N'Nước mắm truyền thống', N'Available', NULL),
-(15, 8, N'Nước mắm Phú Quốc 750ml', 85000.00, NULL, NULL, DATEADD(month, 36, DATEADD(hour, 7, GETUTCDATE())), NULL, 750.000, N'ml', N'Nước mắm Phú Quốc', N'Available', NULL),
-(16, 9, N'Tiêu đen xay Lâm Đồng', 45000.00, NULL, NULL, DATEADD(month, 18, DATEADD(hour, 7, GETUTCDATE())), NULL, 100.000, N'g', N'Tiêu đen nguyên chất', N'Available', NULL),
-(17, 10, N'Đường cát trắng Biên Hòa', 28000.00, 25000.00, NULL, DATEADD(month, 24, DATEADD(hour, 7, GETUTCDATE())), NULL, 1.000, N'kg', N'Đường tinh luyện', N'Available', NULL),
-(18, 10, N'Đường thốt nốt An Giang', 55000.00, NULL, NULL, DATEADD(month, 12, DATEADD(hour, 7, GETUTCDATE())), NULL, 500.000, N'g', N'Đường thốt nốt tự nhiên', N'Available', NULL),
+(14, 8, N'Nước mắm Nam Ngư 500ml', 35000.00, 29000.00, DATEADD(month, 24, DATEADD(hour, 7, GETUTCDATE())), NULL, 500.000, N'ml', N'Nước mắm truyền thống', N'Available', NULL),
+(15, 8, N'Nước mắm Phú Quốc 750ml', 85000.00, NULL, DATEADD(month, 36, DATEADD(hour, 7, GETUTCDATE())), NULL, 750.000, N'ml', N'Nước mắm Phú Quốc', N'Available', NULL),
+(16, 9, N'Tiêu đen xay Lâm Đồng', 45000.00, NULL, DATEADD(month, 18, DATEADD(hour, 7, GETUTCDATE())), NULL, 100.000, N'g', N'Tiêu đen nguyên chất', N'Available', NULL),
+(17, 10, N'Đường cát trắng Biên Hòa', 28000.00, 25000.00, DATEADD(month, 24, DATEADD(hour, 7, GETUTCDATE())), NULL, 1.000, N'kg', N'Đường tinh luyện', N'Available', NULL),
+(18, 10, N'Đường thốt nốt An Giang', 55000.00, NULL, DATEADD(month, 12, DATEADD(hour, 7, GETUTCDATE())), NULL, 500.000, N'g', N'Đường thốt nốt tự nhiên', N'Available', NULL),
 -- Nhóm sữa
-(19, 11, N'TH True Milk 1L', 32000.00, NULL, NULL, DATEADD(month, 6, DATEADD(hour, 7, GETUTCDATE())), NULL, 1000.000, N'ml', N'Sữa tươi tiệt trùng TH', N'Available', NULL),
-(20, 11, N'Vinamilk 100% 1L', 30000.00, 27000.00, NULL, DATEADD(month, 6, DATEADD(hour, 7, GETUTCDATE())), NULL, 1000.000, N'ml', N'Sữa tươi Vinamilk', N'Available', NULL),
-(21, 12, N'Sữa tươi Mộc Châu 500ml', 22000.00, NULL, NULL, DATEADD(day, 15, DATEADD(hour, 7, GETUTCDATE())), NULL, 500.000, N'ml', N'Sữa tươi thanh trùng Mộc Châu', N'Available', NULL),
-(22, 13, N'Yogurt Vinamilk có đường', 5500.00, NULL, NULL, DATEADD(day, 30, DATEADD(hour, 7, GETUTCDATE())), NULL, 100.000, N'g', N'Sữa chua Vinamilk', N'Available', NULL),
-(23, 13, N'Yogurt TH True Yogurt', 7000.00, 6500.00, NULL, DATEADD(day, 30, DATEADD(hour, 7, GETUTCDATE())), NULL, 100.000, N'g', N'Sữa chua TH', N'Available', NULL),
-(24, 14, N'Sữa chua không đường Vinamilk', 6000.00, NULL, NULL, DATEADD(day, 30, DATEADD(hour, 7, GETUTCDATE())), NULL, 100.000, N'g', N'Yogurt không đường', N'Available', NULL),
-(25, 15, N'Phô mai cheddar Teama', 35000.00, NULL, NULL, DATEADD(month, 3, DATEADD(hour, 7, GETUTCDATE())), NULL, 200.000, N'g', N'Phô mai cheddar lát', N'Available', NULL),
-(26, 16, N'Phô mai mozzarella Pizza', 75000.00, 65000.00, NULL, DATEADD(month, 2, DATEADD(hour, 7, GETUTCDATE())), NULL, 250.000, N'g', N'Mozzarella bào sợi', N'Available', NULL),
+(19, 11, N'TH True Milk 1L', 32000.00, NULL, DATEADD(month, 6, DATEADD(hour, 7, GETUTCDATE())), NULL, 1000.000, N'ml', N'Sữa tươi tiệt trùng TH', N'Available', NULL),
+(20, 11, N'Vinamilk 100% 1L', 30000.00, 27000.00, DATEADD(month, 6, DATEADD(hour, 7, GETUTCDATE())), NULL, 1000.000, N'ml', N'Sữa tươi Vinamilk', N'Available', NULL),
+(21, 12, N'Sữa tươi Mộc Châu 500ml', 22000.00, NULL, DATEADD(day, 15, DATEADD(hour, 7, GETUTCDATE())), NULL, 500.000, N'ml', N'Sữa tươi thanh trùng Mộc Châu', N'Available', NULL),
+(22, 13, N'Yogurt Vinamilk có đường', 5500.00, NULL, DATEADD(day, 30, DATEADD(hour, 7, GETUTCDATE())), NULL, 100.000, N'g', N'Sữa chua Vinamilk', N'Available', NULL),
+(23, 13, N'Yogurt TH True Yogurt', 7000.00, 6500.00, DATEADD(day, 30, DATEADD(hour, 7, GETUTCDATE())), NULL, 100.000, N'g', N'Sữa chua TH', N'Available', NULL),
+(24, 14, N'Sữa chua không đường Vinamilk', 6000.00, NULL, DATEADD(day, 30, DATEADD(hour, 7, GETUTCDATE())), NULL, 100.000, N'g', N'Yogurt không đường', N'Available', NULL),
+(25, 15, N'Phô mai cheddar Teama', 35000.00, NULL, DATEADD(month, 3, DATEADD(hour, 7, GETUTCDATE())), NULL, 200.000, N'g', N'Phô mai cheddar lát', N'Available', NULL),
+(26, 16, N'Phô mai mozzarella Pizza', 75000.00, 65000.00, DATEADD(month, 2, DATEADD(hour, 7, GETUTCDATE())), NULL, 250.000, N'g', N'Mozzarella bào sợi', N'Available', NULL),
 -- Nhóm đồ gia dụng
-(27, 17, N'Bát cơm sứ Bát Tràng', 35000.00, NULL, NULL, NULL, NULL, 400.000, N'g', N'Bát sứ thủ công', N'Available', NULL),
-(28, 17, N'Bát sứ Minh Long', 85000.00, NULL, NULL, NULL, NULL, 350.000, N'g', N'Bát sứ cao cấp', N'Available', NULL),
-(29, 18, N'Đĩa sứ tròn 25cm', 45000.00, NULL, NULL, NULL, NULL, 500.000, N'g', N'Đĩa sứ tròn', N'Available', NULL),
-(30, 19, N'Chảo chống dính Sunhouse 26cm', 220000.00, 189000.00, NULL, NULL, NULL, 1200.000, N'g', N'Chảo chống dính', N'Available', NULL),
-(31, 20, N'Nồi cơm điện Sharp 1.8L', 890000.00, NULL, NULL, NULL, NULL, 3000.000, N'g', N'Nồi cơm điện tử', N'Available', NULL),
-(32, 20, N'Nồi cơm điện Toshiba 1L', 650000.00, 599000.00, NULL, NULL, NULL, 2500.000, N'g', N'Nồi cơm điện mini', N'Available', NULL),
+(27, 17, N'Bát cơm sứ Bát Tràng', 35000.00, NULL, NULL, NULL, 400.000, N'g', N'Bát sứ thủ công', N'Available', NULL),
+(28, 17, N'Bát sứ Minh Long', 85000.00, NULL, NULL, NULL, 350.000, N'g', N'Bát sứ cao cấp', N'Available', NULL),
+(29, 18, N'Đĩa sứ tròn 25cm', 45000.00, NULL, NULL, NULL, 500.000, N'g', N'Đĩa sứ tròn', N'Available', NULL),
+(30, 19, N'Chảo chống dính Sunhouse 26cm', 220000.00, 189000.00, NULL, NULL, 1200.000, N'g', N'Chảo chống dính', N'Available', NULL),
+(31, 20, N'Nồi cơm điện Sharp 1.8L', 890000.00, NULL, NULL, NULL, 3000.000, N'g', N'Nồi cơm điện tử', N'Available', NULL),
+(32, 20, N'Nồi cơm điện Toshiba 1L', 650000.00, 599000.00, NULL, NULL, 2500.000, N'g', N'Nồi cơm điện mini', N'Available', NULL),
 -- Nhóm chăm sóc cá nhân
-(33, 21, N'Clear Men Cool Sport 650ml', 165000.00, NULL, NULL, DATEADD(month, 36, DATEADD(hour, 7, GETUTCDATE())), NULL, 650.000, N'ml', N'Dầu gội nam Clear', N'Available', NULL),
-(34, 21, N'Dove Hair Fall Rescue 650ml', 175000.00, 149000.00, NULL, DATEADD(month, 36, DATEADD(hour, 7, GETUTCDATE())), NULL, 650.000, N'ml', N'Dầu gội Dove', N'Available', NULL),
-(35, 21, N'Pantene Total Damage Care 750ml', 185000.00, NULL, NULL, DATEADD(month, 36, DATEADD(hour, 7, GETUTCDATE())), NULL, 750.000, N'ml', N'Dầu gội Pantene', N'Available', NULL),
-(36, 22, N'P/S Bảo Vệ 123 200g', 35000.00, 29000.00, NULL, DATEADD(month, 24, DATEADD(hour, 7, GETUTCDATE())), NULL, 200.000, N'g', N'Kem đánh răng P/S', N'Available', NULL),
-(37, 22, N'Colgate Total 12 150g', 55000.00, NULL, NULL, DATEADD(month, 24, DATEADD(hour, 7, GETUTCDATE())), NULL, 150.000, N'g', N'Kem đánh răng Colgate', N'Available', NULL),
-(38, 22, N'Sensodyne Fresh Mint 100g', 75000.00, NULL, NULL, DATEADD(month, 24, DATEADD(hour, 7, GETUTCDATE())), NULL, 100.000, N'g', N'Kem đánh răng Sensodyne', N'Available', NULL),
+(33, 21, N'Clear Men Cool Sport 650ml', 165000.00, NULL, DATEADD(month, 36, DATEADD(hour, 7, GETUTCDATE())), NULL, 650.000, N'ml', N'Dầu gội nam Clear', N'Available', NULL),
+(34, 21, N'Dove Hair Fall Rescue 650ml', 175000.00, 149000.00, DATEADD(month, 36, DATEADD(hour, 7, GETUTCDATE())), NULL, 650.000, N'ml', N'Dầu gội Dove', N'Available', NULL),
+(35, 21, N'Pantene Total Damage Care 750ml', 185000.00, NULL, DATEADD(month, 36, DATEADD(hour, 7, GETUTCDATE())), NULL, 750.000, N'ml', N'Dầu gội Pantene', N'Available', NULL),
+(36, 22, N'P/S Bảo Vệ 123 200g', 35000.00, 29000.00, DATEADD(month, 24, DATEADD(hour, 7, GETUTCDATE())), NULL, 200.000, N'g', N'Kem đánh răng P/S', N'Available', NULL),
+(37, 22, N'Colgate Total 12 150g', 55000.00, NULL, DATEADD(month, 24, DATEADD(hour, 7, GETUTCDATE())), NULL, 150.000, N'g', N'Kem đánh răng Colgate', N'Available', NULL),
+(38, 22, N'Sensodyne Fresh Mint 100g', 75000.00, NULL, DATEADD(month, 24, DATEADD(hour, 7, GETUTCDATE())), NULL, 100.000, N'g', N'Kem đánh răng Sensodyne', N'Available', NULL),
 -- Bổ sung thêm đa dạng
-(39, 3, N'3 Miền Bò Viên', 4200.00, NULL, NULL, DATEADD(month, 12, DATEADD(hour, 7, GETUTCDATE())), NULL, 70.000, N'g', N'Mì bò viên', N'Available', NULL),
-(40, 5, N'Gạo Nàng Hoa 5kg', 38000.00, NULL, NULL, NULL, NULL, 5.000, N'kg', N'Gạo Nàng Hoa', N'Available', NULL),
-(41, 11, N'Sữa tươi Ba Vì 1L', 26000.00, NULL, NULL, DATEADD(month, 6, DATEADD(hour, 7, GETUTCDATE())), NULL, 1000.000, N'ml', N'Sữa Ba Vì', N'Available', NULL),
-(42, 13, N'Sữa chua uống Yakult', 22000.00, NULL, NULL, DATEADD(day, 45, DATEADD(hour, 7, GETUTCDATE())), NULL, 200.000, N'ml', N'Yakult 5 chai', N'Available', NULL),
-(43, 21, N'Sunsilk Mềm Mượt 650ml', 145000.00, 119000.00, NULL, DATEADD(month, 36, DATEADD(hour, 7, GETUTCDATE())), NULL, 650.000, N'ml', N'Dầu gội Sunsilk', N'Available', NULL),
-(44, 3, N'Gau Do Re Mi Cay', 5000.00, NULL, NULL, DATEADD(month, 12, DATEADD(hour, 7, GETUTCDATE())), NULL, 80.000, N'g', N'Mì Gấu Đỏ', N'Available', NULL),
-(45, 8, N'Nước mắm Chinsu 500ml', 38000.00, 32000.00, NULL, DATEADD(month, 24, DATEADD(hour, 7, GETUTCDATE())), NULL, 500.000, N'ml', N'Nước mắm Chinsu', N'Available', NULL),
-(46, 19, N'Chảo inox Elmich 28cm', 380000.00, NULL, NULL, NULL, NULL, 1500.000, N'g', N'Chảo inox đáy từ', N'Available', NULL),
-(47, 16, N'Phô mai con bò cười', 45000.00, 38000.00, NULL, DATEADD(month, 2, DATEADD(hour, 7, GETUTCDATE())), NULL, 120.000, N'g', N'Phô mai hộp', N'Available', NULL),
-(48, 11, N'Nutri Boost Sữa dâu', 12000.00, NULL, NULL, DATEADD(month, 6, DATEADD(hour, 7, GETUTCDATE())), NULL, 295.000, N'ml', N'Sữa trái cây', N'Available', NULL),
-(49, 22, N'Closeup White Now 150g', 45000.00, NULL, NULL, DATEADD(month, 24, DATEADD(hour, 7, GETUTCDATE())), NULL, 150.000, N'g', N'Kem đánh răng Closeup', N'Available', NULL),
-(50, 7, N'Bột chiên giòn Meizan', 18000.00, NULL, NULL, DATEADD(month, 8, DATEADD(hour, 7, GETUTCDATE())), NULL, 500.000, N'g', N'Bột chiên giòn', N'Available', NULL),
-(51, 13, N'Sữa chua Hy Lạp Olympus', 95000.00, 85000.00, NULL, DATEADD(day, 21, DATEADD(hour, 7, GETUTCDATE())), NULL, 200.000, N'g', N'Greek yogurt nhập khẩu', N'Available', NULL),
-(52, 20, N'Nồi áp suất điện Lock&Lock 5L', 1250000.00, 1099000.00, NULL, NULL, NULL, 4000.000, N'g', N'Nồi áp suất điện', N'Available', NULL),
-(53, 21, N'Head&Shoulders Bạc Hà 750ml', 195000.00, NULL, NULL, DATEADD(month, 36, DATEADD(hour, 7, GETUTCDATE())), NULL, 750.000, N'ml', N'Dầu gội H&S chống gàu', N'Available', NULL);
+(39, 3, N'3 Miền Bò Viên', 4200.00, NULL, DATEADD(month, 12, DATEADD(hour, 7, GETUTCDATE())), NULL, 70.000, N'g', N'Mì bò viên', N'Available', NULL),
+(40, 5, N'Gạo Nàng Hoa 5kg', 38000.00, NULL, NULL, NULL, 5.000, N'kg', N'Gạo Nàng Hoa', N'Available', NULL),
+(41, 11, N'Sữa tươi Ba Vì 1L', 26000.00, NULL, DATEADD(month, 6, DATEADD(hour, 7, GETUTCDATE())), NULL, 1000.000, N'ml', N'Sữa Ba Vì', N'Available', NULL),
+(42, 13, N'Sữa chua uống Yakult', 22000.00, NULL, DATEADD(day, 45, DATEADD(hour, 7, GETUTCDATE())), NULL, 200.000, N'ml', N'Yakult 5 chai', N'Available', NULL),
+(43, 21, N'Sunsilk Mềm Mượt 650ml', 145000.00, 119000.00, DATEADD(month, 36, DATEADD(hour, 7, GETUTCDATE())), NULL, 650.000, N'ml', N'Dầu gội Sunsilk', N'Available', NULL),
+(44, 3, N'Gau Do Re Mi Cay', 5000.00, NULL, DATEADD(month, 12, DATEADD(hour, 7, GETUTCDATE())), NULL, 80.000, N'g', N'Mì Gấu Đỏ', N'Available', NULL),
+(45, 8, N'Nước mắm Chinsu 500ml', 38000.00, 32000.00, DATEADD(month, 24, DATEADD(hour, 7, GETUTCDATE())), NULL, 500.000, N'ml', N'Nước mắm Chinsu', N'Available', NULL),
+(46, 19, N'Chảo inox Elmich 28cm', 380000.00, NULL, NULL, NULL, 1500.000, N'g', N'Chảo inox đáy từ', N'Available', NULL),
+(47, 16, N'Phô mai con bò cười', 45000.00, 38000.00, DATEADD(month, 2, DATEADD(hour, 7, GETUTCDATE())), NULL, 120.000, N'g', N'Phô mai hộp', N'Available', NULL),
+(48, 11, N'Nutri Boost Sữa dâu', 12000.00, NULL, DATEADD(month, 6, DATEADD(hour, 7, GETUTCDATE())), NULL, 295.000, N'ml', N'Sữa trái cây', N'Available', NULL),
+(49, 22, N'Closeup White Now 150g', 45000.00, NULL, DATEADD(month, 24, DATEADD(hour, 7, GETUTCDATE())), NULL, 150.000, N'g', N'Kem đánh răng Closeup', N'Available', NULL),
+(50, 7, N'Bột chiên giòn Meizan', 18000.00, NULL, DATEADD(month, 8, DATEADD(hour, 7, GETUTCDATE())), NULL, 500.000, N'g', N'Bột chiên giòn', N'Available', NULL),
+(51, 13, N'Sữa chua Hy Lạp Olympus', 95000.00, 85000.00, DATEADD(day, 21, DATEADD(hour, 7, GETUTCDATE())), NULL, 200.000, N'g', N'Greek yogurt nhập khẩu', N'Available', NULL),
+(52, 20, N'Nồi áp suất điện Lock&Lock 5L', 1250000.00, 1099000.00, NULL, NULL, 4000.000, N'g', N'Nồi áp suất điện', N'Available', NULL),
+(53, 21, N'Head&Shoulders Bạc Hà 750ml', 195000.00, NULL, DATEADD(month, 36, DATEADD(hour, 7, GETUTCDATE())), NULL, 750.000, N'ml', N'Dầu gội H&S chống gàu', N'Available', NULL),
+-- Sản phẩm bổ sung phong phú mới (54-83)
+(54, 3, N'Mì ly Modern lẩu thái', 6000.00, NULL, DATEADD(month, 12, DATEADD(hour, 7, GETUTCDATE())), NULL, 65.000, N'g', N'Mì ly lẩu thái', N'Available', NULL),
+(55, 3, N'Mì trộn Indomie Mi Goreng', 7500.00, NULL, DATEADD(month, 12, DATEADD(hour, 7, GETUTCDATE())), NULL, 85.000, N'g', N'Mì xào khô Indomie', N'Available', NULL),
+(56, 3, N'Mì Koreno vị kim chi', 12000.00, 10500.00, DATEADD(month, 12, DATEADD(hour, 7, GETUTCDATE())), NULL, 120.000, N'g', N'Mì nướng Hàn Quốc', N'Available', NULL),
+(57, 4, N'Phở bò Đệ Nhất Acecook', 8000.00, NULL, DATEADD(month, 12, DATEADD(hour, 7, GETUTCDATE())), NULL, 72.000, N'g', N'Phở Đệ Nhất bò', N'Available', NULL),
+(58, 4, N'Hủ tiếu Nhịp Sống Nam Vang', 9000.00, NULL, DATEADD(month, 12, DATEADD(hour, 7, GETUTCDATE())), NULL, 70.000, N'g', N'Hủ tiếu Nam Vang', N'Available', NULL),
+(59, 5, N'Gạo Japonica Nhật Bản 5kg', 195000.00, 175000.00, NULL, NULL, 5.000, N'kg', N'Gạo dẻo kiểu Nhật', N'Available', NULL),
+(60, 6, N'Gạo lứt đỏ Điện Biên 1kg', 39000.00, 36000.00, NULL, NULL, 1.000, N'kg', N'Gạo lứt đỏ tự nhiên', N'Available', NULL),
+(61, 7, N'Bột làm bánh xèo Tài Ký', 16000.00, NULL, DATEADD(month, 8, DATEADD(hour, 7, GETUTCDATE())), NULL, 400.000, N'g', N'Bột bánh xèo pha sẵn', N'Available', NULL),
+(62, 8, N'Nước tương Chin-su tỏi ớt', 18000.00, 15000.00, DATEADD(month, 18, DATEADD(hour, 7, GETUTCDATE())), NULL, 250.000, N'ml', N'Nước tương tỏi ớt', N'Available', NULL),
+(63, 8, N'Nước mắm nhỉ Knorr 500ml', 55000.00, NULL, DATEADD(month, 24, DATEADD(hour, 7, GETUTCDATE())), NULL, 500.000, N'ml', N'Nước mắm Knorr ngon', N'Available', NULL),
+(64, 9, N'Muối tiêu chanh Cholimex', 10000.00, NULL, DATEADD(month, 18, DATEADD(hour, 7, GETUTCDATE())), NULL, 90.000, N'g', N'Muối tiêu chanh tiện lợi', N'Available', NULL),
+(65, 10, N'Đường phèn Biên Hòa 500g', 38000.00, NULL, DATEADD(month, 24, DATEADD(hour, 7, GETUTCDATE())), NULL, 500.000, N'g', N'Đường phèn hạt nhỏ', N'Available', NULL),
+(66, 11, N'Sữa Milo lúa mạch 180ml', 28000.00, 25000.00, DATEADD(month, 6, DATEADD(hour, 7, GETUTCDATE())), NULL, 720.000, N'ml', N'Lốc 4 hộp Milo', N'Available', NULL),
+(67, 11, N'Sữa tươi Dutch Lady 1L', 29000.00, NULL, DATEADD(month, 6, DATEADD(hour, 7, GETUTCDATE())), NULL, 1000.000, N'ml', N'Sữa tiệt trùng Cô gái Hà Lan', N'Available', NULL),
+(68, 12, N'Sữa thanh trùng Dalat Milk 1L', 42000.00, NULL, DATEADD(day, 10, DATEADD(hour, 7, GETUTCDATE())), NULL, 1000.000, N'ml', N'Sữa thanh trùng Dalat Milk', N'Available', NULL),
+(69, 13, N'Sữa chua nha đam Vinamilk', 7000.00, NULL, DATEADD(day, 30, DATEADD(hour, 7, GETUTCDATE())), NULL, 100.000, N'g', N'Sữa chua nha đam hạt giòn', N'Available', NULL),
+(70, 13, N'Sữa chua nếp cẩm TH True', 9000.00, 8000.00, DATEADD(day, 25, DATEADD(hour, 7, GETUTCDATE())), NULL, 100.000, N'g', N'Sữa chua nếp cẩm dẻo ngon', N'Available', NULL),
+(71, 14, N'Sữa chua ít đường TH True', 7500.00, NULL, DATEADD(day, 30, DATEADD(hour, 7, GETUTCDATE())), NULL, 100.000, N'g', N'Sữa chua ít đường', N'Available', NULL),
+(72, 15, N'Phô mai bơ President lát', 52000.00, NULL, DATEADD(month, 4, DATEADD(hour, 7, GETUTCDATE())), NULL, 150.000, N'g', N'Phô mai President thơm béo', N'Available', NULL),
+(73, 16, N'Phô mai mozzarella Anchor', 89000.00, 82000.00, DATEADD(month, 3, DATEADD(hour, 7, GETUTCDATE())), NULL, 200.000, N'g', N'Mozzarella Anchor nhập khẩu', N'Available', NULL),
+(74, 17, N'Tô sứ sâu Minh Long', 95000.00, NULL, NULL, NULL, 600.000, N'g', N'Tô sứ đựng canh', N'Available', NULL),
+(75, 18, N'Đĩa sứ Minh Long 20cm', 55000.00, NULL, NULL, NULL, 450.000, N'g', N'Đĩa sứ Minh Long trơn', N'Available', NULL),
+(76, 19, N'Chảo chống dính Tefal 24cm', 450000.00, 399000.00, NULL, NULL, 900.000, N'g', N'Chảo chống dính Tefal Pháp', N'Available', NULL),
+(77, 20, N'Nồi cơm điện cao tần Tefal 1.5L', 1890000.00, 1690000.00, NULL, NULL, 3500.000, N'g', N'Nồi cơm cao tần Tefal thông minh', N'Available', NULL),
+(78, 21, N'Romano Force Dầu Gội 650ml', 155000.00, NULL, DATEADD(month, 36, DATEADD(hour, 7, GETUTCDATE())), NULL, 650.000, N'ml', N'Dầu gội nam Romano hương nam tính', N'Available', NULL),
+(79, 21, N'Rejoice Siêu Mềm Mượt 650ml', 135000.00, 119000.00, DATEADD(month, 36, DATEADD(hour, 7, GETUTCDATE())), NULL, 650.000, N'ml', N'Dầu gội Rejoice dưỡng tóc', N'Available', NULL),
+(80, 22, N'Kem đánh răng Closeup Bạc Hà 230g', 42000.00, 37000.00, DATEADD(month, 24, DATEADD(hour, 7, GETUTCDATE())), NULL, 230.000, N'g', N'Closeup hơi thở thơm mát', N'Available', NULL),
+(81, 11, N'Sữa tươi tiệt trùng Meadow Fresh 1L', 55000.00, NULL, DATEADD(month, 6, DATEADD(hour, 7, GETUTCDATE())), NULL, 1000.000, N'ml', N'Sữa tươi nhập khẩu Meadow Fresh', N'Available', NULL),
+(82, 11, N'Sữa tươi nguyên kem Devondale 1L', 45000.00, 39000.00, DATEADD(month, 8, DATEADD(hour, 7, GETUTCDATE())), NULL, 1000.000, N'ml', N'Sữa Úc nguyên chất Devondale', N'Available', NULL),
+(83, 21, N'TRESemmé Keratin Smooth 640ml', 189000.00, 169000.00, DATEADD(month, 36, DATEADD(hour, 7, GETUTCDATE())), NULL, 640.000, N'ml', N'Dầu gội chuẩn salon TRESemme', N'Available', NULL);
 SET IDENTITY_INSERT dbo.PRODUCT OFF;
 GO
 
 -- ══════════════════════════════════════════════════════════════
--- 10. PRODUCT_HEALTHTAG (20 record) — tag cho 1 số sản phẩm
+-- 10. PRODUCT_HEALTHTAG
 -- ══════════════════════════════════════════════════════════════
 INSERT INTO dbo.PRODUCT_HEALTHTAG (ProductID, HealthTagID) VALUES
--- Vegan
+-- Mẫu ban đầu (Vegan)
 (9, 8), (10, 8), (11, 8), (12, 8), (13, 8),
 -- Keto
 (12, 9), (24, 9), (25, 9), (26, 9),
@@ -234,8 +291,30 @@ INSERT INTO dbo.PRODUCT_HEALTHTAG (ProductID, HealthTagID) VALUES
 (15, 7), (19, 7), (20, 7), (21, 7), (25, 7), (26, 7),
 -- Low-carb
 (24, 6), (25, 6), (26, 6),
--- Có gluten (cho test allergy gluten)
-(13, 2), (50, 2);
+-- Có Gluten (cho test allergy gluten)
+(13, 2), (50, 2),
+-- Bổ sung mapping dị ứng và sức khỏe chi tiết cho sản phẩm
+-- Mì/phở chứa Gluten (bột mì)
+(4, 2), (5, 2),
+-- Hảo Hảo tôm chua cay chứa Hải sản có vỏ
+(4, 5),
+-- Nhóm Sữa (Milk/Lactose)
+(19, 3), (19, 14), (20, 3), (20, 14), (21, 3), (21, 14), (22, 3), (22, 14),
+(23, 3), (23, 14), (24, 3), (24, 14), (25, 3), (25, 14), (26, 3), (26, 14),
+-- Gạo hữu cơ/organic
+(9, 15), (12, 15),
+-- Mì/phở chứa Gluten (54, 55, 56, 57, 58, 61)
+(54, 2), (55, 2), (56, 2), (57, 2), (58, 2), (61, 2),
+-- Mì Modern chứa Hải sản có vỏ (54)
+(54, 5),
+-- Nước mắm chứa Cá (63)
+(63, 13),
+-- Sữa/phô mai chứa Sữa (3) & Sữa tươi (14)
+(66, 3), (66, 14), (67, 3), (67, 14), (68, 3), (68, 14), 
+(69, 3), (69, 14), (70, 3), (70, 14), (71, 3), (71, 14), 
+(72, 3), (72, 14), (73, 3), (73, 14), (81, 3), (81, 14), (82, 3), (82, 14),
+-- Sản phẩm chay/ăn kiêng
+(59, 8), (60, 8), (60, 15), (60, 17), (71, 21), (73, 9), (73, 7);
 GO
 
 -- ══════════════════════════════════════════════════════════════
@@ -329,12 +408,12 @@ DECLARE @productStart INT = 4;
 WHILE @slotId <= 62
 BEGIN
     INSERT INTO dbo.PRODUCT_SLOT (ProductsSlotID, SlotID, ProductID)
-    VALUES (@psId, @slotId, @productStart + ((@slotId - 3) % 50));
+    VALUES (@psId, @slotId, @productStart + ((@slotId - 3) % 80));
     SET @psId = @psId + 1;
-    IF @slotId % 3 = 0 AND @productStart + ((@slotId - 3) % 50) + 1 <= 53
+    IF @slotId % 3 = 0 AND @productStart + ((@slotId - 3) % 80) + 1 <= 83
     BEGIN
         INSERT INTO dbo.PRODUCT_SLOT (ProductsSlotID, SlotID, ProductID)
-        VALUES (@psId, @slotId, @productStart + ((@slotId - 3) % 50) + 1);
+        VALUES (@psId, @slotId, @productStart + ((@slotId - 3) % 80) + 1);
         SET @psId = @psId + 1;
     END
     SET @slotId = @slotId + 1;
@@ -343,10 +422,29 @@ SET IDENTITY_INSERT dbo.PRODUCT_SLOT OFF;
 GO
 
 -- ══════════════════════════════════════════════════════════════
--- 17. ROBOT (4 record mới: ID 2-5) — pin & mode đa dạng
+-- 17. ROBOT / BRAND / AD_CAMPAIGN dọn dẹp & nạp lại an toàn (Tránh conflict với seed_map)
 -- ══════════════════════════════════════════════════════════════
+DELETE FROM dbo.AD_CAMPAIGN_LOG;
+DELETE FROM dbo.SPONSORED_PRODUCT;
+DELETE FROM dbo.AD_CAMPAIGN;
+DELETE FROM dbo.AD_PACKAGE;
+DELETE FROM dbo.BRAND;
+DELETE FROM dbo.ROBOT_LOG;
+DELETE FROM dbo.ROBOT;
+GO
+
+DBCC CHECKIDENT('dbo.ROBOT', RESEED, 0);
+DBCC CHECKIDENT('dbo.ROBOT_LOG', RESEED, 0);
+DBCC CHECKIDENT('dbo.BRAND', RESEED, 0);
+DBCC CHECKIDENT('dbo.AD_PACKAGE', RESEED, 0);
+DBCC CHECKIDENT('dbo.AD_CAMPAIGN', RESEED, 0);
+DBCC CHECKIDENT('dbo.SPONSORED_PRODUCT', RESEED, 0);
+DBCC CHECKIDENT('dbo.AD_CAMPAIGN_LOG', RESEED, 0);
+GO
+
 SET IDENTITY_INSERT dbo.ROBOT ON;
 INSERT INTO dbo.ROBOT (RobotID, RobotName, RobotCode, BatteryPct, Mode, Status, LastSeenAt) VALUES
+(1, N'Robot 01', N'RB001', 100, N'idle', N'Online', DATEADD(hour, 7, GETUTCDATE())),
 (2, N'Robot 02', N'RB002', 87, N'idle', N'Online', DATEADD(minute, -2, DATEADD(hour, 7, GETUTCDATE()))),
 (3, N'Robot 03', N'RB003', 45, N'navigating', N'Online', DATEADD(minute, -1, DATEADD(hour, 7, GETUTCDATE()))),
 (4, N'Robot 04', N'RB004', 15, N'charging', N'Online', DATEADD(hour, -1, DATEADD(hour, 7, GETUTCDATE()))),
@@ -354,26 +452,6 @@ INSERT INTO dbo.ROBOT (RobotID, RobotName, RobotCode, BatteryPct, Mode, Status, 
 SET IDENTITY_INSERT dbo.ROBOT OFF;
 GO
 
--- ══════════════════════════════════════════════════════════════
--- 18. ROBOT_ZONE (10 record — gán robot vào zone)
--- ══════════════════════════════════════════════════════════════
-SET IDENTITY_INSERT dbo.ROBOT_ZONE ON;
-INSERT INTO dbo.ROBOT_ZONE (RobotZoneID, RobotID, ZoneID) VALUES
-(2, 2, 3),
-(3, 2, 4),
-(4, 3, 5),
-(5, 3, 6),
-(6, 4, 3),
-(7, 4, 4),
-(8, 4, 5),
-(9, 5, 3),
-(10, 5, 6);
-SET IDENTITY_INSERT dbo.ROBOT_ZONE OFF;
-GO
-
--- ══════════════════════════════════════════════════════════════
--- 19. ROBOT_LOG (20 record) — log đa dạng state
--- ══════════════════════════════════════════════════════════════
 SET IDENTITY_INSERT dbo.ROBOT_LOG ON;
 DECLARE @i INT = 1;
 DECLARE @robotId INT;
@@ -402,11 +480,9 @@ END
 SET IDENTITY_INSERT dbo.ROBOT_LOG OFF;
 GO
 
--- ══════════════════════════════════════════════════════════════
--- 20. BRAND (4 record mới: ID 2-5)
--- ══════════════════════════════════════════════════════════════
 SET IDENTITY_INSERT dbo.BRAND ON;
 INSERT INTO dbo.BRAND (BrandID, BrandName, Wallet, Description) VALUES
+(1, N'Coca-Cola Company', 1000000.00, N'Hãng nước giải khát'),
 (2, N'Unilever Vietnam', 5000000.00, N'Nhà sản xuất hàng tiêu dùng'),
 (3, N'Vinamilk', 8000000.00, N'Sữa và sản phẩm từ sữa'),
 (4, N'Sunhouse Group', 3500000.00, N'Đồ gia dụng'),
@@ -414,35 +490,29 @@ INSERT INTO dbo.BRAND (BrandID, BrandName, Wallet, Description) VALUES
 SET IDENTITY_INSERT dbo.BRAND OFF;
 GO
 
--- ══════════════════════════════════════════════════════════════
--- 21. AD_PACKAGE (2 record mới: ID 2-3)
--- ══════════════════════════════════════════════════════════════
 SET IDENTITY_INSERT dbo.AD_PACKAGE ON;
 INSERT INTO dbo.AD_PACKAGE (PackageID, PackageName, PricePackage, PriceRoute, BasePriceClick, AdScore, Status) VALUES
+(1, N'Gói cơ bản', 1000000.00, 200000.00, 5000.00, 50, N'Active'),
 (2, N'Gói cao cấp', 2500000.00, 500000.00, 8000.00, 75, N'Active'),
 (3, N'Gói VIP', 5000000.00, 1000000.00, 12000.00, 90, N'Active');
 SET IDENTITY_INSERT dbo.AD_PACKAGE OFF;
 GO
 
--- ══════════════════════════════════════════════════════════════
--- 22. AD_CAMPAIGN (6 record mới: ID 2-7) — gán RobotZone có sẵn
--- ══════════════════════════════════════════════════════════════
 SET IDENTITY_INSERT dbo.AD_CAMPAIGN ON;
-INSERT INTO dbo.AD_CAMPAIGN (AdCampaignID, PackageID, BrandID, RobotZoneID, CampaignName, StartDate, EndDate, Status) VALUES
-(2, 2, 2, 2, N'Clear Men tháng 6', DATEADD(day, -10, DATEADD(hour, 7, GETUTCDATE())), DATEADD(day, 20, DATEADD(hour, 7, GETUTCDATE())), N'Running'),
-(3, 2, 3, 3, N'Vinamilk mùa hè 2026', DATEADD(day, -5, DATEADD(hour, 7, GETUTCDATE())), DATEADD(day, 60, DATEADD(hour, 7, GETUTCDATE())), N'Running'),
-(4, 3, 4, 4, N'Sunhouse khuyến mãi T6', DATEADD(day, -15, DATEADD(hour, 7, GETUTCDATE())), DATEADD(day, 15, DATEADD(hour, 7, GETUTCDATE())), N'Running'),
-(5, 2, 5, 5, N'Panasonic tháng này', DATEADD(day, -3, DATEADD(hour, 7, GETUTCDATE())), DATEADD(day, 30, DATEADD(hour, 7, GETUTCDATE())), N'Running'),
-(6, 3, 3, 6, N'TH True Yogurt quảng bá', DATEADD(day, -7, DATEADD(hour, 7, GETUTCDATE())), DATEADD(day, 25, DATEADD(hour, 7, GETUTCDATE())), N'Running'),
+INSERT INTO dbo.AD_CAMPAIGN (AdCampaignID, PackageID, BrandID, SemanticObjectID, CampaignName, StartDate, EndDate, Status) VALUES
+(1, 1, 1, NULL, N'Coca mùa hè 2026', DATEADD(hour, 7, GETUTCDATE()), DATEADD(month, 3, DATEADD(hour, 7, GETUTCDATE())), N'Running'),
+(2, 2, 2, NULL, N'Clear Men tháng 6', DATEADD(day, -10, DATEADD(hour, 7, GETUTCDATE())), DATEADD(day, 20, DATEADD(hour, 7, GETUTCDATE())), N'Running'),
+(3, 2, 3, NULL, N'Vinamilk mùa hè 2026', DATEADD(day, -5, DATEADD(hour, 7, GETUTCDATE())), DATEADD(day, 60, DATEADD(hour, 7, GETUTCDATE())), N'Running'),
+(4, 3, 4, NULL, N'Sunhouse khuyến mãi T6', DATEADD(day, -15, DATEADD(hour, 7, GETUTCDATE())), DATEADD(day, 15, DATEADD(hour, 7, GETUTCDATE())), N'Running'),
+(5, 2, 5, NULL, N'Panasonic tháng này', DATEADD(day, -3, DATEADD(hour, 7, GETUTCDATE())), DATEADD(day, 30, DATEADD(hour, 7, GETUTCDATE())), N'Running'),
+(6, 3, 3, NULL, N'TH True Yogurt quảng bá', DATEADD(day, -7, DATEADD(hour, 7, GETUTCDATE())), DATEADD(day, 25, DATEADD(hour, 7, GETUTCDATE())), N'Running'),
 (7, 2, 2, NULL, N'Dove Refresh Q3', DATEADD(month, 1, DATEADD(hour, 7, GETUTCDATE())), DATEADD(month, 4, DATEADD(hour, 7, GETUTCDATE())), N'Scheduled');
 SET IDENTITY_INSERT dbo.AD_CAMPAIGN OFF;
 GO
 
--- ══════════════════════════════════════════════════════════════
--- 23. SPONSORED_PRODUCT (12 record mới: ID 2-13) — gán vào campaign
--- ══════════════════════════════════════════════════════════════
 SET IDENTITY_INSERT dbo.SPONSORED_PRODUCT ON;
 INSERT INTO dbo.SPONSORED_PRODUCT (SponsoredID, AdCampaignID, ProductID, Priority, status) VALUES
+(1, 1, 3, 10, N'Active'),
 (2, 2, 33, 8, N'Active'),
 (3, 2, 43, 6, N'Active'),
 (4, 3, 20, 10, N'Active'),
@@ -458,9 +528,6 @@ INSERT INTO dbo.SPONSORED_PRODUCT (SponsoredID, AdCampaignID, ProductID, Priorit
 SET IDENTITY_INSERT dbo.SPONSORED_PRODUCT OFF;
 GO
 
--- ══════════════════════════════════════════════════════════════
--- 24. AD_CAMPAIGN_LOG (30 record) — mix Click/View/RoutePass
--- ══════════════════════════════════════════════════════════════
 SET IDENTITY_INSERT dbo.AD_CAMPAIGN_LOG ON;
 DECLARE @k INT = 1;
 DECLARE @action NVARCHAR(50);
@@ -469,7 +536,7 @@ BEGIN
     SET @action = CASE @k % 3 WHEN 0 THEN N'Click' WHEN 1 THEN N'View' ELSE N'RoutePass' END;
     INSERT INTO dbo.AD_CAMPAIGN_LOG (
         LogID, AdCampaignID, ActionType, ChargedAmount, Timestamp,
-        SponsoredID, ProductID, RobotID, RobotZoneID, ZoneID, SlotID, MemberID, XCoord, YCoord)
+        SponsoredID, ProductID, RobotID, SemanticObjectID, ZoneID, SlotID, MemberID, XCoord, YCoord)
     VALUES (
         @k,
         ((@k - 1) % 6) + 2,
@@ -479,7 +546,7 @@ BEGIN
         ((@k - 1) % 12) + 2,
         ((@k - 1) % 50) + 4,
         ((@k - 1) % 5) + 1,
-        ((@k - 1) % 9) + 2,
+        NULL,
         ((@k - 1) % 6) + 1,
         ((@k - 1) % 60) + 3,
         ((@k - 1) % 12) + 1,
@@ -492,12 +559,25 @@ SET IDENTITY_INSERT dbo.AD_CAMPAIGN_LOG OFF;
 GO
 
 -- ══════════════════════════════════════════════════════════════
--- 25. INVOICE_HISTORY (25 record mới: ID 2-26) — lịch sử mua hàng
+-- 18. INVOICE / MEAL / AISLE_SCAN dọn dẹp & nạp lại sạch sẽ
 -- ══════════════════════════════════════════════════════════════
+DELETE FROM dbo.AISLE_SCAN;
+DELETE FROM dbo.MEAL_ITEM;
+DELETE FROM dbo.MEAL_SUGGESTION;
+DELETE FROM dbo.INVOICE_HISTORY_ITEM;
+DELETE FROM dbo.INVOICE_HISTORY;
+GO
+
+DBCC CHECKIDENT('dbo.INVOICE_HISTORY', RESEED, 0);
+DBCC CHECKIDENT('dbo.INVOICE_HISTORY_ITEM', RESEED, 0);
+DBCC CHECKIDENT('dbo.MEAL_SUGGESTION', RESEED, 0);
+DBCC CHECKIDENT('dbo.AISLE_SCAN', RESEED, 0);
+GO
+
 SET IDENTITY_INSERT dbo.INVOICE_HISTORY ON;
 DECLARE @m INT = 1;
 DECLARE @total DECIMAL(18,2);
-DECLARE @invoiceId INT = 2;
+DECLARE @invoiceId INT = 1;
 WHILE @m <= 25
 BEGIN
     SET @total = 50000 + (@m * 12345) % 800000;
@@ -514,16 +594,13 @@ END
 SET IDENTITY_INSERT dbo.INVOICE_HISTORY OFF;
 GO
 
--- ══════════════════════════════════════════════════════════════
--- 26. INVOICE_HISTORY_ITEM (70 record) — mỗi invoice 2-3 items
--- ══════════════════════════════════════════════════════════════
 SET IDENTITY_INSERT dbo.INVOICE_HISTORY_ITEM ON;
-DECLARE @inv INT = 2;
+DECLARE @inv INT = 1;
 DECLARE @items INT;
-DECLARE @itemId INT = 2;
+DECLARE @itemId INT = 1;
 DECLARE @productId INT;
 DECLARE @price DECIMAL(18,2);
-WHILE @inv <= 26
+WHILE @inv <= 25
 BEGIN
     SET @items = 2 + (@inv % 2);
     DECLARE @n INT = 0;
@@ -541,11 +618,9 @@ END
 SET IDENTITY_INSERT dbo.INVOICE_HISTORY_ITEM OFF;
 GO
 
--- ══════════════════════════════════════════════════════════════
--- 27. MEAL_SUGGESTION (8 record mới: ID 2-9)
--- ══════════════════════════════════════════════════════════════
 SET IDENTITY_INSERT dbo.MEAL_SUGGESTION ON;
 INSERT INTO dbo.MEAL_SUGGESTION (MealSuggestionID, MealName, Description, YieldPortions, ImageUrl, Calories, healthy_score, alternative_suggestion) VALUES
+(1, N'Cơm chiên trứng', N'Cơm chiên với trứng và hành lá', 2, NULL, 480, 65, N'Có thể thêm rau xanh'),
 (2, N'Cơm gạo lứt gà xé', N'Bữa trưa healthy với gạo lứt và ức gà', 2, NULL, 450, 85, N'Có thể thay ức gà bằng cá hồi'),
 (3, N'Phở bò truyền thống', N'Phở bò với nước dùng hầm xương 12 tiếng', 4, NULL, 550, 70, N'Phở gà ít béo hơn'),
 (4, N'Salad rau trộn dầu oliu', N'Salad rau xanh với sốt dầu oliu chanh', 2, NULL, 220, 95, N'Salad Caesar nếu thích phô mai'),
@@ -557,12 +632,8 @@ INSERT INTO dbo.MEAL_SUGGESTION (MealSuggestionID, MealName, Description, YieldP
 SET IDENTITY_INSERT dbo.MEAL_SUGGESTION OFF;
 GO
 
--- ══════════════════════════════════════════════════════════════
--- 28. MEAL_ITEM (25 record) — gán product vào meal
--- ══════════════════════════════════════════════════════════════
-SET IDENTITY_INSERT dbo.MEAL_ITEM ON;
-DECLARE @mid INT = 2;
-DECLARE @miId INT = 2;
+-- MEAL_ITEM (27 record: 3 sản phẩm mỗi meal)
+DECLARE @mid INT = 1;
 DECLARE @p INT;
 DECLARE @q DECIMAL(18,3);
 DECLARE @u NVARCHAR(20);
@@ -576,19 +647,15 @@ BEGIN
         SET @u = CASE @c WHEN 0 THEN N'kg' WHEN 1 THEN N'g' ELSE N'ml' END;
         INSERT INTO dbo.MEAL_ITEM (MealSuggestionID, ProductID, QuantityRequired, UnitOfMeasure)
         VALUES (@mid, @p, @q, @u);
-        SET @miId = @miId + 1;
         SET @c = @c + 1;
     END
     SET @mid = @mid + 1;
 END
-SET IDENTITY_INSERT dbo.MEAL_ITEM OFF;
 GO
 
--- ══════════════════════════════════════════════════════════════
--- 29. AISLE_SCAN (6 record) — robot scan aisle
--- ══════════════════════════════════════════════════════════════
 SET IDENTITY_INSERT dbo.AISLE_SCAN ON;
 INSERT INTO dbo.AISLE_SCAN (ScanID, AisleID, RobotID, ScannedAt, EmptyPercentage, NeedsRestock, ImageUrl) VALUES
+(1, 1, 1, DATEADD(hour, -1, DATEADD(hour, 7, GETUTCDATE())), 12.50, 0, NULL),
 (2, 3, 2, DATEADD(hour, -2, DATEADD(hour, 7, GETUTCDATE())), 15.50, 0, NULL),
 (3, 4, 3, DATEADD(hour, -3, DATEADD(hour, 7, GETUTCDATE())), 45.00, 1, NULL),
 (4, 5, 2, DATEADD(hour, -4, DATEADD(hour, 7, GETUTCDATE())), 8.20, 0, NULL),
@@ -598,8 +665,5 @@ INSERT INTO dbo.AISLE_SCAN (ScanID, AisleID, RobotID, ScannedAt, EmptyPercentage
 SET IDENTITY_INSERT dbo.AISLE_SCAN OFF;
 GO
 
--- ══════════════════════════════════════════════════════════════
--- SUMMARY
--- ══════════════════════════════════════════════════════════════
-PRINT '✅ FE Dev Seed: ~500 records inserted (excluding MAP tables).';
+PRINT '✅ Unified FE Dev Seed Data: ~500 records successfully consolidated!';
 GO

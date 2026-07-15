@@ -9,5 +9,5 @@ public interface IGeminiService
     /// Sắp xếp lại danh sách sản phẩm theo ngữ nghĩa query người dùng.
     /// Trả về chuỗi danh sách ProductId theo thứ tự relevance giảm dần (vd "12,5,8,1").
     /// </summary>
-    Task<string> RerankAndExplainAsync(string query, IReadOnlyList<string> productIdAndNames, CancellationToken ct = default);
+    Task<string> RerankAndExplainAsync(string query, IReadOnlyList<string> productIdAndNames, string? personalizedContext = null, CancellationToken ct = default);
 }

@@ -360,7 +360,6 @@ public sealed class AdCampaignService(
             throw new InvalidOperationException(localizer.Get("CampaignNotInactive"));
 
         var isResuming = campaign.Status == CampaignStatus.Paused;
-        decimal chargedAmount = 0;
 
         if (!isResuming)
         {
@@ -657,7 +656,7 @@ public sealed class AdCampaignService(
         {
             if (sp.Product?.ProductSlots == null || !sp.Product.ProductSlots.Any())
                 return true;
-            return sp.Product.ProductSlots.All(ps => ps.Slot.Quantity <= 0);
+            return sp.Product.ProductSlots.All(ps => ps.Slot!.Quantity <= 0);
         });
 
         if (allOutOfStock)
@@ -692,30 +691,30 @@ public sealed class AdCampaignService(
         var productTypeId = semanticObject.ProductTypeId.Value;
 
         var playlistItems = await (from sp in db.SponsoredProducts.AsNoTracking()
-                                   where sp.Product.ProductTypeId == productTypeId
+                                   where sp.Product!.ProductTypeId == productTypeId
                                          && sp.Status == SponsoredProductStatus.Active
-                                         && sp.AdCampaign.Status == CampaignStatus.Active
+                                         && sp.AdCampaign!.Status == CampaignStatus.Active
                                          && sp.AdCampaign.StartDate <= now
                                          && sp.AdCampaign.EndDate >= now
-                                   orderby sp.AdCampaign.Package.AdScore descending, sp.Priority descending, sp.AdCampaign.EndDate
+                                   orderby sp.AdCampaign!.Package!.AdScore descending, sp.Priority descending, sp.AdCampaign!.EndDate
                                    select new RobotPlaylistItemDto
                                    {
                                        SponsoredId = sp.SponsoredId,
                                        AdCampaignId = sp.AdCampaignId,
-                                       CampaignName = sp.AdCampaign.CampaignName,
+                                       CampaignName = sp.AdCampaign!.CampaignName,
                                        ProductId = sp.ProductId,
-                                       ProductName = sp.Product.ProductName,
+                                       ProductName = sp.Product!.ProductName,
                                        ProductPrice = sp.Product.UnitPrice,
                                        Priority = sp.Priority,
-                                       AdScore = sp.AdCampaign.Package.AdScore,
-                                       EndDate = sp.AdCampaign.EndDate,
-                                       ImageUrl = sp.Product.ImageUrl ?? string.Empty,
+                                       AdScore = sp.AdCampaign.Package!.AdScore,
+                                       EndDate = sp.AdCampaign!.EndDate,
+                                       ImageUrl = sp.Product!.ImageUrl ?? string.Empty,
                                        DisplayDurationSeconds = 30,
-                                       MediaContents = sp.AdCampaign.AdResources
+                                       MediaContents = sp.AdCampaign!.AdResources
                                            .Where(r => r.Status == AdResourceStatus.Active)
                                            .Select(r => new MediaContentDto(
                                                r.ResourceType,
-                                               r.ResourceUrl,
+                                               r.ResourceUrl!,
                                                r.ContentText,
                                                r.Resolution))
                                            .ToList()
@@ -1080,30 +1079,30 @@ public sealed class AdCampaignService(
                                        on sp.AdCampaignId equals acz.AdCampaignId
                                    where acz.ZoneId == zoneId
                                          && sp.Status == SponsoredProductStatus.Active
-                                         && sp.AdCampaign.Status == CampaignStatus.Active
+                                         && sp.AdCampaign!.Status == CampaignStatus.Active
                                          && sp.AdCampaign.StartDate <= now
                                          && sp.AdCampaign.EndDate >= now
-                                   orderby sp.AdCampaign.Package.AdScore descending,
+                                   orderby sp.AdCampaign!.Package!.AdScore descending,
                                            sp.Priority descending,
-                                           sp.AdCampaign.EndDate
+                                           sp.AdCampaign!.EndDate
                                    select new RobotPlaylistItemDto
                                    {
                                        SponsoredId = sp.SponsoredId,
                                        AdCampaignId = sp.AdCampaignId,
-                                       CampaignName = sp.AdCampaign.CampaignName,
+                                       CampaignName = sp.AdCampaign!.CampaignName,
                                        ProductId = sp.ProductId,
-                                       ProductName = sp.Product.ProductName,
+                                       ProductName = sp.Product!.ProductName,
                                        ProductPrice = sp.Product.UnitPrice,
                                        Priority = sp.Priority,
-                                       AdScore = sp.AdCampaign.Package.AdScore,
-                                       EndDate = sp.AdCampaign.EndDate,
-                                       ImageUrl = sp.Product.ImageUrl ?? string.Empty,
+                                       AdScore = sp.AdCampaign.Package!.AdScore,
+                                       EndDate = sp.AdCampaign!.EndDate,
+                                       ImageUrl = sp.Product!.ImageUrl ?? string.Empty,
                                        DisplayDurationSeconds = 30,
-                                       MediaContents = sp.AdCampaign.AdResources
+                                       MediaContents = sp.AdCampaign!.AdResources
                                            .Where(r => r.Status == AdResourceStatus.Active)
                                            .Select(r => new MediaContentDto(
                                                r.ResourceType,
-                                               r.ResourceUrl,
+                                               r.ResourceUrl!,
                                                r.ContentText,
                                                r.Resolution))
                                            .ToList()
@@ -1137,64 +1136,87 @@ public sealed class AdCampaignService(
         var robotRoute = routeAssignment.RobotRoute;
         var now = DateTime.UtcNow;
 
-        var stops = new List<AutonomousRouteStopDto>();
-        foreach (var routeNode in robotRoute.RouteNodeMappings.OrderBy(n => n.SequenceOrder))
+        // [P1-N+1 FIX] Trước đây: mỗi stop gọi 1 query AisleNode + 1 query SponsoredProducts
+        // → 10 stops = 20 queries. Bây giờ: chỉ 2 query batch toàn bộ rồi nhóm trong memory.
+        // Lợi: giảm round-trip xuống ~20×, tải DB giảm đáng kể khi route dài.
+        var stopNodes = robotRoute.RouteNodeMappings
+            .OrderBy(n => n.SequenceOrder)
+            .ToList();
+
+        // Query 1: lấy tất cả AisleNode (kèm Aisle) cho mọi NodeId trong route — 1 round-trip
+        var nodeIds = stopNodes.Select(sn => sn.NodeId).Distinct().ToList();
+        var aisleByNodeId = await db.AisleNodes
+            .AsNoTracking()
+            .Where(an => nodeIds.Contains(an.NodeId))
+            .Include(an => an.Aisle)
+            .ToDictionaryAsync(an => an.NodeId, cancellationToken);
+
+        // Query 2: lấy tất cả SponsoredProducts cho mọi ZoneId của route — 1 round-trip
+        var zoneIds = aisleByNodeId.Values
+            .Where(an => an.Aisle?.ZoneId != null)
+            .Select(an => an.Aisle!.ZoneId)
+            .Distinct()
+            .ToList();
+
+        Dictionary<int, List<RobotPlaylistItemDto>> playlistByZoneId = new();
+        if (zoneIds.Count > 0)
         {
-            var aisleNode = await db.AisleNodes
-                .AsNoTracking()
-                .Include(an => an.Aisle)
-                .FirstOrDefaultAsync(an => an.NodeId == routeNode.NodeId, cancellationToken);
+            var allPlaylistItems = await (from sp in db.SponsoredProducts.AsNoTracking()
+                                          join acz in db.AdCampaignZones.AsNoTracking()
+                                              on sp.AdCampaignId equals acz.AdCampaignId
+                                          where zoneIds.Contains(acz.ZoneId)
+                                                && sp.Status == SponsoredProductStatus.Active
+                                                && sp.AdCampaign!.Status == CampaignStatus.Active
+                                                && sp.AdCampaign.StartDate <= now
+                                                && sp.AdCampaign!.EndDate >= now
+                                          orderby sp.AdCampaign!.Package!.AdScore descending,
+                                                  sp.Priority descending
+                                          select new
+                                          {
+                                              acz.ZoneId,
+                                              Item = new RobotPlaylistItemDto
+                                              {
+                                                  SponsoredId = sp.SponsoredId,
+                                                  AdCampaignId = sp.AdCampaignId,
+                                                  CampaignName = sp.AdCampaign!.CampaignName,
+                                                  ProductId = sp.ProductId,
+                                                  ProductName = sp.Product!.ProductName,
+                                                  ProductPrice = sp.Product.UnitPrice,
+                                                  Priority = sp.Priority,
+                                                  AdScore = sp.AdCampaign.Package!.AdScore,
+                                                  EndDate = sp.AdCampaign!.EndDate,
+                                                  ImageUrl = sp.Product!.ImageUrl ?? string.Empty,
+                                                  DisplayDurationSeconds = 30,
+                                                  MediaContents = sp.AdCampaign!.AdResources
+                                                      .Where(r => r.Status == AdResourceStatus.Active)
+                                                      .Select(r => new MediaContentDto(
+                                                          r.ResourceType,
+                                                          r.ResourceUrl!,
+                                                          r.ContentText,
+                                                          r.Resolution))
+                                                      .ToList()
+                                              }
+                                          })
+                                          .ToListAsync(cancellationToken);
 
-            List<RobotPlaylistItemDto> playlistItems;
+            playlistByZoneId = allPlaylistItems
+                .GroupBy(p => p.ZoneId)
+                .ToDictionary(g => g.Key, g => g.Select(x => x.Item).ToList());
+        }
 
-            if (aisleNode?.Aisle?.ZoneId != null)
-            {
-                playlistItems = await (from sp in db.SponsoredProducts.AsNoTracking()
-                                      join acz in db.AdCampaignZones.AsNoTracking()
-                                          on sp.AdCampaignId equals acz.AdCampaignId
-                                      where acz.ZoneId == aisleNode.Aisle.ZoneId
-                                            && sp.Status == SponsoredProductStatus.Active
-                                            && sp.AdCampaign.Status == CampaignStatus.Active
-                                            && sp.AdCampaign.StartDate <= now
-                                            && sp.AdCampaign.EndDate >= now
-                                      orderby sp.AdCampaign.Package.AdScore descending,
-                                              sp.Priority descending
-                                      select new RobotPlaylistItemDto
-                                      {
-                                          SponsoredId = sp.SponsoredId,
-                                          AdCampaignId = sp.AdCampaignId,
-                                          CampaignName = sp.AdCampaign.CampaignName,
-                                          ProductId = sp.ProductId,
-                                          ProductName = sp.Product.ProductName,
-                                          ProductPrice = sp.Product.UnitPrice,
-                                          Priority = sp.Priority,
-                                          AdScore = sp.AdCampaign.Package.AdScore,
-                                          EndDate = sp.AdCampaign.EndDate,
-                                          ImageUrl = sp.Product.ImageUrl ?? string.Empty,
-                                          DisplayDurationSeconds = 30,
-                                          MediaContents = sp.AdCampaign.AdResources
-                                              .Where(r => r.Status == AdResourceStatus.Active)
-                                              .Select(r => new MediaContentDto(
-                                                  r.ResourceType,
-                                                  r.ResourceUrl,
-                                                  r.ContentText,
-                                                  r.Resolution))
-                                              .ToList()
-                                      })
-                                      .ToListAsync(cancellationToken);
-            }
-            else
-            {
-                playlistItems = [];
-            }
-
-            stops.Add(new AutonomousRouteStopDto(
+        // Ghép stop + aisle + playlist trong bộ nhớ (không query thêm)
+        var stops = stopNodes.Select(routeNode =>
+        {
+            aisleByNodeId.TryGetValue(routeNode.NodeId, out var aisleNode);
+            var zoneId = aisleNode?.Aisle?.ZoneId;
+            playlistByZoneId.TryGetValue(zoneId ?? 0, out var playlistItems);
+            return new AutonomousRouteStopDto(
                 routeNode.SequenceOrder,
                 routeNode.NodeId,
                 routeNode.Node?.NodeName,
                 routeNode.DwellTimeSeconds,
-                playlistItems));
-        }
+                playlistItems ?? []);
+        }).ToList();
 
         return new AutonomousRouteDto(
             robotRoute.RobotRouteId,
@@ -1229,29 +1251,29 @@ public sealed class AdCampaignService(
                                        on sp.AdCampaignId equals acz.AdCampaignId
                                    where acz.ZoneId == aisleNode.Aisle.ZoneId
                                          && sp.Status == SponsoredProductStatus.Active
-                                         && sp.AdCampaign.Status == CampaignStatus.Active
+                                         && sp.AdCampaign!.Status == CampaignStatus.Active
                                          && sp.AdCampaign.StartDate <= now
-                                         && sp.AdCampaign.EndDate >= now
-                                   orderby sp.AdCampaign.Package.AdScore descending,
+                                         && sp.AdCampaign!.EndDate >= now
+                                   orderby sp.AdCampaign!.Package!.AdScore descending,
                                            sp.Priority descending
                                    select new RobotPlaylistItemDto
                                    {
                                        SponsoredId = sp.SponsoredId,
                                        AdCampaignId = sp.AdCampaignId,
-                                       CampaignName = sp.AdCampaign.CampaignName,
+                                       CampaignName = sp.AdCampaign!.CampaignName,
                                        ProductId = sp.ProductId,
-                                       ProductName = sp.Product.ProductName,
+                                       ProductName = sp.Product!.ProductName,
                                        ProductPrice = sp.Product.UnitPrice,
                                        Priority = sp.Priority,
-                                       AdScore = sp.AdCampaign.Package.AdScore,
-                                       EndDate = sp.AdCampaign.EndDate,
-                                       ImageUrl = sp.Product.ImageUrl ?? string.Empty,
+                                       AdScore = sp.AdCampaign.Package!.AdScore,
+                                       EndDate = sp.AdCampaign!.EndDate,
+                                       ImageUrl = sp.Product!.ImageUrl ?? string.Empty,
                                        DisplayDurationSeconds = 30,
-                                       MediaContents = sp.AdCampaign.AdResources
+                                       MediaContents = sp.AdCampaign!.AdResources
                                            .Where(r => r.Status == AdResourceStatus.Active)
                                            .Select(r => new MediaContentDto(
                                                r.ResourceType,
-                                               r.ResourceUrl,
+                                               r.ResourceUrl!,
                                                r.ContentText,
                                                r.Resolution))
                                            .ToList()

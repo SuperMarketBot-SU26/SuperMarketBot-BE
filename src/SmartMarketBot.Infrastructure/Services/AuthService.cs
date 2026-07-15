@@ -224,8 +224,8 @@ public sealed class AuthService(
 
         // 3. Truy vấn các sản phẩm mua nhiều nhất từ lịch sử mua hàng
         var topProductsList = await db.InvoiceHistoryItems
-            .Where(i => i.InvoiceHistory.MemberId == member.MemberId)
-            .GroupBy(i => i.Product.ProductName)
+            .Where(i => i.InvoiceHistory!.MemberId == member.MemberId)
+            .GroupBy(i => i.Product!.ProductName)
             .OrderByDescending(g => g.Count())
             .Select(g => g.Key)
             .Take(3)
@@ -272,7 +272,7 @@ public sealed class AuthService(
     private async Task<(Member Member, double Similarity)?> FindBestFaceMatchAsync(
         List<double> probe, CancellationToken ct)
     {
-        const double Threshold = 0.85;
+        const double Threshold = 0.60;
 
         var members = await db.Members
             .Include(m => m.Account)

@@ -739,6 +739,8 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
             entity.Property(x => x.XCoord).HasColumnName("XCoord");
             entity.Property(x => x.YCoord).HasColumnName("YCoord");
             entity.Property(x => x.HeadingRad).HasColumnName("HeadingRad");
+            // [P0-3/4 FIX] Mapping cho CurrentNodeId — dùng cho auto-dock / reroute
+            entity.Property(x => x.CurrentNodeId).HasColumnName("CurrentNodeId");
             entity.HasOne(x => x.Robot)
                 .WithMany(r => r.RobotLogs)
                 .HasForeignKey(x => x.RobotId)

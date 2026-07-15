@@ -272,6 +272,23 @@ public sealed class CartService(
         var allergyTagIds = preferences.Where(p => p.Status == "Allergy").Select(p => p.HealthTagId).ToList();
         var avoidTagIds = preferences.Where(p => p.Status == "Avoid").Select(p => p.HealthTagId).ToList();
 
+        // Tải trước (batch) ProductHealthTag cho TẤT CẢ sản phẩm trong giỏ — tránh N+1.
+        var productIdsInCart = cart.CartItems
+            .Where(ci => ci.Product != null)
+            .Select(ci => ci.ProductId)
+            .Distinct()
+            .ToList();
+
+        var productHealthTagMap = productIdsInCart.Count == 0
+            ? new Dictionary<int, List<int>>()
+            : (await db.ProductHealthTags
+                .AsNoTracking()
+                .Where(pht => productIdsInCart.Contains(pht.ProductId))
+                .Select(pht => new { pht.ProductId, pht.HealthTagId })
+                .ToListAsync(ct))
+                .GroupBy(x => x.ProductId)
+                .ToDictionary(g => g.Key, g => g.Select(x => x.HealthTagId).ToList());
+
         foreach (var item in cart.CartItems)
         {
             if (item.Product == null) continue;
@@ -281,12 +298,10 @@ public sealed class CartService(
             var itemTotal = price * item.Quantity;
             totalPrice += itemTotal;
 
-            // Check health preferences for this product
-            var productTagIds = await db.ProductHealthTags
-                .AsNoTracking()
-                .Where(pht => pht.ProductId == product.ProductId)
-                .Select(pht => pht.HealthTagId)
-                .ToListAsync(ct);
+            // Tra cứu O(1) từ map đã batch ở trên
+            var productTagIds = productHealthTagMap.TryGetValue(product.ProductId, out var ids)
+                ? ids
+                : new List<int>();
 
             string? alertType = null;
             string? alertMessage = null;

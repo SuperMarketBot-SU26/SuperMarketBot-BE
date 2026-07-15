@@ -49,6 +49,8 @@ public sealed class LocalizationService : ILocalizationService
 
                 // Staff & OOS
                 ["SlotNotFound"] = "Không tìm thấy vị trí ô kệ {0}.",
+                ["SlotHasNoShelf"] = "Slot {0} chưa được gán vào Shelf nào.",
+                ["ShelfHasNoAisle"] = "Shelf {0} chưa được gán vào Aisle nào.",
                 ["OosEventWithStock"] = "Ghi nhận sự cố hết hàng (ScanID={0}). Đã gửi thông báo cho nhân viên.",
                 ["OosEventNoStock"] = "Ghi nhận sự cố hết hàng (ScanID={0}). Kho tổng hết hàng - đề xuất sản phẩm thay thế.",
 
@@ -157,6 +159,8 @@ public sealed class LocalizationService : ILocalizationService
 
                 // Staff & OOS
                 ["SlotNotFound"] = "Shelf slot {0} not found.",
+                ["SlotHasNoShelf"] = "Slot {0} is not linked to any Shelf.",
+                ["ShelfHasNoAisle"] = "Shelf {0} is not linked to any Aisle.",
                 ["OosEventWithStock"] = "Out-of-stock event logged (ScanID={0}). Staff notification sent.",
                 ["OosEventNoStock"] = "Out-of-stock event logged (ScanID={0}). No warehouse stock - product substitution recommended.",
 

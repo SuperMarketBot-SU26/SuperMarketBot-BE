@@ -15,5 +15,12 @@ public class RobotLog
     public double? YCoord { get; set; }
     public double? HeadingRad { get; set; }
 
+    /// <summary>
+    /// Node ID trên bản đồ (NAVIGATION_NODE) mà robot đang đứng/kế tiếp.
+    /// P0-3/4 FIX: dùng để auto-dock và reroute chọn đúng startNode thay vì RobotId.
+    /// Nullable để không phá vỡ dữ liệu log cũ (cột sẽ NULL với record trước migration).
+    /// </summary>
+    public int? CurrentNodeId { get; set; }
+
     public virtual Robot? Robot { get; set; }
 }

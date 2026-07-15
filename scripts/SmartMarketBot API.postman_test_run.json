@@ -1,0 +1,769 @@
+{
+	"id": "68436a1a-cba0-4166-a0d7-a89c84f88cf7",
+	"name": "SmartMarketBot API",
+	"timestamp": "2026-07-08T18:03:54.233Z",
+	"collection_id": "42550672-bff18a28-0491-41c5-92d1-3abffe6486df",
+	"folder_id": 0,
+	"environment_id": "0",
+	"totalPass": 11,
+	"delay": 0,
+	"persist": true,
+	"status": "finished",
+	"startedAt": "2026-07-08T18:03:47.383Z",
+	"totalFail": 0,
+	"results": [
+		{
+			"id": "6d6bf6d6-e9d1-461a-b88d-b05117470a83",
+			"name": "Login Admin",
+			"url": "http://localhost:5000/api/auth/login",
+			"time": 352,
+			"responseCode": {
+				"code": 200,
+				"name": "OK"
+			},
+			"tests": {
+				"✅ Login admin thành công": true,
+				"Role = Admin": true
+			},
+			"testPassFailCounts": {
+				"✅ Login admin thành công": {
+					"pass": 1,
+					"fail": 0
+				},
+				"Role = Admin": {
+					"pass": 1,
+					"fail": 0
+				}
+			},
+			"times": [
+				352
+			],
+			"allTests": [
+				{
+					"✅ Login admin thành công": true,
+					"Role = Admin": true
+				}
+			]
+		},
+		{
+			"id": "f19d6bf1-e5c0-47d5-a718-b87fea5930ed",
+			"name": "Login Member1",
+			"url": "http://localhost:5000/api/auth/login",
+			"time": 128,
+			"responseCode": {
+				"code": 200,
+				"name": "OK"
+			},
+			"tests": {
+				"✅ Login member thành công": true,
+				"Role = Member": true
+			},
+			"testPassFailCounts": {
+				"✅ Login member thành công": {
+					"pass": 1,
+					"fail": 0
+				},
+				"Role = Member": {
+					"pass": 1,
+					"fail": 0
+				}
+			},
+			"times": [
+				128
+			],
+			"allTests": [
+				{
+					"✅ Login member thành công": true,
+					"Role = Member": true
+				}
+			]
+		},
+		{
+			"id": "7305e8c3-1cfa-45af-ad7b-06c17a3231cd",
+			"name": "Login Staff",
+			"url": "http://localhost:5000/api/auth/login",
+			"time": 121,
+			"responseCode": {
+				"code": 200,
+				"name": "OK"
+			},
+			"tests": {},
+			"testPassFailCounts": {},
+			"times": [
+				121
+			],
+			"allTests": [
+				{}
+			]
+		},
+		{
+			"id": "db729772-c590-488b-a6cd-ba04ca621741",
+			"name": "Register → Gửi OTP",
+			"url": "http://localhost:5000/api/auth/register",
+			"time": 72,
+			"responseCode": {
+				"code": 400,
+				"name": "Bad Request"
+			},
+			"tests": {},
+			"testPassFailCounts": {},
+			"times": [
+				72
+			],
+			"allTests": [
+				{}
+			]
+		},
+		{
+			"id": "c234f76f-396a-4c04-a445-df6d07307848",
+			"name": "Verify OTP",
+			"url": "http://localhost:5000/api/auth/verify-otp",
+			"time": 54,
+			"responseCode": {
+				"code": 400,
+				"name": "Bad Request"
+			},
+			"tests": {},
+			"testPassFailCounts": {},
+			"times": [
+				54
+			],
+			"allTests": [
+				{}
+			]
+		},
+		{
+			"id": "f686008d-6482-4492-828d-ca428394938b",
+			"name": "Refresh Token",
+			"url": "http://localhost:5000/api/auth/refresh",
+			"time": 120,
+			"responseCode": {
+				"code": 200,
+				"name": "OK"
+			},
+			"tests": {
+				"✅ Refresh thành công": true
+			},
+			"testPassFailCounts": {
+				"✅ Refresh thành công": {
+					"pass": 1,
+					"fail": 0
+				}
+			},
+			"times": [
+				120
+			],
+			"allTests": [
+				{
+					"✅ Refresh thành công": true
+				}
+			]
+		},
+		{
+			"id": "5de9f5f2-f202-4d44-ae42-f04a7add5c97",
+			"name": "Logout",
+			"url": "http://localhost:5000/api/auth/logout",
+			"time": 134,
+			"responseCode": {
+				"code": 200,
+				"name": "OK"
+			},
+			"tests": {},
+			"testPassFailCounts": {},
+			"times": [
+				134
+			],
+			"allTests": [
+				{}
+			]
+		},
+		{
+			"id": "d6768d9c-a6bf-48b3-91c0-89f779192ecc",
+			"name": "GET All Robots",
+			"url": "http://localhost:5000/api/robots",
+			"time": 59,
+			"responseCode": {
+				"code": 200,
+				"name": "OK"
+			},
+			"tests": {
+				"✅ Lấy danh sách robot": true
+			},
+			"testPassFailCounts": {
+				"✅ Lấy danh sách robot": {
+					"pass": 1,
+					"fail": 0
+				}
+			},
+			"times": [
+				59
+			],
+			"allTests": [
+				{
+					"✅ Lấy danh sách robot": true
+				}
+			]
+		},
+		{
+			"id": "cfa87a9a-0fad-4630-8998-e8469e3e8931",
+			"name": "GET Robot Status Values",
+			"url": "http://localhost:5000/api/robots/status-values",
+			"time": 11,
+			"responseCode": {
+				"code": 200,
+				"name": "OK"
+			},
+			"tests": {},
+			"testPassFailCounts": {},
+			"times": [
+				11
+			],
+			"allTests": [
+				{}
+			]
+		},
+		{
+			"id": "dbaa48ee-d145-48bd-9137-f582bdd3abb7",
+			"name": "GET Robot Pose",
+			"url": "http://localhost:5000/api/robots/RB001/pose",
+			"time": 101,
+			"responseCode": {
+				"code": 200,
+				"name": "OK"
+			},
+			"tests": {},
+			"testPassFailCounts": {},
+			"times": [
+				101
+			],
+			"allTests": [
+				{}
+			]
+		},
+		{
+			"id": "d36e6a00-282b-404e-9284-e789de00848b",
+			"name": "POST Update Robot Status → Idle",
+			"url": "http://localhost:5000/api/robots/RB001/status",
+			"time": 364,
+			"responseCode": {
+				"code": 200,
+				"name": "OK"
+			},
+			"tests": {
+				"✅ Update status thành công": true,
+				"Status = Idle": true
+			},
+			"testPassFailCounts": {
+				"✅ Update status thành công": {
+					"pass": 1,
+					"fail": 0
+				},
+				"Status = Idle": {
+					"pass": 1,
+					"fail": 0
+				}
+			},
+			"times": [
+				364
+			],
+			"allTests": [
+				{
+					"✅ Update status thành công": true,
+					"Status = Idle": true
+				}
+			]
+		},
+		{
+			"id": "84c311b6-b54e-4360-9e72-ad99e9ca06de",
+			"name": "POST Update Robot Status → Moving",
+			"url": "http://localhost:5000/api/robots/RB001/status",
+			"time": 153,
+			"responseCode": {
+				"code": 200,
+				"name": "OK"
+			},
+			"tests": {},
+			"testPassFailCounts": {},
+			"times": [
+				153
+			],
+			"allTests": [
+				{}
+			]
+		},
+		{
+			"id": "58c26249-10d1-4a0e-b863-e5de2d9d2c33",
+			"name": "POST Update Robot Status → Interacting",
+			"url": "http://localhost:5000/api/robots/RB001/status",
+			"time": 174,
+			"responseCode": {
+				"code": 200,
+				"name": "OK"
+			},
+			"tests": {},
+			"testPassFailCounts": {},
+			"times": [
+				174
+			],
+			"allTests": [
+				{}
+			]
+		},
+		{
+			"id": "0ac8a6fa-b1fc-4237-9b7c-e44727a90f51",
+			"name": "POST Publish MQTT Command",
+			"url": "http://localhost:5000/api/robots/command",
+			"time": 239,
+			"responseCode": {
+				"code": 202,
+				"name": "Accepted"
+			},
+			"tests": {},
+			"testPassFailCounts": {},
+			"times": [
+				239
+			],
+			"allTests": [
+				{}
+			]
+		},
+		{
+			"id": "c60e83cf-355d-4173-b5ee-b30013f3e8e6",
+			"name": "POST Navigate Robot",
+			"url": "http://localhost:5000/api/robots/navigate",
+			"time": 445,
+			"responseCode": {
+				"code": 202,
+				"name": "Accepted"
+			},
+			"tests": {},
+			"testPassFailCounts": {},
+			"times": [
+				445
+			],
+			"allTests": [
+				{}
+			]
+		},
+		{
+			"id": "8dd7ba6d-c035-4fe2-a7be-437b03b1a9da",
+			"name": "GET Member Profile (me)",
+			"url": "http://localhost:5000/api/members/me",
+			"time": 137,
+			"responseCode": {
+				"code": 200,
+				"name": "OK"
+			},
+			"tests": {},
+			"testPassFailCounts": {},
+			"times": [
+				137
+			],
+			"allTests": [
+				{}
+			]
+		},
+		{
+			"id": "e752b0f6-3330-49de-8567-119cc415b9da",
+			"name": "POST Push Realtime → ScanItem [DEV no-auth]",
+			"url": "http://localhost:5000/api/members/1/push-test",
+			"time": 18,
+			"responseCode": {
+				"code": 200,
+				"name": "OK"
+			},
+			"tests": {
+				"✅ Push thành công": true,
+				"pushed = true": true
+			},
+			"testPassFailCounts": {
+				"✅ Push thành công": {
+					"pass": 1,
+					"fail": 0
+				},
+				"pushed = true": {
+					"pass": 1,
+					"fail": 0
+				}
+			},
+			"times": [
+				18
+			],
+			"allTests": [
+				{
+					"✅ Push thành công": true,
+					"pushed = true": true
+				}
+			]
+		},
+		{
+			"id": "1af11345-275c-40e3-b463-5469d09f4027",
+			"name": "POST Push Realtime → BudgetWarning [DEV no-auth]",
+			"url": "http://localhost:5000/api/members/1/push-test",
+			"time": 6,
+			"responseCode": {
+				"code": 200,
+				"name": "OK"
+			},
+			"tests": {},
+			"testPassFailCounts": {},
+			"times": [
+				6
+			],
+			"allTests": [
+				{}
+			]
+		},
+		{
+			"id": "90d3cfc6-5846-42ce-8d4c-eb41cc6314b9",
+			"name": "POST Push Realtime → AllergyAlert [DEV no-auth]",
+			"url": "http://localhost:5000/api/members/1/push-test",
+			"time": 4,
+			"responseCode": {
+				"code": 200,
+				"name": "OK"
+			},
+			"tests": {},
+			"testPassFailCounts": {},
+			"times": [
+				4
+			],
+			"allTests": [
+				{}
+			]
+		},
+		{
+			"id": "7b44acee-f231-4288-bf1b-29f3f70f3835",
+			"name": "POST Test Notification [Auth required]",
+			"url": "http://localhost:5000/api/members/me/notifications/test",
+			"time": 54,
+			"responseCode": {
+				"code": 200,
+				"name": "OK"
+			},
+			"tests": {},
+			"testPassFailCounts": {},
+			"times": [
+				54
+			],
+			"allTests": [
+				{}
+			]
+		},
+		{
+			"id": "50085f6e-51b6-46d3-b2b2-bee25ff824bf",
+			"name": "GET Notifications",
+			"url": "http://localhost:5000/api/members/me/notifications?page=1&pageSize=20",
+			"time": 197,
+			"responseCode": {
+				"code": 200,
+				"name": "OK"
+			},
+			"tests": {},
+			"testPassFailCounts": {},
+			"times": [
+				197
+			],
+			"allTests": [
+				{}
+			]
+		},
+		{
+			"id": "3d4ae592-56cd-4b51-8aa7-eb29a4ded14f",
+			"name": "GET Unread Count",
+			"url": "http://localhost:5000/api/members/me/notifications/unread-count",
+			"time": 90,
+			"responseCode": {
+				"code": 200,
+				"name": "OK"
+			},
+			"tests": {},
+			"testPassFailCounts": {},
+			"times": [
+				90
+			],
+			"allTests": [
+				{}
+			]
+		},
+		{
+			"id": "675c176c-49dd-42f0-af94-3226fc6a2a7d",
+			"name": "GET Purchase History",
+			"url": "http://localhost:5000/api/members/me/purchase-history?page=1&pageSize=10",
+			"time": 98,
+			"responseCode": {
+				"code": 200,
+				"name": "OK"
+			},
+			"tests": {},
+			"testPassFailCounts": {},
+			"times": [
+				98
+			],
+			"allTests": [
+				{}
+			]
+		},
+		{
+			"id": "7dc56815-09f1-4ca9-adfe-caf80a69a7a4",
+			"name": "GET Mobile Route",
+			"url": "http://localhost:5000/api/navigation/route?startX=1.794&startY=1.212&endNodeId=9",
+			"time": 131,
+			"responseCode": {
+				"code": 200,
+				"name": "OK"
+			},
+			"tests": {},
+			"testPassFailCounts": {},
+			"times": [
+				131
+			],
+			"allTests": [
+				{}
+			]
+		},
+		{
+			"id": "191ffea2-084f-46bb-bbb4-2fec6820910d",
+			"name": "POST Plan Route (Dijkstra)",
+			"url": "http://localhost:5000/api/navigation/route",
+			"time": 127,
+			"responseCode": {
+				"code": 200,
+				"name": "OK"
+			},
+			"tests": {},
+			"testPassFailCounts": {},
+			"times": [
+				127
+			],
+			"allTests": [
+				{}
+			]
+		},
+		{
+			"id": "89d6f93c-3f0a-4030-8e97-e220d5cd8a1c",
+			"name": "POST Navigate Robot (Dijkstra + MQTT)",
+			"url": "http://localhost:5000/api/navigation/navigate",
+			"time": 349,
+			"responseCode": {
+				"code": 202,
+				"name": "Accepted"
+			},
+			"tests": {},
+			"testPassFailCounts": {},
+			"times": [
+				349
+			],
+			"allTests": [
+				{}
+			]
+		},
+		{
+			"id": "cbc9a361-af20-422a-94f4-dee827129fef",
+			"name": "POST Optimize Shopping Route",
+			"url": "http://localhost:5000/api/navigation/optimize-shopping-route",
+			"time": 239,
+			"responseCode": {
+				"code": 200,
+				"name": "OK"
+			},
+			"tests": {},
+			"testPassFailCounts": {},
+			"times": [
+				239
+			],
+			"allTests": [
+				{}
+			]
+		},
+		{
+			"id": "460b4d7f-e78a-4482-886a-1a9a221a8996",
+			"name": "POST Block Node (NodeID=8)",
+			"url": "http://localhost:5000/api/navigation/nodes/8/block",
+			"time": 125,
+			"responseCode": {
+				"code": 200,
+				"name": "OK"
+			},
+			"tests": {},
+			"testPassFailCounts": {},
+			"times": [
+				125
+			],
+			"allTests": [
+				{}
+			]
+		},
+		{
+			"id": "55db22ef-761d-4b4e-a3d9-e69fb29e7c73",
+			"name": "POST Unblock Node (NodeID=8)",
+			"url": "http://localhost:5000/api/navigation/nodes/8/block",
+			"time": 79,
+			"responseCode": {
+				"code": 200,
+				"name": "OK"
+			},
+			"tests": {},
+			"testPassFailCounts": {},
+			"times": [
+				79
+			],
+			"allTests": [
+				{}
+			]
+		},
+		{
+			"id": "a783170e-3ace-4ce8-bd9e-1250614ab8e9",
+			"name": "GET Health",
+			"url": "http://localhost:5000/api/health",
+			"time": 68,
+			"responseCode": {
+				"code": 200,
+				"name": "OK"
+			},
+			"tests": {
+				"✅ API đang chạy": true
+			},
+			"testPassFailCounts": {
+				"✅ API đang chạy": {
+					"pass": 1,
+					"fail": 0
+				}
+			},
+			"times": [
+				68
+			],
+			"allTests": [
+				{
+					"✅ API đang chạy": true
+				}
+			]
+		}
+	],
+	"count": 1,
+	"totalTime": 4249,
+	"collection": {
+		"requests": [
+			{
+				"id": "6d6bf6d6-e9d1-461a-b88d-b05117470a83",
+				"method": "POST"
+			},
+			{
+				"id": "f19d6bf1-e5c0-47d5-a718-b87fea5930ed",
+				"method": "POST"
+			},
+			{
+				"id": "7305e8c3-1cfa-45af-ad7b-06c17a3231cd",
+				"method": "POST"
+			},
+			{
+				"id": "db729772-c590-488b-a6cd-ba04ca621741",
+				"method": "POST"
+			},
+			{
+				"id": "c234f76f-396a-4c04-a445-df6d07307848",
+				"method": "POST"
+			},
+			{
+				"id": "f686008d-6482-4492-828d-ca428394938b",
+				"method": "POST"
+			},
+			{
+				"id": "5de9f5f2-f202-4d44-ae42-f04a7add5c97",
+				"method": "POST"
+			},
+			{
+				"id": "d6768d9c-a6bf-48b3-91c0-89f779192ecc",
+				"method": "GET"
+			},
+			{
+				"id": "cfa87a9a-0fad-4630-8998-e8469e3e8931",
+				"method": "GET"
+			},
+			{
+				"id": "dbaa48ee-d145-48bd-9137-f582bdd3abb7",
+				"method": "GET"
+			},
+			{
+				"id": "d36e6a00-282b-404e-9284-e789de00848b",
+				"method": "POST"
+			},
+			{
+				"id": "84c311b6-b54e-4360-9e72-ad99e9ca06de",
+				"method": "POST"
+			},
+			{
+				"id": "58c26249-10d1-4a0e-b863-e5de2d9d2c33",
+				"method": "POST"
+			},
+			{
+				"id": "0ac8a6fa-b1fc-4237-9b7c-e44727a90f51",
+				"method": "POST"
+			},
+			{
+				"id": "c60e83cf-355d-4173-b5ee-b30013f3e8e6",
+				"method": "POST"
+			},
+			{
+				"id": "8dd7ba6d-c035-4fe2-a7be-437b03b1a9da",
+				"method": "GET"
+			},
+			{
+				"id": "e752b0f6-3330-49de-8567-119cc415b9da",
+				"method": "POST"
+			},
+			{
+				"id": "1af11345-275c-40e3-b463-5469d09f4027",
+				"method": "POST"
+			},
+			{
+				"id": "90d3cfc6-5846-42ce-8d4c-eb41cc6314b9",
+				"method": "POST"
+			},
+			{
+				"id": "7b44acee-f231-4288-bf1b-29f3f70f3835",
+				"method": "POST"
+			},
+			{
+				"id": "50085f6e-51b6-46d3-b2b2-bee25ff824bf",
+				"method": "GET"
+			},
+			{
+				"id": "3d4ae592-56cd-4b51-8aa7-eb29a4ded14f",
+				"method": "GET"
+			},
+			{
+				"id": "675c176c-49dd-42f0-af94-3226fc6a2a7d",
+				"method": "GET"
+			},
+			{
+				"id": "7dc56815-09f1-4ca9-adfe-caf80a69a7a4",
+				"method": "GET"
+			},
+			{
+				"id": "191ffea2-084f-46bb-bbb4-2fec6820910d",
+				"method": "POST"
+			},
+			{
+				"id": "89d6f93c-3f0a-4030-8e97-e220d5cd8a1c",
+				"method": "POST"
+			},
+			{
+				"id": "cbc9a361-af20-422a-94f4-dee827129fef",
+				"method": "POST"
+			},
+			{
+				"id": "460b4d7f-e78a-4482-886a-1a9a221a8996",
+				"method": "POST"
+			},
+			{
+				"id": "55db22ef-761d-4b4e-a3d9-e69fb29e7c73",
+				"method": "POST"
+			},
+			{
+				"id": "a783170e-3ace-4ce8-bd9e-1250614ab8e9",
+				"method": "GET"
+			}
+		]
+	}
+}

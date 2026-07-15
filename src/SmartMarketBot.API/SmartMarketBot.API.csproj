@@ -9,7 +9,11 @@
   <ItemGroup>
     <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="10.0.0" />
     <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.1" />
-    <PackageReference Include="Scalar.AspNetCore" Version="2.0.36" />
+    <PackageReference Include="Scalar.AspNetCore" Version="2.16.11" />
+    <!-- [CVE NU1903 FIX] Pin Microsoft.OpenApi ≥2.7.5 để vá CVE-2026-49451
+         (Circular schema reference gây stack overflow). Scalar.AspNetCore 2.16.11
+         hiện đã pull 2.9.0 nhưng ta giữ override làm safety net chống future downgrade. -->
+    <PackageReference Include="Microsoft.OpenApi" Version="2.9.0" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.0">
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
       <PrivateAssets>all</PrivateAssets>

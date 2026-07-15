@@ -67,8 +67,9 @@ SELECT ProductID, ProductName FROM PRODUCT;
 | 6 | `RobotImpressionController` | `/api/robots` | 1 | **Ghi impression khi robot đi qua** — 3 luồng UNION |
 | 7 | `SponsoredProductsController` | `/api/v1/sponsored-products` | 7 | CRUD sponsored product (Add/Bulk/Priority/Status) |
 | 8 | `MemberSponsoredController` | `/api/members` | 1 | Member app gọi lấy recommended ads + allergy check |
+| 9 | `MobileProductsController` | `/api/v1/products` | **3** (search + **deals**) | Mobile: search sản phẩm + **General Deals** |
 
-**Tổng cộng: 8 controllers × 44 endpoints** (đã đủ 100% theo code Backend).
+**Tổng cộng: 9 controllers × 47 endpoints** (đã đủ 100% theo code Backend).
 
 ---
 
@@ -1103,6 +1104,99 @@ curl -X GET "http://localhost:5000/api/members/5/sponsored-recommendations?slotI
 -- Lưu ý: dữ liệu đến từ JOIN SponsoredProducts + AdCampaigns + Brands + Products
 --         + ProductHealthTags + MemberHealthPreferences + Slots
 ```
+
+---
+
+### 2.9. General Deals — `GET /api/v1/products/deals`
+
+> **⚡ MỚI — Dành cho Guest (chưa đăng nhập) và Member đã đăng nhập.**
+> Trả về tất cả sản phẩm đang giảm giá trên **toàn siêu thị**.
+> Nguồn deal: `Product.PromotionPrice != null` + `SponsoredProducts` thuộc `AdCampaign Active`.
+
+#### 2.9.1. `GET /api/v1/products/deals` ⭐⭐⭐
+
+```bash
+# Guest (không cần đăng nhập)
+curl -X GET "http://localhost:5000/api/v1/products/deals?pageNumber=1&pageSize=20"
+
+# Member đã đăng nhập (có allergy check)
+curl -X GET "http://localhost:5000/api/v1/products/deals?memberId=5&pageNumber=1&pageSize=20"
+
+# Lọc theo ProductType
+curl -X GET "http://localhost:5000/api/v1/products/deals?productTypeId=3&pageNumber=1&pageSize=10"
+
+# Chỉ deals giảm ≥ 20%
+curl -X GET "http://localhost:5000/api/v1/products/deals?minDiscountPercent=20"
+```
+
+**Query params:**
+
+| Param | Type | Mô tả |
+|-------|------|--------|
+| `productTypeId` | int? | Lọc theo loại sản phẩm |
+| `categoryId` | int? | Lọc theo danh mục |
+| `minDiscountPercent` | int? | Chỉ deals giảm ≥ N% |
+| `memberId` | int? | Nếu truyền → check allergy, trả `hasAllergenConflict` |
+| `pageNumber` | int | Default 1 |
+| `pageSize` | int | Default 20, max 100 |
+
+**Response mẫu:**
+```json
+{
+  "totalCount": 42,
+  "pageNumber": 1,
+  "pageSize": 20,
+  "totalPages": 3,
+  "items": [
+    {
+      "productId": 101,
+      "productName": "Coca-Cola 330ml",
+      "originalPrice": 12000.00,
+      "dealPrice": 10000.00,
+      "discountPercent": 17,
+      "promotionLabel": "⚡ Khuyến mãi",
+      "imageUrl": "https://cdn.example.com/products/coca.jpg",
+      "productTypeName": "Nước giải khát",
+      "productTypeId": 3,
+      "brandName": "Coca-Cola",
+      "brandId": 1,
+      "healthTags": [],
+      "hasAllergenConflict": false,
+      "allergenConflicts": [],
+      "adCampaignName": "Coca mùa hè 2026",
+      "adCampaignId": 10,
+      "slotCode": "A1-S05",
+      "slotId": 15
+    },
+    {
+      "productId": 201,
+      "productName": "Sữa tươi Vinamilk 1L",
+      "originalPrice": 35000.00,
+      "dealPrice": 25000.00,
+      "discountPercent": 29,
+      "promotionLabel": "🏷️ Giảm giá",
+      "imageUrl": "https://cdn.example.com/products/sua.jpg",
+      "productTypeName": "Sữa",
+      "productTypeId": 5,
+      "brandName": "Vinamilk",
+      "brandId": 2,
+      "healthTags": ["Sữa", "Lactose"],
+      "hasAllergenConflict": false,
+      "allergenConflicts": [],
+      "adCampaignName": null,
+      "adCampaignId": null,
+      "slotCode": null,
+      "slotId": null
+    }
+  ]
+}
+```
+
+**Sort order:** Sponsored deal lên đầu → giảm % cao nhất → tên A-Z.
+
+**FE dùng để:**
+- **Guest:** Hiển thị trang Deals/Flash Sale trên app — không cần đăng nhập.
+- **Member:** Khi `memberId` truyền → trả kèm `hasAllergenConflict` để hiển thị cảnh báo dị ứng.
 
 ---
 

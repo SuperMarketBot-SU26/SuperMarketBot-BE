@@ -46,6 +46,8 @@ public sealed class LocalizationService : ILocalizationService
                 ["BdayDeal"] = "🎂 Quà sinh nhật",
                 ["AnniversaryDeal"] = "🎉 Kỷ niệm hội viên",
                 ["EventDealReason"] = "{0:N0}% giảm giá cho toàn bộ đơn hàng dịp {1}",
+                ["DealLabel_Sponsored"] = "⚡ Khuyến mãi",
+                ["DealLabel_Promotion"] = "🏷️ Giảm giá",
 
                 // Staff & OOS
                 ["SlotNotFound"] = "Không tìm thấy vị trí ô kệ {0}.",
@@ -156,6 +158,8 @@ public sealed class LocalizationService : ILocalizationService
                 ["BdayDeal"] = "🎂 Birthday Gift",
                 ["AnniversaryDeal"] = "🎉 Member Anniversary",
                 ["EventDealReason"] = "{0:N0}% discount storewide for {1}",
+                ["DealLabel_Sponsored"] = "⚡ Sponsored Deal",
+                ["DealLabel_Promotion"] = "🏷️ On Sale",
 
                 // Staff & OOS
                 ["SlotNotFound"] = "Shelf slot {0} not found.",

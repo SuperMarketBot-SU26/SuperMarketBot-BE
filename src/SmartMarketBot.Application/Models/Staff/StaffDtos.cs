@@ -17,7 +17,9 @@ public sealed record RestockTaskDto(
     decimal EmptyPercentage,
     DateTime ReportedAt,
     string Priority,            // 'High' | 'Medium' | 'Low'
-    bool HasWarehouseStock);
+    bool HasWarehouseStock,
+    int AisleId,                // required by POST /complete
+    int? AisleNodeId = null);   // optional, helps narrow the scan
 
 public sealed record RestockTaskListResponseDto(
     int TotalPending,

@@ -75,7 +75,7 @@ public sealed class MealSuggestionService(AppDbContext db) : IMealSuggestionServ
             .Where(g => g.Key != 0)
             .ToDictionary(g => g.Key, g => g.First());
 
-        decimal portionMultiplier = portions;
+        decimal portionMultiplier = mealSuggestion.YieldPortions > 0 ? (decimal)portions / mealSuggestion.YieldPortions : portions;
         decimal totalCost = 0;
         var ingredients = new List<RecipeIngredientDto>();
 

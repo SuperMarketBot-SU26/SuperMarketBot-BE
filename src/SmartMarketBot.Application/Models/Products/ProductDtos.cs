@@ -19,7 +19,10 @@ public sealed record ProductDetailDto(
     int ProductTypeId,
     bool IsOnSale,
     bool IsFavorite,
-    IReadOnlyList<HealthTagDto> HealthTags);
+    IReadOnlyList<HealthTagDto> HealthTags,
+    string? AisleCode = null,
+    int? LevelNumber = null,
+    string? SlotCode = null);
 
 public sealed record CreateProductRequestDto
 {

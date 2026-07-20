@@ -34,7 +34,10 @@ public sealed record SearchResultItemDto(
     /// <summary>Điểm relevance (0-1) từ DB-side + AI rerank.</summary>
     double RelevanceScore,
     /// <summary>Các health-tag của sản phẩm (để client hiển thị icon dị ứng).</summary>
-    IReadOnlyList<string> HealthTags
+    IReadOnlyList<string> HealthTags,
+    string? AisleCode = null,
+    int? LevelNumber = null,
+    string? SlotCode = null
 );
 
 public sealed record SearchResponseDto(

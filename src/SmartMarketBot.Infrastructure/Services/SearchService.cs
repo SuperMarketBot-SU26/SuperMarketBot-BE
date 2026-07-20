@@ -62,7 +62,10 @@ public sealed class SearchService(
                 SubcategoryName = p.ProductType.Subcategory.SubcategoryName,
                 ProductTypeName = p.ProductType.TypeName,
                 HealthTags = p.ProductHealthTags
-                    .Select(ph => new { ph.HealthTagId, ph.HealthTag!.TagName }).ToList()
+                    .Select(ph => new { ph.HealthTagId, ph.HealthTag!.TagName }).ToList(),
+                AisleCode = p.ProductSlots.Select(ps => ps.Slot!.Shelf!.Aisle!.AisleCode).FirstOrDefault(),
+                LevelNumber = p.ProductSlots.Select(ps => (int?)ps.Slot!.Shelf!.LevelNumber).FirstOrDefault(),
+                SlotCode = p.ProductSlots.Select(ps => ps.Slot!.SlotCode).FirstOrDefault()
             })
             .ToListAsync(ct);
 
@@ -151,7 +154,10 @@ public sealed class SearchService(
                 x.r.SubcategoryName,
                 x.r.ProductTypeName,
                 Math.Min(1.0, x.score),
-                x.r.HealthTags.Select(t => t.TagName).ToList()
+                x.r.HealthTags.Select(t => t.TagName).ToList(),
+                x.r.AisleCode,
+                x.r.LevelNumber,
+                x.r.SlotCode
             ))
             .ToList();
 
@@ -227,7 +233,10 @@ public sealed class SearchService(
                 SubcategoryName = p.ProductType.Subcategory.SubcategoryName,
                 ProductTypeName = p.ProductType.TypeName,
                 HealthTags = p.ProductHealthTags
-                    .Select(ph => new { ph.HealthTagId, ph.HealthTag!.TagName }).ToList()
+                    .Select(ph => new { ph.HealthTagId, ph.HealthTag!.TagName }).ToList(),
+                AisleCode = p.ProductSlots.Select(ps => ps.Slot!.Shelf!.Aisle!.AisleCode).FirstOrDefault(),
+                LevelNumber = p.ProductSlots.Select(ps => (int?)ps.Slot!.Shelf!.LevelNumber).FirstOrDefault(),
+                SlotCode = p.ProductSlots.Select(ps => ps.Slot!.SlotCode).FirstOrDefault()
             })
             .ToListAsync(ct);
 
@@ -360,7 +369,10 @@ public sealed class SearchService(
                 x.r.SubcategoryName,
                 x.r.ProductTypeName,
                 Math.Min(1.0, x.score),
-                x.r.HealthTags.Select(t => t.TagName).ToList()
+                x.r.HealthTags.Select(t => t.TagName).ToList(),
+                x.r.AisleCode,
+                x.r.LevelNumber,
+                x.r.SlotCode
             ))
             .ToList();
 

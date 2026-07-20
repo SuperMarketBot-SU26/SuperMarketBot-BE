@@ -92,7 +92,11 @@ public sealed class ProductService(AppDbContext dbContext) : IProductService
         var product = await dbContext.Products
             .AsNoTracking()
             .Include(x => x.ProductHealthTags)
-            .ThenInclude(x => x.HealthTag)
+                .ThenInclude(x => x.HealthTag)
+            .Include(x => x.ProductSlots)
+                .ThenInclude(x => x.Slot)
+                .ThenInclude(x => x!.Shelf)
+                .ThenInclude(x => x!.Aisle)
             .FirstOrDefaultAsync(x => x.ProductId == productId, cancellationToken);
 
         if (product is null) return null;
@@ -100,6 +104,14 @@ public sealed class ProductService(AppDbContext dbContext) : IProductService
         var isFavorite = memberId.HasValue && await dbContext.MemberFavoriteProducts
             .AsNoTracking()
             .AnyAsync(x => x.MemberId == memberId.Value && x.ProductId == productId, cancellationToken);
+
+        var firstSlot = product.ProductSlots
+            .Select(ps => ps.Slot)
+            .FirstOrDefault(s => s is not null);
+
+        var aisleCode = firstSlot?.Shelf?.Aisle?.AisleCode;
+        var levelNumber = firstSlot?.Shelf?.LevelNumber;
+        var slotCode = firstSlot?.SlotCode;
 
         return new ProductDetailDto(
             product.ProductId,
@@ -115,7 +127,10 @@ public sealed class ProductService(AppDbContext dbContext) : IProductService
             product.ProductHealthTags
                 .Select(x => new HealthTagDto(x.HealthTag!.HealthTagId, x.HealthTag.TagName, x.HealthTag.TagType))
                 .OrderBy(x => x.TagName)
-                .ToList());
+                .ToList(),
+            aisleCode,
+            levelNumber,
+            slotCode);
     }
 
     public async Task<IReadOnlyList<ProductDto>> GetAlternativeProductsAsync(

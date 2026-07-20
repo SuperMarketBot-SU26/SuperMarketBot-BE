@@ -21,6 +21,7 @@ builder.Services.AddControllers()
     .AddJsonOptions(options =>
     {
         options.JsonSerializerOptions.PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase;
+        options.JsonSerializerOptions.Encoder = System.Text.Encodings.Web.JavaScriptEncoder.Create(System.Text.Unicode.UnicodeRanges.All);
         options.JsonSerializerOptions.Converters.Add(new System.Text.Json.Serialization.JsonStringEnumConverter());
         options.JsonSerializerOptions.Converters.Add(new SmartMarketBot.API.Converters.DateTimeConverter());
         options.JsonSerializerOptions.Converters.Add(new SmartMarketBot.API.Converters.DateTimeNullableConverter());
@@ -30,6 +31,7 @@ builder.Services.AddControllers()
 // Without this, DateTime converters are not picked up by the OpenAPI pipeline.
 builder.Services.Configure<JsonOptions>(options =>
 {
+    options.SerializerOptions.Encoder = System.Text.Encodings.Web.JavaScriptEncoder.Create(System.Text.Unicode.UnicodeRanges.All);
     options.SerializerOptions.Converters.Add(new System.Text.Json.Serialization.JsonStringEnumConverter());
     options.SerializerOptions.Converters.Add(new SmartMarketBot.API.Converters.DateTimeConverter());
     options.SerializerOptions.Converters.Add(new SmartMarketBot.API.Converters.DateTimeNullableConverter());

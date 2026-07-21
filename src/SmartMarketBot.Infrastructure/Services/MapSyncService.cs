@@ -328,15 +328,58 @@ public sealed class MapSyncService(
         return (created, updated, deleted);
     }
 
-    public async Task<MapFloorplanDto?> GetLatestMapAsync(int floorId, CancellationToken cancellationToken = default)
+    public async Task<List<MapSummaryDto>> GetAllMapsAsync(int? floorId = null, CancellationToken cancellationToken = default)
+    {
+        var query = db.Maps.AsNoTracking();
+        if (floorId.HasValue && floorId.Value > 0)
+        {
+            query = query.Where(m => m.FloorId == floorId.Value);
+        }
+
+        return await query
+            .OrderByDescending(m => m.CreatedAt)
+            .Select(m => new MapSummaryDto(
+                m.MapId,
+                m.FloorId,
+                m.MapName,
+                m.CreatedAt,
+                m.FloorplanImageUrl,
+                m.WidthMeters,
+                m.HeightMeters,
+                m.NavigationNodes.Count,
+                db.NavigationEdges.Count(e => db.NavigationNodes.Any(n => n.NodeId == e.FromNodeId && n.MapId == m.MapId)),
+                m.SemanticObjects.Count))
+            .ToListAsync(cancellationToken);
+    }
+
+    public async Task<MapFloorplanDto?> GetMapByIdAsync(int mapId, CancellationToken cancellationToken = default)
     {
         var map = await db.Maps
             .AsNoTracking()
-            .FirstOrDefaultAsync(m => m.FloorId == floorId, cancellationToken);
+            .FirstOrDefaultAsync(m => m.MapId == mapId, cancellationToken);
 
         if (map is null)
             return null;
 
+        return await BuildMapFloorplanDtoAsync(map, cancellationToken);
+    }
+
+    public async Task<MapFloorplanDto?> GetLatestMapAsync(int floorId, CancellationToken cancellationToken = default)
+    {
+        var map = await db.Maps
+            .AsNoTracking()
+            .Where(m => m.FloorId == floorId)
+            .OrderByDescending(m => m.CreatedAt)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        if (map is null)
+            return null;
+
+        return await BuildMapFloorplanDtoAsync(map, cancellationToken);
+    }
+
+    private async Task<MapFloorplanDto> BuildMapFloorplanDtoAsync(Domain.Entities.Map map, CancellationToken cancellationToken)
+    {
         var nodes = await db.NavigationNodes
             .AsNoTracking()
             .Where(n => n.MapId == map.MapId)
@@ -368,6 +411,7 @@ public sealed class MapSyncService(
             map.WidthMeters, map.HeightMeters,
             nodes, edges, semanticObjects);
     }
+
 
     public async Task<MapSyncStatsDto> GetMapStatsAsync(int floorId, CancellationToken cancellationToken = default)
     {

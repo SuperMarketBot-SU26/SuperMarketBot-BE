@@ -433,3 +433,6 @@ db/*.log
 
 # Cursor workspace artifacts
 .cursor/
+
+# Local files
+run-backend.bat

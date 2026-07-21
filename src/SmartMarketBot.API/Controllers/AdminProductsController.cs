@@ -12,17 +12,56 @@ namespace SmartMarketBot.API.Controllers;
 public sealed class AdminProductsController(IAdminProductService adminProductService) : ControllerBase
 {
     [HttpPost]
-    public async Task<ActionResult<ProductDto>> Create([FromBody] CreateProductRequestDto request, CancellationToken cancellationToken = default)
+    [Consumes("multipart/form-data")]
+    public async Task<ActionResult<ProductDto>> Create(
+        [FromForm] CreateProductRequestDto request,
+        IFormFile? imageFile,
+        CancellationToken cancellationToken = default)
     {
-        var created = await adminProductService.CreateProductAsync(request, cancellationToken);
-        return CreatedAtAction(nameof(Update), new { productId = created.ProductId }, created);
+        Stream? stream = null;
+        string? fileName = null;
+        if (imageFile is { Length: > 0 })
+        {
+            stream = imageFile.OpenReadStream();
+            fileName = imageFile.FileName;
+        }
+
+        try
+        {
+            var created = await adminProductService.CreateProductAsync(request, stream, fileName, cancellationToken);
+            return CreatedAtAction(nameof(Update), new { productId = created.ProductId }, created);
+        }
+        finally
+        {
+            if (stream is not null) await stream.DisposeAsync();
+        }
     }
 
     [HttpPut("{productId:int}")]
-    public async Task<ActionResult<ProductDto>> Update(int productId, [FromBody] UpdateProductRequestDto request, CancellationToken cancellationToken = default)
+    [Consumes("multipart/form-data")]
+    public async Task<ActionResult<ProductDto>> Update(
+        int productId,
+        [FromForm] UpdateProductRequestDto request,
+        IFormFile? imageFile,
+        CancellationToken cancellationToken = default)
     {
-        var updated = await adminProductService.UpdateProductAsync(productId, request, cancellationToken);
-        return updated is null ? NotFound() : Ok(updated);
+        Stream? stream = null;
+        string? fileName = null;
+        if (imageFile is { Length: > 0 })
+        {
+            stream = imageFile.OpenReadStream();
+            fileName = imageFile.FileName;
+        }
+
+        try
+        {
+            var updated = await adminProductService.UpdateProductAsync(productId, request, stream, fileName, cancellationToken);
+            return updated is null ? NotFound() : Ok(updated);
+        }
+        finally
+        {
+            if (stream is not null) await stream.DisposeAsync();
+        }
     }
 
     [HttpPatch("{productId:int}/status")]

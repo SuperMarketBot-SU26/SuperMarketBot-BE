@@ -1,5 +1,6 @@
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Logging;
 using SmartMarketBot.Application.Interfaces;
 using SmartMarketBot.Application.Models.Navigation;
@@ -16,11 +17,18 @@ public sealed class RobotService(
     INavigationService navigationService,
     IRobotHubNotifier hubNotifier,
     ILocalizationService localizer,
+    IMemoryCache memoryCache,
     ILogger<RobotService> logger) : IRobotService
 {
     public async Task<IReadOnlyList<RobotDto>> GetRobotsAsync(CancellationToken cancellationToken = default)
     {
-        return await dbContext.Robots
+        const string cacheKey = "robots_list_all";
+        if (memoryCache.TryGetValue(cacheKey, out IReadOnlyList<RobotDto>? cachedRobots) && cachedRobots is not null)
+        {
+            return cachedRobots;
+        }
+
+        var robots = await dbContext.Robots
             .AsNoTracking()
             .OrderBy(x => x.RobotId)
             .Select(x => new RobotDto(
@@ -33,6 +41,9 @@ public sealed class RobotService(
                 x.LastSeenAt,
                 x.IPAddress))
             .ToListAsync(cancellationToken);
+
+        memoryCache.Set(cacheKey, robots, TimeSpan.FromMilliseconds(1000));
+        return robots;
     }
 
     public Task PublishCommandAsync(PublishRobotCommandRequestDto request, CancellationToken cancellationToken = default)
@@ -42,6 +53,12 @@ public sealed class RobotService(
 
     public async Task<RobotPoseDto> GetPoseAsync(string robotCode, CancellationToken cancellationToken = default)
     {
+        string cacheKey = $"robot_pose_{robotCode}";
+        if (memoryCache.TryGetValue(cacheKey, out RobotPoseDto? cachedPose) && cachedPose is not null)
+        {
+            return cachedPose;
+        }
+
         var robot = await dbContext.Robots
             .AsNoTracking()
             .FirstOrDefaultAsync(r => r.RobotCode == robotCode, cancellationToken)
@@ -58,8 +75,11 @@ public sealed class RobotService(
         double headingRad = latestLog?.HeadingRad ?? 0;
         double headingDeg = headingRad * 180.0 / Math.PI;
 
-        return new RobotPoseDto(robotCode, x, y, headingRad, headingDeg, latestLog?.Timestamp);
+        var pose = new RobotPoseDto(robotCode, x, y, headingRad, headingDeg, latestLog?.Timestamp);
+        memoryCache.Set(cacheKey, pose, TimeSpan.FromMilliseconds(500));
+        return pose;
     }
+
 
     public async Task NavigateRobotAsync(NavigateRobotRequestDto request, CancellationToken cancellationToken = default)
     {

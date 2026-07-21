@@ -57,8 +57,9 @@ public sealed class GlobalExceptionMiddleware(RequestDelegate next, ILogger<Glob
                 }
                 return;
             }
-            logger.LogError(ex, "Unhandled server exception.");
-            await WriteErrorAsync(context, HttpStatusCode.InternalServerError, localizer.Get("UnexpectedError"));
+            logger.LogError(ex, "Unhandled server exception: {ExMessage} | {ExDetails}", ex.Message, ex.ToString());
+            await WriteErrorAsync(context, HttpStatusCode.InternalServerError, ex.Message);
+
         }
     }
 

@@ -9,6 +9,7 @@ namespace SmartMarketBot.API.Controllers;
 public sealed class RobotsController(IRobotService robotService) : ControllerBase
 {
     [HttpGet]
+    [ResponseCache(Duration = 1, Location = ResponseCacheLocation.Any)]
     public async Task<ActionResult<IReadOnlyList<RobotDto>>> GetRobots(CancellationToken cancellationToken)
     {
         var robots = await robotService.GetRobotsAsync(cancellationToken);
@@ -53,11 +54,13 @@ public sealed class RobotsController(IRobotService robotService) : ControllerBas
     /// Lấy pose mới nhất của robot (Dead Reckoning — x, y, heading).
     /// </summary>
     [HttpGet("{robotCode}/pose")]
+    [ResponseCache(Duration = 1, Location = ResponseCacheLocation.Any)]
     public async Task<ActionResult<RobotPoseDto>> GetPose(string robotCode, CancellationToken cancellationToken)
     {
         var pose = await robotService.GetPoseAsync(robotCode, cancellationToken);
         return Ok(pose);
     }
+
 
     /// <summary>
     /// Cập nhật trạng thái robot (Power_Off | Idle | Moving | Interacting | Offline_Charging).

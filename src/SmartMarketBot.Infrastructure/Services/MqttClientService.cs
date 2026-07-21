@@ -26,8 +26,10 @@ public sealed class MqttClientService(
 {
     private readonly MqttOptions _mqttOptions = mqttOptions.Value;
     private readonly IMqttClient _mqttClient = new MqttClientFactory().CreateMqttClient();
+    private readonly System.Collections.Concurrent.ConcurrentDictionary<string, DateTime> _lastDbSaveMap = new();
 
     public Task StartAsync(CancellationToken cancellationToken)
+
     {
         _mqttClient.ApplicationMessageReceivedAsync += OnApplicationMessageReceivedAsync;
         _mqttClient.DisconnectedAsync += OnDisconnectedAsync;
@@ -191,51 +193,49 @@ public sealed class MqttClientService(
             var timestamp = payload.Timestamp ?? VnDateTime.Now;
 
             var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-
             var robot = await dbContext.Robots.FirstOrDefaultAsync(x => x.RobotCode == robotCode);
-            var log = new RobotLog
+
+            // Rate limit DB writes (max 1 write per 300ms per robot) to prevent DB overload from high-frequency telemetry
+            var now = VnDateTime.Now;
+
+            bool shouldSaveDb = true;
+            if (_lastDbSaveMap.TryGetValue(robotCode, out var lastSaveTime) && (now - lastSaveTime).TotalMilliseconds < 300)
             {
-                RobotId = robot?.RobotId,
-                Battery = payload.Battery,
-                Location = payload.Location,
-                Status = payload.Status ?? "Unknown",
-                Timestamp = timestamp,
-                XCoord = payload.XCoord,
-                YCoord = payload.YCoord,
-                HeadingRad = payload.HeadingRad,
-                // [P0-3/4 FIX] Lưu CurrentNodeId từ telemetry để HandleAutoDockAsync / HandleRerouteAsync
-                // lấy được đúng node trên bản đồ (thay vì nhầm với RobotId như trước).
-                CurrentNodeId = payload.CurrentNodeId
-            };
-
-            dbContext.RobotLogs.Add(log);
-
-            if (robot is not null)
-            {
-                if (payload.Battery.HasValue)
-                {
-                    robot.BatteryPct = payload.Battery.Value;
-                }
-
-                if (!string.IsNullOrWhiteSpace(payload.Mode))
-                {
-                    robot.Mode = payload.Mode;
-                }
-
-                if (payload.IsOnline.HasValue)
-                {
-                    robot.Status = payload.IsOnline.Value ? "Online" : "Offline";
-                }
-
-                if (!string.IsNullOrWhiteSpace(payload.Ip))
-                {
-                    robot.IPAddress = payload.Ip;
-                }
-
-                robot.LastSeenAt = timestamp;
+                shouldSaveDb = false;
             }
 
-            await dbContext.SaveChangesAsync();
+            if (shouldSaveDb)
+            {
+                _lastDbSaveMap[robotCode] = now;
+
+                var log = new RobotLog
+                {
+                    RobotId = robot?.RobotId,
+                    Battery = payload.Battery,
+                    Location = payload.Location,
+                    Status = payload.Status ?? "Unknown",
+                    Timestamp = timestamp,
+                    XCoord = payload.XCoord,
+                    YCoord = payload.YCoord,
+                    HeadingRad = payload.HeadingRad,
+                    CurrentNodeId = payload.CurrentNodeId
+                };
+
+                dbContext.RobotLogs.Add(log);
+
+                if (robot is not null)
+                {
+                    if (payload.Battery.HasValue) robot.BatteryPct = payload.Battery.Value;
+                    if (!string.IsNullOrWhiteSpace(payload.Mode)) robot.Mode = payload.Mode;
+                    if (payload.IsOnline.HasValue) robot.Status = payload.IsOnline.Value ? "Online" : "Offline";
+                    if (!string.IsNullOrWhiteSpace(payload.Ip)) robot.IPAddress = payload.Ip;
+                    robot.LastSeenAt = timestamp;
+                }
+
+                await dbContext.SaveChangesAsync();
+            }
+
+
 
             if (eventType.Equals("telemetry", StringComparison.OrdinalIgnoreCase))
             {

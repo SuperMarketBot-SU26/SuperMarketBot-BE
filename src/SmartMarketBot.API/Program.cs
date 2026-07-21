@@ -38,8 +38,11 @@ builder.Services.Configure<JsonOptions>(options =>
 });
 builder.Services.AddOpenApi();
 builder.Services.AddSignalR();
+builder.Services.AddMemoryCache();
+builder.Services.AddResponseCaching();
 
 builder.Services.AddCors(options =>
+
 {
     options.AddPolicy("AllowAll", policy =>
     {
@@ -92,7 +95,9 @@ app.MapGet("/swagger", () => Results.Redirect("/scalar/v1", permanent: false));
 app.MapGet("/swagger/index.html", () => Results.Redirect("/scalar/v1", permanent: false));
 app.MapGet("/", () => Results.Redirect("/scalar/v1", permanent: false));
 
+app.UseResponseCaching();
 app.UseCors("AllowAll");
+
 app.UseMiddleware<GlobalExceptionMiddleware>();
 app.UseStaticFiles();
 app.UseAuthentication();

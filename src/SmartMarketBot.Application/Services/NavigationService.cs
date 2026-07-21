@@ -120,9 +120,10 @@ public sealed class NavigationService(IAppDbContext dbContext, ILocalizationServ
 
         // 2. Tìm NodeId gần nhất cho từng ProductId
         //    Schema mới (V4.0): Product → ProductSlot → Slot → Shelf → Aisle → AisleNode → NavigationNode
+        var requestedPids = request.ProductIds ?? Array.Empty<int>();
         var rawMap = await (
             from ps in dbContext.ProductSlots.AsNoTracking()
-            where request.ProductIds.Contains(ps.ProductId)
+            where requestedPids.Contains(ps.ProductId)
             join s  in dbContext.Slots.AsNoTracking()       on ps.SlotId   equals s.SlotId
             join sh in dbContext.Shelves.AsNoTracking()     on s.ShelfId   equals sh.ShelfId
             join a  in dbContext.Aisles.AsNoTracking()      on sh.AisleId  equals a.AisleId
@@ -131,6 +132,7 @@ public sealed class NavigationService(IAppDbContext dbContext, ILocalizationServ
             select new ProductNodeInfo(ps.ProductId, n.NodeId, n.XCoord, n.YCoord, s.SlotCode)
         ).ToListAsync(cancellationToken);
 
+
         var productNodeMap = rawMap
             .GroupBy(x => x.ProductId)
             .ToDictionary(g => g.Key, g => g.First());
@@ -138,7 +140,54 @@ public sealed class NavigationService(IAppDbContext dbContext, ILocalizationServ
         // 3. Nearest-Neighbour TSP để tối ưu thứ tự ghé qua
         var remaining = productNodeMap.Keys.ToList();
         var orderedProductIds = new List<int>();
-        var currentNodeId = request.StartNodeId;
+        int currentNodeId = 0;
+
+        // Nếu client truyền tọa độ thực tế (startX, startY), tìm NavigationNode gần nhất theo Euclid
+        if (request.StartX.HasValue && request.StartY.HasValue && nodes.Count > 0)
+        {
+            var nearestNode = nodes.Values
+                .Where(n => !n.IsBlocked)
+                .OrderBy(n => DistanceSquared(n.XCoord, n.YCoord, request.StartX.Value, request.StartY.Value))
+                .FirstOrDefault();
+
+            nearestNode ??= nodes.Values
+                .OrderBy(n => DistanceSquared(n.XCoord, n.YCoord, request.StartX.Value, request.StartY.Value))
+                .FirstOrDefault();
+
+            if (nearestNode != null)
+            {
+                currentNodeId = nearestNode.NodeId;
+            }
+        }
+
+        // Nếu chưa tìm thấy từ tọa độ, thử dùng StartNodeId nếu được truyền vào
+        if (currentNodeId == 0 && request.StartNodeId.HasValue && request.StartNodeId.Value > 0)
+        {
+            if (nodes.ContainsKey(request.StartNodeId.Value))
+            {
+                currentNodeId = request.StartNodeId.Value;
+            }
+        }
+
+        // Fallback an toàn: nếu vẫn chưa có NodeId hợp lệ, tự động chọn Node đầu tiên không bị cản
+        if (currentNodeId == 0 || !nodes.ContainsKey(currentNodeId))
+        {
+            var fallbackNode = nodes.Values.FirstOrDefault(n => !n.IsBlocked)?.NodeId ?? nodes.Keys.FirstOrDefault();
+            if (fallbackNode > 0)
+            {
+                currentNodeId = fallbackNode;
+            }
+            else
+            {
+                return new OptimizeShoppingRouteResponseDto(
+                    0d, 0, [], obstacleIds,
+                    "No valid navigation nodes found on map.");
+            }
+        }
+
+
+
+        int originNodeId = currentNodeId;
 
         while (remaining.Count > 0)
         {
@@ -160,7 +209,32 @@ public sealed class NavigationService(IAppDbContext dbContext, ILocalizationServ
         // 4. Xây waypoints theo thứ tự tối ưu
         var waypoints = new List<ShoppingWaypointDto>();
         double totalDistance = 0;
-        int prevNode = request.StartNodeId;
+        int prevNode = originNodeId;
+
+        // Nếu client truyền tọa độ thực tế startX & startY, thêm waypoint 0 làm vị trí xuất phát của Robot
+        if (request.StartX.HasValue && request.StartY.HasValue)
+        {
+            double sX = request.StartX.Value;
+            double sY = request.StartY.Value;
+
+            waypoints.Add(new ShoppingWaypointDto(
+                0,
+                originNodeId,
+                $"{sX:F1},{sY:F1}",
+                sX,
+                sY,
+                null,
+                "Vị trí Robot (Xuất phát)",
+                null,
+                null,
+                "Lối xuất phát"));
+
+            // Cộng thêm khoảng cách từ vị trí Robot (startX, startY) tới originNodeId (Node gần nhất)
+            if (nodes.TryGetValue(originNodeId, out var originNode))
+            {
+                totalDistance += Math.Sqrt(DistanceSquared(sX, sY, originNode.XCoord, originNode.YCoord));
+            }
+        }
 
         for (int i = 0; i < orderedProductIds.Count; i++)
         {
@@ -168,7 +242,8 @@ public sealed class NavigationService(IAppDbContext dbContext, ILocalizationServ
             if (!productNodeMap.TryGetValue(pid, out var pn)) continue;
 
             var (dist, _) = Dijkstra(adjacency, prevNode);
-            totalDistance += dist.TryGetValue(pn.NodeId, out var segDist) ? segDist : 0;
+            var segDist = dist.TryGetValue(pn.NodeId, out var sd) && !double.IsInfinity(sd) && !double.IsNaN(sd) ? sd : 0;
+            totalDistance += segDist;
             prevNode = pn.NodeId;
 
             var coordLabel = nodes.TryGetValue(pn.NodeId, out var nd)
@@ -188,12 +263,16 @@ public sealed class NavigationService(IAppDbContext dbContext, ILocalizationServ
                 pn.SlotCode is null ? null : $"Slot {pn.SlotCode}"));
         }
 
+
+        var safeTotalDistance = double.IsInfinity(totalDistance) || double.IsNaN(totalDistance) ? 0d : Math.Round(totalDistance, 2);
+
         return new OptimizeShoppingRouteResponseDto(
-            Math.Round(totalDistance, 2),
+            safeTotalDistance,
             waypoints.Count,
             waypoints,
             obstacleIds,
             $"TSP Nearest-Neighbour + Dijkstra. {obstacleIds.Count} obstacle(s) excluded from graph.");
+
     }
 
     // ── FindMobileRouteAsync ─────────────────────────────────────────────────
@@ -366,8 +445,12 @@ public sealed class NavigationService(IAppDbContext dbContext, ILocalizationServ
         var previous = graph.Keys.ToDictionary(k => k, _ => (int?)null);
         var queue = new PriorityQueue<int, double>();
 
-        distances[startNodeId] = 0d;
-        queue.Enqueue(startNodeId, 0d);
+        if (distances.ContainsKey(startNodeId))
+        {
+            distances[startNodeId] = 0d;
+            queue.Enqueue(startNodeId, 0d);
+        }
+
 
         while (queue.TryDequeue(out var current, out var currentDistance))
         {

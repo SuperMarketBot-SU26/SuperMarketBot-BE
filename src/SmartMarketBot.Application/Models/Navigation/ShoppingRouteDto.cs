@@ -1,20 +1,46 @@
 using System.ComponentModel.DataAnnotations;
+using System.Text.Json.Serialization;
 
 namespace SmartMarketBot.Application.Models.Navigation;
 
 // ─── Flow 1: Multi-stop Shopping Route ───────────────────────────────────────
 
 /// <summary>Request tối ưu hoá lộ trình gom hàng đa điểm (TSP + Dijkstra + ForbiddenZones).</summary>
-public sealed record OptimizeShoppingRouteRequestDto(
+public sealed record OptimizeShoppingRouteRequestDto
+{
     [Range(1, int.MaxValue, ErrorMessage = "RobotId phải hợp lệ.")]
-    int RobotId,
+    public int RobotId { get; init; }
 
-    [Range(1, int.MaxValue, ErrorMessage = "StartNodeId phải hợp lệ.")]
-    int StartNodeId,
+    public int? StartNodeId { get; init; }
+    public double? StartX { get; init; }
+    public double? StartY { get; init; }
 
     [Required(ErrorMessage = "Danh sách ProductIds là bắt buộc.")]
     [MinLength(1, ErrorMessage = "Danh sách ProductIds phải chứa ít nhất 1 sản phẩm.")]
-    IReadOnlyList<int> ProductIds);
+    public IReadOnlyList<int>? ProductIds { get; init; }
+
+    [JsonConstructor]
+    public OptimizeShoppingRouteRequestDto(
+        int robotId,
+        int? startNodeId = null,
+        double? startX = null,
+        double? startY = null,
+        IReadOnlyList<int>? productIds = null)
+    {
+        RobotId = robotId;
+        StartNodeId = startNodeId;
+        StartX = startX;
+        StartY = startY;
+        ProductIds = productIds;
+    }
+
+    public OptimizeShoppingRouteRequestDto(int robotId, int startNodeId, IReadOnlyList<int> productIds)
+        : this(robotId, startNodeId, null, null, productIds) { }
+}
+
+
+
+
 
 /// <summary>Một điểm dừng trong lộ trình mua sắm tối ưu.</summary>
 public sealed record ShoppingWaypointDto(
@@ -23,11 +49,12 @@ public sealed record ShoppingWaypointDto(
     string NodeName,
     double X,
     double Y,
-    int ProductId,
+    int? ProductId,
     string ProductName,
     int? ShelfLevelId,
     string? SlotCode,
     string? ShelfLocation);
+
 
 public sealed record OptimizeShoppingRouteResponseDto(
     double TotalDistanceMeters,

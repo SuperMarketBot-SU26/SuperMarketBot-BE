@@ -29,6 +29,32 @@ public sealed class MapsController(
         return Ok(result);
     }
 
+    /// <summary>Lấy danh sách tất cả các sơ đồ bản đồ (có thể lọc theo floorId).</summary>
+    [HttpGet]
+    public async Task<ActionResult<List<MapSummaryDto>>> GetAllMaps(
+        [FromQuery] int? floorId,
+        CancellationToken cancellationToken)
+    {
+        var maps = await mapSyncService.GetAllMapsAsync(floorId, cancellationToken);
+        return Ok(maps);
+    }
+
+    /// <summary>Lấy chi tiết bản đồ theo MapId (bao gồm danh sách Nodes, Edges, SemanticObjects).</summary>
+    [HttpGet("{mapId:int}")]
+    public async Task<ActionResult<MapFloorplanDto>> GetMapById(
+        int mapId,
+        CancellationToken cancellationToken)
+    {
+        if (mapId <= 0)
+            return BadRequest(new { message = localizer.Get("MapNotFound", mapId) });
+
+        var map = await mapSyncService.GetMapByIdAsync(mapId, cancellationToken);
+        if (map is null)
+            return NotFound(new { message = localizer.Get("MapNotFound", mapId) });
+
+        return Ok(map);
+    }
+
     /// <summary>Mỗi khi Admin mở Web Manager (hoặc F5) → gọi API này tải map mới nhất từ DB xuống vẽ ra màn hình.</summary>
     [HttpGet("latest")]
     public async Task<ActionResult<MapFloorplanDto>> GetLatestMap(
@@ -44,6 +70,7 @@ public sealed class MapsController(
 
         return Ok(map);
     }
+
 
     /// <summary>Lấy thống kê map: số nodes, edges, semantic objects, thời điểm sync cuối.</summary>
     [HttpGet("stats")]

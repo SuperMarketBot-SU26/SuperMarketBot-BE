@@ -77,3 +77,15 @@ public sealed record UploadFloorplanImageResponseDto(
     int MapId,
     string ImageUrl,
     string Message);
+
+public sealed record MapSummaryDto(
+    int MapId,
+    int FloorId,
+    string MapName,
+    DateTime CreatedAt,
+    string? FloorplanImageUrl,
+    double WidthMeters,
+    double HeightMeters,
+    int NodeCount,
+    int EdgeCount,
+    int SemanticObjectCount);

@@ -9,7 +9,8 @@ namespace SmartMarketBot.API.Controllers;
 [ApiController]
 [Route("api/v1/ad-campaign")]
 public sealed class AdCampaignController(
-    IAdCampaignService adCampaignService) : ControllerBase
+    IAdCampaignService adCampaignService,
+    ILocalizationService localizer) : ControllerBase
 {
     [HttpGet("robot-playlist/{robotId}")]
     [AllowAnonymous]
@@ -74,5 +75,32 @@ public sealed class AdCampaignController(
     {
         var result = await adCampaignService.BindSessionAsync(request, cancellationToken);
         return Ok(result);
+    }
+
+    /// <summary>
+    /// Single-fetch payload cho TargetingSelector UI: mapId + shelves (filter shelf)
+    /// + all routes of map + campaign's assigned routeIds.
+    /// Thay thế 4 HTTP call trước đây (maps/latest + semantic-objects paged + routes +
+    /// ad-campaigns/{id}/routes).
+    /// </summary>
+    [HttpGet("{campaignId:int}/targeting-context")]
+    [AllowAnonymous]
+    public async Task<ActionResult<TargetingContextResponseDto>> GetTargetingContext(
+        int campaignId,
+        [FromQuery] int floorId,
+        CancellationToken cancellationToken)
+    {
+        if (floorId <= 0)
+            return BadRequest(new { message = localizer.Get("FloorIdRequired") });
+
+        try
+        {
+            var result = await adCampaignService.GetTargetingContextAsync(campaignId, floorId, cancellationToken);
+            return Ok(result);
+        }
+        catch (KeyNotFoundException ex)
+        {
+            return NotFound(new { message = ex.Message });
+        }
     }
 }

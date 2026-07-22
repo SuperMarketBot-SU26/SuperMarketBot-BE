@@ -398,11 +398,18 @@ public sealed class MapSyncService(
 
         var semanticObjects = await db.SemanticObjects
             .AsNoTracking()
+            .Include(s => s.ProductType)
+                .ThenInclude(pt => pt!.Subcategory)
+                    .ThenInclude(sc => sc!.Category)
             .Where(s => s.MapId == map.MapId)
             .Select(s => new MapSyncSemanticObjectDto(
                 s.ObjectId, s.ObjectType,
                 s.XMin, s.YMin, s.XMax, s.YMax,
-                s.Label, s.Confidence, s.DetectedAt, s.ImageUrl))
+                s.Label, s.Confidence, s.DetectedAt, s.ImageUrl,
+                s.ProductTypeId,
+                s.ProductType != null ? s.ProductType.TypeName : null,
+                s.ProductType != null ? s.ProductType.Subcategory != null ? s.ProductType.Subcategory.SubcategoryName : null : null,
+                s.ProductType != null ? s.ProductType.Subcategory != null ? s.ProductType.Subcategory.Category != null ? s.ProductType.Subcategory.Category.CategoryName : null : null : null))
             .ToListAsync(cancellationToken);
 
         return new MapFloorplanDto(

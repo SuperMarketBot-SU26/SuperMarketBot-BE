@@ -38,7 +38,11 @@ public sealed record MapSyncSemanticObjectDto(
     string? Label,
     double? Confidence,
     DateTime? DetectedAt,
-    string? ImageUrl);
+    string? ImageUrl,
+    int? ProductTypeId,
+    string? ProductTypeName,
+    string? SubcategoryName,
+    string? CategoryName);
 
 // Response DTOs (positional constructors)
 public sealed record MapSyncResponseDto(

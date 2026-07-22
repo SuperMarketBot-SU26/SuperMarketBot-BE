@@ -63,6 +63,7 @@ public static class DependencyInjection
         services.AddScoped<IAdResourceService, AdResourceService>();
         services.AddScoped<IAdAnalyticsService, AdAnalyticsService>();
         services.AddScoped<IAdRouteService, AdRouteService>();
+        services.AddScoped<IAdBroadcastService, AdBroadcastService>();
         services.AddScoped<IAdRecommendationService, AdRecommendationService>();
         services.AddScoped<IGeneralDealService, GeneralDealService>();
 

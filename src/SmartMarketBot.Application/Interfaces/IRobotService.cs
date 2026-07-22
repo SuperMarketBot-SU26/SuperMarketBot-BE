@@ -5,6 +5,12 @@ namespace SmartMarketBot.Application.Interfaces;
 public interface IRobotService
 {
     Task<IReadOnlyList<RobotDto>> GetRobotsAsync(CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Lấy RobotDto theo RobotCode (dùng cho IoT endpoint tra cứu nhanh).
+    /// </summary>
+    Task<RobotDto?> GetByCodeAsync(string robotCode, CancellationToken cancellationToken = default);
+
     Task PublishCommandAsync(PublishRobotCommandRequestDto request, CancellationToken cancellationToken = default);
     /// <summary>
     /// Tính đường đi (Dijkstra nếu cần) rồi publish lệnh navigate xuống robot qua MQTT.

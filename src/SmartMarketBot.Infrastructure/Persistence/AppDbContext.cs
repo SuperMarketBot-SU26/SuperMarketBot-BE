@@ -51,6 +51,7 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
     public DbSet<AdRoute> AdRoutes => Set<AdRoute>();
     public DbSet<AdRouteNode> AdRouteNodes => Set<AdRouteNode>();
     public DbSet<AdRouteCampaign> AdRouteCampaigns => Set<AdRouteCampaign>();
+    public DbSet<RobotAdRouteAssignment> RobotAdRouteAssignments => Set<RobotAdRouteAssignment>();
     public DbSet<AdCampaignRoute> AdCampaignRoutes => Set<AdCampaignRoute>();
 
     // ── Region 6: Robot & Navigation ─────────────────────────────────────────
@@ -654,6 +655,17 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
             entity.Property(x => x.Description).HasColumnName("Description").HasMaxLength(500);
             entity.Property(x => x.IsActive).HasColumnName("IsActive").HasDefaultValue(true);
             entity.Property(x => x.CreatedAt).HasColumnName("CreatedAt").HasDefaultValueSql("DATEADD(hour, 7, GETUTCDATE())");
+
+            // === NEW: Ad Mode ===
+            entity.Property(x => x.IsAutonomous).HasColumnName("IsAutonomous").HasDefaultValue(false);
+            entity.Property(x => x.SemanticObjectId).HasColumnName("SemanticObjectID");
+
+            entity.HasOne(x => x.SemanticObject)
+                .WithMany()
+                .HasForeignKey(x => x.SemanticObjectId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            entity.HasIndex(x => x.IsAutonomous);
         });
 
         modelBuilder.Entity<AdRouteNode>(entity =>
@@ -665,6 +677,10 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
             entity.Property(x => x.NodeId).HasColumnName("NodeID");
             entity.Property(x => x.SequenceOrder).HasColumnName("SequenceOrder").HasDefaultValue(0);
             entity.Property(x => x.DwellTimeSeconds).HasColumnName("DwellTimeSeconds").HasDefaultValue(30);
+
+            // === NEW: Zone linking for playlist grouping ===
+            entity.Property(x => x.ZoneId).HasColumnName("ZoneID");
+
             entity.HasOne(x => x.AdRoute)
                 .WithMany(r => r.Nodes)
                 .HasForeignKey(x => x.AdRouteId)
@@ -673,6 +689,10 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
                 .WithMany()
                 .HasForeignKey(x => x.NodeId)
                 .OnDelete(DeleteBehavior.NoAction);
+            entity.HasOne(x => x.Zone)
+                .WithMany()
+                .HasForeignKey(x => x.ZoneId)
+                .OnDelete(DeleteBehavior.SetNull);
         });
 
         modelBuilder.Entity<AdRouteCampaign>(entity =>
@@ -689,6 +709,30 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
                 .WithMany()
                 .HasForeignKey(x => x.AdCampaignId)
                 .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<RobotAdRouteAssignment>(entity =>
+        {
+            entity.ToTable("ROBOT_AD_ROUTE_ASSIGNMENT");
+            entity.HasKey(x => x.AssignmentId);
+            entity.Property(x => x.AssignmentId).HasColumnName("AssignmentID");
+            entity.Property(x => x.RobotId).HasColumnName("RobotID");
+            entity.Property(x => x.AdRouteId).HasColumnName("AdRouteID");
+            entity.Property(x => x.AssignedAt).HasColumnName("AssignedAt").HasDefaultValueSql("DATEADD(hour, 7, GETUTCDATE())");
+            entity.Property(x => x.Status).HasColumnName("Status").HasMaxLength(50).HasDefaultValue("Active");
+
+            entity.HasOne(x => x.Robot)
+                .WithMany()
+                .HasForeignKey(x => x.RobotId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(x => x.AdRoute)
+                .WithMany(r => r.Assignments)
+                .HasForeignKey(x => x.AdRouteId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasIndex(x => x.RobotId);
+            entity.HasIndex(x => x.AdRouteId);
         });
 
         modelBuilder.Entity<AdCampaignRoute>(entity =>

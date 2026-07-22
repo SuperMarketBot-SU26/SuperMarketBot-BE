@@ -29,6 +29,9 @@ public sealed class AdRouteService(
             .Take(pageSize)
             .Include(r => r.Nodes)
                 .ThenInclude(n => n.Node)
+            .Include(r => r.Nodes)
+                .ThenInclude(n => n.Zone)
+            .Include(r => r.SemanticObject)
             .Include(r => r.Campaigns)
             .ToListAsync(cancellationToken);
 
@@ -43,6 +46,9 @@ public sealed class AdRouteService(
             .AsNoTracking()
             .Include(r => r.Nodes.OrderBy(n => n.SequenceOrder))
                 .ThenInclude(n => n.Node)
+            .Include(r => r.Nodes)
+                .ThenInclude(n => n.Zone)
+            .Include(r => r.SemanticObject)
             .Include(r => r.Campaigns)
             .FirstOrDefaultAsync(r => r.AdRouteId == routeId, cancellationToken);
 
@@ -66,13 +72,15 @@ public sealed class AdRouteService(
         await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
         try
         {
-            var route = new AdRoute
-            {
-                RouteName = request.RouteName,
-                Description = request.Description,
-                IsActive = true,
-                CreatedAt = DateTime.UtcNow
-            };
+        var route = new AdRoute
+        {
+            RouteName = request.RouteName,
+            Description = request.Description,
+            IsActive = true,
+            IsAutonomous = request.IsAutonomous,
+            SemanticObjectId = request.SemanticObjectId,
+            CreatedAt = DateTime.UtcNow
+        };
 
             db.AdRoutes.Add(route);
             await db.SaveChangesAsync(cancellationToken);
@@ -83,7 +91,8 @@ public sealed class AdRouteService(
                 AdRouteId = route.AdRouteId,
                 NodeId = n.NodeId,
                 SequenceOrder = n.SequenceOrder > 0 ? n.SequenceOrder : idx + 1,
-                DwellTimeSeconds = n.DwellTimeSeconds > 0 ? n.DwellTimeSeconds : 30
+                DwellTimeSeconds = n.DwellTimeSeconds > 0 ? n.DwellTimeSeconds : 30,
+                ZoneId = n.ZoneId
             });
             db.AdRouteNodes.AddRange(routeNodes);
             await db.SaveChangesAsync(cancellationToken);
@@ -125,6 +134,8 @@ public sealed class AdRouteService(
         route.RouteName = request.RouteName;
         route.Description = request.Description;
         route.IsActive = request.IsActive;
+        route.IsAutonomous = request.IsAutonomous;
+        route.SemanticObjectId = request.SemanticObjectId;
 
         // Update nodes if provided
         if (request.Nodes != null)
@@ -139,7 +150,8 @@ public sealed class AdRouteService(
                     AdRouteId = routeId,
                     NodeId = n.NodeId,
                     SequenceOrder = n.SequenceOrder > 0 ? n.SequenceOrder : idx + 1,
-                    DwellTimeSeconds = n.DwellTimeSeconds > 0 ? n.DwellTimeSeconds : 30
+                    DwellTimeSeconds = n.DwellTimeSeconds > 0 ? n.DwellTimeSeconds : 30,
+                    ZoneId = n.ZoneId
                 });
                 db.AdRouteNodes.AddRange(newNodes);
             }
@@ -195,23 +207,23 @@ public sealed class AdRouteService(
             ?? throw new KeyNotFoundException(localizer.Get("RobotNotFound", robotId));
 
         // Deactivate existing assignments for this robot
-        var existingAssignments = await db.RouteAssignments
+        var existingAssignments = await db.RobotAdRouteAssignments
             .Where(ra => ra.RobotId == robotId && ra.Status == "Active")
             .ToListAsync(cancellationToken);
 
         foreach (var assignment in existingAssignments)
             assignment.Status = "Completed";
 
-        // Create new assignment
-        var newAssignment = new RouteAssignment
+        // Create new assignment using RobotAdRouteAssignment
+        var newAssignment = new RobotAdRouteAssignment
         {
             RobotId = robotId,
-            RobotRouteId = routeId,
+            AdRouteId = routeId,
             AssignedAt = DateTime.UtcNow,
             Status = "Active"
         };
 
-        db.RouteAssignments.Add(newAssignment);
+        db.RobotAdRouteAssignments.Add(newAssignment);
         await db.SaveChangesAsync(cancellationToken);
 
         logger.LogInformation("AdRoute {RouteId} assigned to Robot {RobotId}", routeId, robotId);
@@ -222,7 +234,7 @@ public sealed class AdRouteService(
     public async Task<AdRouteResponseDto?> GetActiveRouteForRobotAsync(
         int robotId, CancellationToken cancellationToken = default)
     {
-        var assignment = await db.RouteAssignments
+        var assignment = await db.RobotAdRouteAssignments
             .AsNoTracking()
             .Where(ra => ra.RobotId == robotId && ra.Status == "Active")
             .OrderByDescending(ra => ra.AssignedAt)
@@ -231,7 +243,7 @@ public sealed class AdRouteService(
         if (assignment == null)
             return null;
 
-        return await GetByIdAsync(assignment.RobotRouteId, cancellationToken);
+        return await GetByIdAsync(assignment.AdRouteId, cancellationToken);
     }
 
     private static AdRouteResponseDto MapToDto(AdRoute route)
@@ -241,13 +253,18 @@ public sealed class AdRouteService(
             route.RouteName,
             route.Description,
             route.IsActive,
+            route.IsAutonomous,
+            route.SemanticObjectId,
+            route.SemanticObject?.Label,
             route.CreatedAt,
             route.Nodes.OrderBy(n => n.SequenceOrder).Select(n => new AdRouteNodeDto(
                 n.AdRouteNodeId,
                 n.NodeId,
                 n.Node?.NodeName,
                 n.SequenceOrder,
-                n.DwellTimeSeconds
+                n.DwellTimeSeconds,
+                n.ZoneId,
+                n.Zone?.ZoneName
             )).ToList(),
             route.Campaigns.Select(c => c.AdCampaignId).ToList());
     }

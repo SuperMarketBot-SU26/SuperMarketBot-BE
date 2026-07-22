@@ -46,6 +46,23 @@ public sealed class RobotService(
         return robots;
     }
 
+    public async Task<RobotDto?> GetByCodeAsync(string robotCode, CancellationToken cancellationToken = default)
+    {
+        return await dbContext.Robots
+            .AsNoTracking()
+            .Where(r => r.RobotCode == robotCode)
+            .Select(r => new RobotDto(
+                r.RobotId,
+                r.RobotName,
+                r.RobotCode,
+                r.BatteryPct,
+                r.Mode,
+                r.Status,
+                r.LastSeenAt,
+                r.IPAddress))
+            .FirstOrDefaultAsync(cancellationToken);
+    }
+
     public Task PublishCommandAsync(PublishRobotCommandRequestDto request, CancellationToken cancellationToken = default)
     {
         return commandPublisher.PublishCommandAsync(request.RobotCode, request.Command, request.Payload, cancellationToken);

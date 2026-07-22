@@ -1174,109 +1174,109 @@ public sealed class AdCampaignService(
         if (!robotExists)
             throw new KeyNotFoundException(localizer.Get("RobotNotFound", robotId));
 
-        var routeAssignment = await db.RouteAssignments
+        // Get active AdRoute assignment (not RobotRoute)
+        var routeAssignment = await db.RobotAdRouteAssignments
             .AsNoTracking()
-            .Include(ra => ra.RobotRoute)
-                .ThenInclude(rr => rr!.RouteNodeMappings.OrderBy(n => n.SequenceOrder))
+            .Include(ra => ra.AdRoute)
+                .ThenInclude(r => r!.Nodes.OrderBy(n => n.SequenceOrder))
                     .ThenInclude(n => n.Node)
+            .Include(ra => ra.AdRoute)
+                .ThenInclude(r => r!.Nodes.Where(n => n.ZoneId != null))
+                    .ThenInclude(n => n.Zone)
+            .Include(ra => ra.AdRoute)
+                .ThenInclude(r => r!.SemanticObject)
             .Where(ra => ra.RobotId == robotId && ra.Status == "Active")
             .OrderByDescending(ra => ra.AssignedAt)
             .FirstOrDefaultAsync(cancellationToken);
 
-        if (routeAssignment?.RobotRoute == null)
+        if (routeAssignment?.AdRoute == null)
             return null;
 
-        var robotRoute = routeAssignment.RobotRoute;
+        var adRoute = routeAssignment.AdRoute;
+        if (!adRoute.IsAutonomous || !adRoute.IsActive)
+            return null;
+
         var now = DateTime.UtcNow;
+        var stopNodes = adRoute.Nodes.OrderBy(n => n.SequenceOrder).ToList();
 
-        // [P1-N+1 FIX] Trước đây: mỗi stop gọi 1 query AisleNode + 1 query SponsoredProducts
-        // → 10 stops = 20 queries. Bây giờ: chỉ 2 query batch toàn bộ rồi nhóm trong memory.
-        // Lợi: giảm round-trip xuống ~20×, tải DB giảm đáng kể khi route dài.
-        var stopNodes = robotRoute.RouteNodeMappings
-            .OrderBy(n => n.SequenceOrder)
-            .ToList();
-
-        // Query 1: lấy tất cả AisleNode (kèm Aisle) cho mọi NodeId trong route — 1 round-trip
-        var nodeIds = stopNodes.Select(sn => sn.NodeId).Distinct().ToList();
-        var aisleByNodeId = await db.AisleNodes
-            .AsNoTracking()
-            .Where(an => nodeIds.Contains(an.NodeId))
-            .Include(an => an.Aisle)
-            .ToDictionaryAsync(an => an.NodeId, cancellationToken);
-
-        // Query 2: lấy tất cả SponsoredProducts cho mọi ZoneId của route — 1 round-trip
-        var zoneIds = aisleByNodeId.Values
-            .Where(an => an.Aisle?.ZoneId != null)
-            .Select(an => an.Aisle!.ZoneId)
+        var zoneIds = stopNodes
+            .Where(n => n.ZoneId.HasValue)
+            .Select(n => n.ZoneId!.Value)
             .Distinct()
             .ToList();
 
-        Dictionary<int, List<RobotPlaylistItemDto>> playlistByZoneId = new();
-        if (zoneIds.Count > 0)
-        {
-            var allPlaylistItems = await (from sp in db.SponsoredProducts.AsNoTracking()
-                                          join acz in db.AdCampaignZones.AsNoTracking()
-                                              on sp.AdCampaignId equals acz.AdCampaignId
-                                          where zoneIds.Contains(acz.ZoneId)
-                                                && sp.Status == SponsoredProductStatus.Active
-                                                && sp.AdCampaign!.Status == CampaignStatus.Active
-                                                && sp.AdCampaign.StartDate <= now
-                                                && sp.AdCampaign!.EndDate >= now
-                                          orderby sp.AdCampaign!.Package!.AdScore descending,
-                                                  sp.Priority descending
-                                          select new
-                                          {
-                                              acz.ZoneId,
-                                              Item = new RobotPlaylistItemDto
-                                              {
-                                                  SponsoredId = sp.SponsoredId,
-                                                  AdCampaignId = sp.AdCampaignId,
-                                                  CampaignName = sp.AdCampaign!.CampaignName,
-                                                  ProductId = sp.ProductId,
-                                                  ProductName = sp.Product!.ProductName,
-                                                  ProductPrice = sp.Product.UnitPrice,
-                                                  Priority = sp.Priority,
-                                                  AdScore = sp.AdCampaign.Package!.AdScore,
-                                                  EndDate = sp.AdCampaign!.EndDate,
-                                                  ImageUrl = sp.Product!.ImageUrl ?? string.Empty,
-                                                  DisplayDurationSeconds = 30,
-                                                  MediaContents = sp.AdCampaign!.AdResources
-                                                      .Where(r => r.Status == AdResourceStatus.Active)
-                                                      .Select(r => new MediaContentDto(
-                                                          r.ResourceType,
-                                                          r.ResourceUrl!,
-                                                          r.ContentText,
-                                                          r.Resolution))
-                                                      .ToList()
-                                              }
-                                          })
-                                          .ToListAsync(cancellationToken);
+        var playlistByZone = await BuildPlaylistByZoneAsync(zoneIds, now, cancellationToken);
 
-            playlistByZoneId = allPlaylistItems
-                .GroupBy(p => p.ZoneId)
-                .ToDictionary(g => g.Key, g => g.Select(x => x.Item).ToList());
-        }
-
-        // Ghép stop + aisle + playlist trong bộ nhớ (không query thêm)
-        var stops = stopNodes.Select(routeNode =>
+        var stops = stopNodes.Select(n =>
         {
-            aisleByNodeId.TryGetValue(routeNode.NodeId, out var aisleNode);
-            var zoneId = aisleNode?.Aisle?.ZoneId;
-            playlistByZoneId.TryGetValue(zoneId ?? 0, out var playlistItems);
+            playlistByZone.TryGetValue(n.ZoneId ?? 0, out var playlist);
             return new AutonomousRouteStopDto(
-                routeNode.SequenceOrder,
-                routeNode.NodeId,
-                routeNode.Node?.NodeName,
-                routeNode.DwellTimeSeconds,
-                playlistItems ?? []);
+                n.SequenceOrder,
+                n.NodeId,
+                n.Node?.NodeName,
+                n.DwellTimeSeconds,
+                n.ZoneId,
+                n.Zone?.ZoneName,
+                playlist ?? []);
         }).ToList();
 
         return new AutonomousRouteDto(
-            robotRoute.RobotRouteId,
-            robotRoute.RouteName ?? string.Empty,
-            robotRoute.Description,
+            adRoute.AdRouteId,
+            adRoute.RouteName,
+            adRoute.Description,
+            adRoute.IsAutonomous,
+            adRoute.SemanticObjectId,
             stops,
-            DateTime.UtcNow);
+            now);
+    }
+
+    private async Task<Dictionary<int, List<RobotPlaylistItemDto>>> BuildPlaylistByZoneAsync(
+        List<int> zoneIds, DateTime now, CancellationToken ct)
+    {
+        if (zoneIds.Count == 0)
+            return [];
+
+        var allItems = await (from sp in db.SponsoredProducts.AsNoTracking()
+                             join acz in db.AdCampaignZones.AsNoTracking()
+                                 on sp.AdCampaignId equals acz.AdCampaignId
+                             where zoneIds.Contains(acz.ZoneId)
+                                   && sp.Status == SponsoredProductStatus.Active
+                                   && sp.AdCampaign!.Status == CampaignStatus.Active
+                                   && sp.AdCampaign.StartDate <= now
+                                   && sp.AdCampaign.EndDate >= now
+                             orderby sp.AdCampaign!.Package!.AdScore descending,
+                                     sp.Priority descending
+                             select new
+                             {
+                                 acz.ZoneId,
+                                 Item = new RobotPlaylistItemDto
+                                 {
+                                     SponsoredId = sp.SponsoredId,
+                                     AdCampaignId = sp.AdCampaignId,
+                                     CampaignName = sp.AdCampaign!.CampaignName,
+                                     ProductId = sp.ProductId,
+                                     ProductName = sp.Product!.ProductName,
+                                     ProductPrice = sp.Product.UnitPrice,
+                                     Priority = sp.Priority,
+                                     AdScore = sp.AdCampaign.Package!.AdScore,
+                                     EndDate = sp.AdCampaign!.EndDate,
+                                     ImageUrl = sp.Product!.ImageUrl ?? string.Empty,
+                                     DisplayDurationSeconds = 30,
+                                     MediaContents = sp.AdCampaign!.AdResources
+                                         .Where(r => r.Status == AdResourceStatus.Active)
+                                         .Select(r => new MediaContentDto(
+                                             r.ResourceType,
+                                             r.ResourceUrl!,
+                                             r.ContentText,
+                                             r.Resolution))
+                                         .ToList()
+                                 }
+                             })
+                             .ToListAsync(ct);
+
+        return allItems
+            .GroupBy(x => x.ZoneId)
+            .ToDictionary(g => g.Key, g => g.Select(x => x.Item).ToList());
     }
 
     public async Task<RobotPlaylistResponseDto> GetPlaylistForNodeAsync(
@@ -1290,23 +1290,38 @@ public sealed class AdCampaignService(
 
         var now = DateTime.UtcNow;
 
-        var aisleNode = await db.AisleNodes
+        // Try to get ZoneId from AdRouteNode first (Autonomous mode)
+        var routeNode = await db.AdRouteNodes
             .AsNoTracking()
-            .Include(an => an.Aisle)
-            .FirstOrDefaultAsync(an => an.NodeId == nodeId, cancellationToken);
+            .Include(rn => rn.Zone)
+            .FirstOrDefaultAsync(rn => rn.NodeId == nodeId, cancellationToken);
+
+        int? zoneId = routeNode?.ZoneId;
+        string? zoneName = routeNode?.Zone?.ZoneName;
+
+        // Fallback to AisleNode if no AdRouteNode mapping
+        if (!zoneId.HasValue)
+        {
+            var aisleNode = await db.AisleNodes
+                .AsNoTracking()
+                .Include(an => an.Aisle)
+                .FirstOrDefaultAsync(an => an.NodeId == nodeId, cancellationToken);
+            zoneId = aisleNode?.Aisle?.ZoneId;
+            zoneName = aisleNode?.Aisle?.Zone?.ZoneName;
+        }
 
         List<RobotPlaylistItemDto> playlistItems;
 
-        if (aisleNode?.Aisle?.ZoneId != null)
+        if (zoneId.HasValue)
         {
             playlistItems = await (from sp in db.SponsoredProducts.AsNoTracking()
                                    join acz in db.AdCampaignZones.AsNoTracking()
                                        on sp.AdCampaignId equals acz.AdCampaignId
-                                   where acz.ZoneId == aisleNode.Aisle.ZoneId
+                                   where acz.ZoneId == zoneId.Value
                                          && sp.Status == SponsoredProductStatus.Active
                                          && sp.AdCampaign!.Status == CampaignStatus.Active
                                          && sp.AdCampaign.StartDate <= now
-                                         && sp.AdCampaign!.EndDate >= now
+                                         && sp.AdCampaign.EndDate >= now
                                    orderby sp.AdCampaign!.Package!.AdScore descending,
                                            sp.Priority descending
                                    select new RobotPlaylistItemDto
@@ -1338,7 +1353,7 @@ public sealed class AdCampaignService(
             playlistItems = [];
         }
 
-        return new RobotPlaylistResponseDto(robotId, aisleNode?.Aisle?.ZoneId, playlistItems, DateTime.UtcNow, null);
+        return new RobotPlaylistResponseDto(robotId, zoneId, playlistItems, DateTime.UtcNow, null);
     }
 
     public async Task<TargetingContextResponseDto> GetTargetingContextAsync(

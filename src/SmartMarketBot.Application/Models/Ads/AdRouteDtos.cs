@@ -7,6 +7,9 @@ public sealed record AdRouteResponseDto(
     string RouteName,
     string? Description,
     bool IsActive,
+    bool IsAutonomous,
+    int? SemanticObjectId,
+    string? SemanticObjectLabel,
     DateTime CreatedAt,
     List<AdRouteNodeDto> Nodes,
     List<int> CampaignIds);
@@ -16,7 +19,9 @@ public sealed record AdRouteNodeDto(
     int NodeId,
     string? NodeName,
     int SequenceOrder,
-    int DwellTimeSeconds);
+    int DwellTimeSeconds,
+    int? ZoneId,
+    string? ZoneName);
 
 public sealed record CreateAdRouteRequestDto
 {
@@ -25,6 +30,17 @@ public sealed record CreateAdRouteRequestDto
     public required string RouteName { get; init; }
 
     public string? Description { get; init; }
+
+    /// <summary>
+    /// If true: Autonomous mode (sequential playlist from stops)
+    /// If false: Zone/Shelf mode (AABB spatial detection)
+    /// </summary>
+    public bool IsAutonomous { get; init; } = false;
+
+    /// <summary>
+    /// For Zone/Shelf mode: target SemanticObject to track.
+    /// </summary>
+    public int? SemanticObjectId { get; init; }
 
     [Required(ErrorMessage = "Danh sách NodeIds là bắt buộc và phải có ít nhất 1 node.")]
     [MinLength(1, ErrorMessage = "Phải có ít nhất 1 node trong lộ trình.")]
@@ -41,6 +57,12 @@ public sealed record AdRouteNodeInput
     public int SequenceOrder { get; init; }
 
     public int DwellTimeSeconds { get; init; } = 30;
+
+    /// <summary>
+    /// ZoneId of the aisle this node belongs to.
+    /// Used to group nodes into playlists for Autonomous mode.
+    /// </summary>
+    public int? ZoneId { get; init; }
 }
 
 public sealed record UpdateAdRouteRequestDto
@@ -52,6 +74,10 @@ public sealed record UpdateAdRouteRequestDto
     public string? Description { get; init; }
 
     public bool IsActive { get; init; } = true;
+
+    public bool IsAutonomous { get; init; } = false;
+
+    public int? SemanticObjectId { get; init; }
 
     public List<AdRouteNodeInput>? Nodes { get; init; }
 

@@ -10,8 +10,50 @@ namespace SmartMarketBot.API.Controllers;
 [Route("api/v1/ad-campaign")]
 public sealed class AdCampaignController(
     IAdCampaignService adCampaignService,
+    IAdBroadcastService adBroadcastService,
+    IRobotService robotService,
     ILocalizationService localizer) : ControllerBase
 {
+    /// <summary>
+    /// Get current playlist based on robot position (x, y).
+    /// Automatically detects mode (Autonomous vs ZoneShelf).
+    /// </summary>
+    [HttpGet("robot/{robotCode}/broadcast/now")]
+    [AllowAnonymous]
+    public async Task<ActionResult<AdPlaylistDto>> GetBroadcastNow(
+        string robotCode,
+        [FromQuery] int x,
+        [FromQuery] int y,
+        CancellationToken cancellationToken)
+    {
+        var robot = await robotService.GetByCodeAsync(robotCode, cancellationToken);
+        if (robot == null)
+            return NotFound(new { message = localizer.Get("RobotNotFound", robotCode) });
+
+        var result = await adBroadcastService.GetPlaylistForRobotAsync(robot.RobotId, x, y, cancellationToken);
+        return Ok(result);
+    }
+
+    /// <summary>
+    /// Get full autonomous route with pre-compiled playlists per stop.
+    /// Called once when robot starts autonomous route.
+    /// </summary>
+    [HttpGet("robot/{robotCode}/broadcast/route")]
+    [AllowAnonymous]
+    public async Task<ActionResult<AdRouteBroadcastDto>> GetBroadcastRoute(
+        string robotCode,
+        CancellationToken cancellationToken)
+    {
+        var robot = await robotService.GetByCodeAsync(robotCode, cancellationToken);
+        if (robot == null)
+            return NotFound(new { message = localizer.Get("RobotNotFound", robotCode) });
+
+        var result = await adBroadcastService.GetAutonomousRoutePlaylistAsync(robot.RobotId, cancellationToken);
+        if (result == null)
+            return NotFound(new { message = "No active autonomous route assigned to this robot." });
+        return Ok(result);
+    }
+
     [HttpGet("robot-playlist/{robotId}")]
     [AllowAnonymous]
     public async Task<ActionResult<RobotPlaylistResponseDto>> GetRobotPlaylist(

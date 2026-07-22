@@ -31,7 +31,7 @@ public sealed class GeneralDealService(AppDbContext db, ILocalizationService loc
             where p.PromotionPrice.HasValue
                   && p.PromotionPrice < p.UnitPrice
                   && p.Status == "Available"
-            select new { p, ProductType = pt, Subcategory = sub, IsSponsored = false, AdCampaignId = (int?)null };
+            select new { p, ProductType = pt, Subcategory = sub, IsSponsored = false, AdCampaignId = (int?)null, IsSystemBrand = false, BrandId = (int?)null, BrandName = (string?)null };
 
         // ── Nguồn 2: SponsoredProducts trong AdCampaign Active ─────────────────
         var sponsoredProductsQuery =
@@ -53,7 +53,7 @@ public sealed class GeneralDealService(AppDbContext db, ILocalizationService loc
                   && ac.Status == CampaignStatus.Active
                   && ac.StartDate <= now
                   && ac.EndDate >= now
-            select new { p, ProductType = pt, Subcategory = sub, IsSponsored = true, AdCampaignId = (int?)ac.AdCampaignId };
+            select new { p, ProductType = pt, Subcategory = sub, IsSponsored = true, AdCampaignId = (int?)ac.AdCampaignId, IsSystemBrand = br.IsSystemBrand, BrandId = (int?)br.BrandId, BrandName = br.BrandName };
 
         var combined = await sponsoredProductsQuery
             .Union(promoProductsQuery)
@@ -110,6 +110,9 @@ public sealed class GeneralDealService(AppDbContext db, ILocalizationService loc
                     c.ProductType,
                     c.IsSponsored,
                     c.AdCampaignId,
+                    c.IsSystemBrand,
+                    c.BrandId,
+                    c.BrandName,
                     OriginalPrice = originalPrice,
                     DealPrice = dealPrice,
                     DiscountPercent = discountPct,
@@ -139,8 +142,9 @@ public sealed class GeneralDealService(AppDbContext db, ILocalizationService loc
                 x.p.ImageUrl,
                 x.ProductType?.TypeName,
                 x.p.ProductTypeId,
-                null,
-                null,
+                x.BrandName,
+                x.BrandId,
+                x.IsSystemBrand,
                 [],
                 x.HasAllergenConflict,
                 x.AllergenList,

@@ -11,6 +11,13 @@
 ### 0.1. Migrations (bắt buộc)
 
 ```bash
+# 1. Thêm cột IsSystemBrand vào bảng BRAND (nếu chưa có)
+sqlcmd -S <server> -d SuperMarketBot -Q "ALTER TABLE dbo.BRAND ADD IsSystemBrand BIT NOT NULL DEFAULT 0;"
+
+# 2. Seed SmartMart brand (tùy chọn)
+sqlcmd -S <server> -d SuperMarketBot -Q "IF NOT EXISTS (SELECT 1 FROM BRAND WHERE BrandName = 'SmartMart') BEGIN INSERT INTO BRAND (BrandName, Wallet, IsSystemBrand, CreatedAt) VALUES ('SmartMart', 10000000, 1, GETUTCDATE()); END"
+
+# 3. Chạy migration chính
 sqlcmd -S <server> -d SuperMarketBot -i db/migrations/migration_all_in_one.sql
 ```
 
@@ -31,6 +38,7 @@ docker compose up -d --build
 |------|--------------------|-------------------|
 | `MEMBER` | ≥ 1 record | Tương tác xem quảng cáo |
 | `BRAND` | ≥ 1 record với `Wallet >= 1000000` | Trừ tiền khi Activate |
+| `BRAND` | ≥ 1 record với `IsSystemBrand = 1` (SmartMart) | SmartMart hiển thị ưu tiên trong ads |
 | `AD_PACKAGE` | 3 records (đã seed) | Gói giá |
 | `ROBOT` | ≥ 1 record | Robot chạy quảng cáo |
 | `ZONE`, `AISLE`, `SHELF`, `SLOT` | ≥ 1 record mỗi loại | Targeting Zone |
@@ -42,7 +50,7 @@ docker compose up -d --build
 ```sql
 -- Lấy ID để dùng cho test
 SELECT PackageID, PackageName, PricePackage, PriceRoute, PriceZone, PriceShelf FROM AD_PACKAGE;
-SELECT BrandID, BrandName, Wallet FROM BRAND;
+SELECT BrandID, BrandName, Wallet, IsSystemBrand FROM BRAND;
 SELECT RobotID, RobotCode FROM ROBOT;
 SELECT ZoneID, ZoneName FROM ZONE;
 SELECT ObjectID, ObjectType, XMin, XMax, YMin, YMax FROM SEMANTIC_OBJECT;
@@ -1197,6 +1205,97 @@ curl -X GET "http://localhost:5000/api/v1/products/deals?minDiscountPercent=20"
 **FE dùng để:**
 - **Guest:** Hiển thị trang Deals/Flash Sale trên app — không cần đăng nhập.
 - **Member:** Khi `memberId` truyền → trả kèm `hasAllergenConflict` để hiển thị cảnh báo dị ứng.
+- **SmartMart Boost:** Khi `isSystemBrand = true` → hiển thị badge "SmartMart" để phân biệt với brand bên ngoài.
+
+---
+
+### 2.9.2. Test Case — `IsSystemBrand` Boost trong Deals ⭐
+
+#### Seed SmartMart Brand
+
+```sql
+-- Kiểm tra SmartMart đã tồn tại chưa
+SELECT BrandID, BrandName, Wallet, IsSystemBrand FROM BRAND WHERE BrandName = 'SmartMart';
+
+-- Nếu chưa có, thêm vào
+INSERT INTO BRAND (BrandName, Wallet, IsSystemBrand, CreatedAt)
+VALUES ('SmartMart', 10000000, 1, GETUTCDATE());
+```
+
+#### Test: SmartMart hiển thị ưu tiên trong Sponsored Deals
+
+```bash
+# Tạo SmartMart campaign với product deal
+curl -X POST http://localhost:5000/api/v1/ad-campaigns \
+  -H "Content-Type: application/json" \
+  -d '{
+    "packageId": 1,
+    "brandId": <SmartMartBrandID>,
+    "semanticObjectId": null,
+    "zoneIds": null,
+    "routeIds": null,
+    "campaignName": "SmartMart Deal Campaign",
+    "startDate": "2026-07-01T00:00:00Z",
+    "endDate": "2027-01-01T00:00:00Z"
+  }'
+
+# Activate campaign
+curl -X POST http://localhost:5000/api/v1/ad-campaigns/<campaignId>/activate
+
+# Thêm product deal cho SmartMart
+curl -X POST http://localhost:5000/api/v1/sponsored-products \
+  -H "Content-Type: application/json" \
+  -d '{
+    "adCampaignId": <campaignId>,
+    "productId": <productId>,
+    "priority": 100
+  }'
+```
+
+#### Verify Response
+
+```bash
+curl -X GET "http://localhost:5000/api/v1/products/deals?pageNumber=1&pageSize=20"
+```
+
+**Mong đợi:**
+```json
+{
+  "totalCount": 2,
+  "items": [
+    {
+      "productId": 101,
+      "productName": "Sữa SmartMart 1L",
+      "dealPrice": 25000.00,
+      "discountPercent": 29,
+      "brandName": "SmartMart",
+      "brandId": 99,
+      "isSystemBrand": true,       // ← SmartMart được đánh dấu
+      "promotionLabel": "SmartMart Deal"
+    },
+    {
+      "productId": 201,
+      "productName": "Coca-Cola 330ml",
+      "dealPrice": 10000.00,
+      "discountPercent": 17,
+      "brandName": "Coca-Cola",
+      "brandId": 1,
+      "isSystemBrand": false,
+      "promotionLabel": "Khuyến mãi"
+    }
+  ]
+}
+```
+
+#### Test: Sponsored Recommendations boost SmartMart
+
+```bash
+curl -X GET "http://localhost:5000/api/members/5/sponsored-recommendations?slotId=10"
+```
+
+**Mong đợi:**
+- SmartMart sponsored products được sort lên đầu dựa trên `systemBrandBonus`
+- `isSystemBrand: true` xuất hiện trong response để FE hiển thị badge
 
 ---
 
@@ -1435,6 +1534,8 @@ SELECT Wallet FROM BRAND WHERE BrandID = 1;  -- Tăng lên theo refund
 | 10 | Cùng 1 campaign match cả 3 luồng → charge MAX, không cộng dồn | ☐ |
 | 11 | Pause → Resume → không charge thêm | ☐ |
 | 12 | Cancel → refund đúng | ☐ |
+| 14 | SmartMart brand có `IsSystemBrand = true` → ưu tiên hiển thị trong deals | ☐ |
+| 15 | SmartMart boost `systemBrandBonus` được tính trong recommendations | ☐ |
 | 13 | Update semantic object → snapshot shelf re-charge đúng giá mới | ☐ |
 
 ---

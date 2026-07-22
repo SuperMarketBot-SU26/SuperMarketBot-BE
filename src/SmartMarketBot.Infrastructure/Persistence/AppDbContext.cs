@@ -484,6 +484,7 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
             entity.Property(x => x.BrandName).HasColumnName("BrandName").HasMaxLength(100).IsRequired();
             entity.Property(x => x.Wallet).HasColumnName("Wallet").HasPrecision(18, 2).HasDefaultValue(0m);
             entity.Property(x => x.Description).HasColumnName("Description").HasMaxLength(500);
+            entity.Property(x => x.IsSystemBrand).HasColumnName("IsSystemBrand").HasDefaultValue(false);
         });
 
         modelBuilder.Entity<AdPackage>(entity =>

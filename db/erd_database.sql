@@ -426,7 +426,8 @@ CREATE TABLE dbo.BRAND (
     BrandID         INT IDENTITY(1,1) PRIMARY KEY,
     BrandName       NVARCHAR(100)  NOT NULL,
     Wallet          DECIMAL(18,2)  NOT NULL DEFAULT 0,
-    Description     NVARCHAR(500)  NULL
+    Description     NVARCHAR(500)  NULL,
+    IsSystemBrand   BIT            NOT NULL DEFAULT 0   -- 1 = brand siêu thị tự chạy quảng cáo miễn phí
 );
 
 CREATE TABLE dbo.AD_PACKAGE (

@@ -66,6 +66,7 @@ public sealed class AdRecommendationService(AppDbContext db, ILocalizationServic
                 ac.SemanticObjectId,
                 br.BrandId,
                 br.BrandName,
+                br.IsSystemBrand,
                 p.ProductId,
                 p.ProductName,
                 p.ProductTypeId,
@@ -118,13 +119,15 @@ public sealed class AdRecommendationService(AppDbContext db, ILocalizationServic
         var isWeekend = (DateTime.UtcNow.DayOfWeek is DayOfWeek.Saturday or DayOfWeek.Sunday);
         var profileBase = 20;
         var weekendBonus = isWeekend ? 10 : 0;
+        var systemBrandBonus = 50; // SystemBrand ưu tiên cao nhất
 
         var items = raw
             .Select(r =>
             {
                 var slotInfo = slotFirstByProduct.GetValueOrDefault(r.ProductId);
                 var allergens = productAllergens.GetValueOrDefault(r.ProductId) ?? [];
-                var total = r.Priority + r.AdScore + profileBase + weekendBonus;
+                var brandBoost = r.IsSystemBrand ? systemBrandBonus : 0;
+                var total = r.Priority + r.AdScore + profileBase + weekendBonus + brandBoost;
                 return new SponsoredRecommendationDto(
                     r.SponsoredId,
                     r.AdCampaignId,
@@ -143,7 +146,9 @@ public sealed class AdRecommendationService(AppDbContext db, ILocalizationServic
                     r.Priority,
                     profileBase,
                     weekendBonus,
+                    brandBoost,
                     total,
+                    r.IsSystemBrand,
                     allergens.Count > 0,
                     allergens);
             })

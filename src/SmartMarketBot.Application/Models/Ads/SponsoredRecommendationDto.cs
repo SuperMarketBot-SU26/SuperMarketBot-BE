@@ -19,6 +19,8 @@ public sealed record SponsoredRecommendationDto(
     int Priority,
     int ProfileScore,
     int WeekendBonus,
+    int SystemBrandBoost,
     int TotalScore,
+    bool IsSystemBrand,
     bool HasAllergenConflict,
     IReadOnlyList<string> AllergenConflicts);

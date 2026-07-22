@@ -411,12 +411,13 @@ GO
 -- 13. BRAND
 -- ═══════════════════════════════════════════════════════════
 SET IDENTITY_INSERT dbo.BRAND ON;
-INSERT INTO dbo.BRAND (BrandID, BrandName, Wallet, Description) VALUES
-(1, N'Coca-Cola Company', 5000000.00, N'Hãng nước giải khát hàng đầu'),
-(2, N'PepsiCo Vietnam', 3000000.00, N'Đồ uống giải khát'),
-(3, N'Nestle Vietnam', 8000000.00, N'Sữa và thực phẩm dinh dưỡng'),
-(4, N'Vinamilk', 10000000.00, N'Sữa tươi và sản phẩm từ sữa'),
-(5, N'Unilever Vietnam', 6000000.00, N'Hàng tiêu dùng nhanh');
+INSERT INTO dbo.BRAND (BrandID, BrandName, Wallet, Description, IsSystemBrand) VALUES
+(1, N'Coca-Cola Company', 5000000.00, N'Hãng nước giải khát hàng đầu', 0),
+(2, N'PepsiCo Vietnam', 3000000.00, N'Đồ uống giải khát', 0),
+(3, N'Nestle Vietnam', 8000000.00, N'Sữa và thực phẩm dinh dưỡng', 0),
+(4, N'Vinamilk', 10000000.00, N'Sữa tươi và sản phẩm từ sữa', 0),
+(5, N'Unilever Vietnam', 6000000.00, N'Hàng tiêu dùng nhanh', 0),
+(99, N'SmartMart', 0.00, N'Siêu thị SmartMart — Brand hệ thống tự chạy khuyến mãi', 1);
 SET IDENTITY_INSERT dbo.BRAND OFF;
 GO
 

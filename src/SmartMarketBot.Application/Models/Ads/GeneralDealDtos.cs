@@ -18,6 +18,7 @@ public sealed record GeneralDealDto(
     int ProductTypeId,
     string? BrandName,
     int? BrandId,
+    bool IsSystemBrand,
     IReadOnlyList<string> HealthTags,
     bool HasAllergenConflict,
     IReadOnlyList<string> AllergenConflicts,

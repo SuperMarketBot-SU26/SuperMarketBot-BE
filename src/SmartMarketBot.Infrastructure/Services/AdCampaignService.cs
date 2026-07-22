@@ -360,6 +360,7 @@ public sealed class AdCampaignService(
             throw new InvalidOperationException(localizer.Get("CampaignNotInactive"));
 
         var isResuming = campaign.Status == CampaignStatus.Paused;
+        var isSystemBrand = campaign.Brand!.IsSystemBrand;
 
         if (!isResuming)
         {
@@ -387,6 +388,31 @@ public sealed class AdCampaignService(
 
             if (isInMemory)
             {
+                if (isSystemBrand)
+                {
+                    campaign.StartDate = DateTime.UtcNow;
+                    campaign.Status = CampaignStatus.Active;
+
+                    db.AdCampaignLogs.Add(new AdCampaignLog
+                    {
+                        AdCampaignId = campaign.AdCampaignId,
+                        ActionType = "Activation",
+                        ChargedAmount = 0,
+                        Timestamp = DateTime.UtcNow
+                    });
+
+                    await db.SaveChangesAsync(cancellationToken);
+
+                    logger.LogInformation(
+                        "Campaign {CampaignId} activated [SYSTEM BRAND - FREE]. Routes={routeCount}, Zones={zoneCount}, Shelf={hasShelf}",
+                        campaignId, routeCount, zoneCount, hasShelf);
+
+                    return new ActivateCampaignResponseDto(
+                        campaign.AdCampaignId, campaign.CampaignName,
+                        CampaignStatus.Inactive, CampaignStatus.Active,
+                        0, campaign.Brand.Wallet);
+                }
+
                 lock (WalletLock)
                 {
                     if (campaign.Brand!.Wallet < totalCost)
@@ -420,6 +446,31 @@ public sealed class AdCampaignService(
                     campaign.AdCampaignId, campaign.CampaignName,
                     CampaignStatus.Inactive, CampaignStatus.Active,
                     totalCost, campaign.Brand.Wallet);
+            }
+
+            if (isSystemBrand)
+            {
+                campaign.StartDate = DateTime.UtcNow;
+                campaign.Status = CampaignStatus.Active;
+
+                db.AdCampaignLogs.Add(new AdCampaignLog
+                {
+                    AdCampaignId = campaign.AdCampaignId,
+                    ActionType = "Activation",
+                    ChargedAmount = 0,
+                    Timestamp = DateTime.UtcNow
+                });
+
+                await db.SaveChangesAsync(cancellationToken);
+
+                logger.LogInformation(
+                    "Campaign {CampaignId} activated [SYSTEM BRAND - FREE]. Routes={routeCount}, Zones={zoneCount}, Shelf={hasShelf}",
+                    campaignId, routeCount, zoneCount, hasShelf);
+
+                return new ActivateCampaignResponseDto(
+                    campaign.AdCampaignId, campaign.CampaignName,
+                    CampaignStatus.Inactive, CampaignStatus.Active,
+                    0, campaign.Brand.Wallet);
             }
 
             await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);

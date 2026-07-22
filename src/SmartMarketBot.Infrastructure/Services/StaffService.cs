@@ -87,7 +87,9 @@ public sealed class StaffService(AppDbContext db, ILocalizationService localizer
                 x.ss.EmptyPercentage,
                 x.ss.ScannedAt,
                 x.ss.EmptyPercentage >= 80 ? "High" : x.ss.EmptyPercentage >= 50 ? "Medium" : "Low",
-                true))
+                true,
+                x.ss.AisleId,
+                x.ss.AisleNodeId))
             .ToListAsync(ct);
 
         return new RestockTaskListResponseDto(tasks.Count, tasks);

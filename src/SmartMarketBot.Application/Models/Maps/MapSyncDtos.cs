@@ -38,7 +38,11 @@ public sealed record MapSyncSemanticObjectDto(
     string? Label,
     double? Confidence,
     DateTime? DetectedAt,
-    string? ImageUrl);
+    string? ImageUrl,
+    int? ProductTypeId,
+    string? ProductTypeName,
+    string? SubcategoryName,
+    string? CategoryName);
 
 // Response DTOs (positional constructors)
 public sealed record MapSyncResponseDto(
@@ -77,3 +81,15 @@ public sealed record UploadFloorplanImageResponseDto(
     int MapId,
     string ImageUrl,
     string Message);
+
+public sealed record MapSummaryDto(
+    int MapId,
+    int FloorId,
+    string MapName,
+    DateTime CreatedAt,
+    string? FloorplanImageUrl,
+    double WidthMeters,
+    double HeightMeters,
+    int NodeCount,
+    int EdgeCount,
+    int SemanticObjectCount);

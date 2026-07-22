@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
 using SmartMarketBot.Application.Interfaces;
 using SmartMarketBot.Application.Models.RobotRoutes;
+using SmartMarketBot.Domain.Enums;
 
 namespace SmartMarketBot.API.Controllers;
 
@@ -112,17 +113,37 @@ public sealed class RobotRoutesController(
     /// Trả về danh sách tất cả RouteType hợp lệ kèm mô tả ngắn.
     /// Frontend dùng để render dropdown thay vì tự nhập string.
     /// GET /api/v1/routes/types
+    ///
+    /// Nguồn dữ liệu: <see cref="RouteTypeKind"/> enum. Label/description lấy qua
+    /// localizer với key "RouteType_{kind}_Label" / "RouteType_{kind}_Description";
+    /// nếu không có translation thì trả về default tiếng Việt. Thêm key mới vào
+    /// file từ điển — không cần đụng C#.
     /// </summary>
     [HttpGet("types")]
     public ActionResult<IReadOnlyList<object>> GetRouteTypes()
     {
-        var types = new[]
-        {
-            new { value = "patrol",   label = "Tuần tra",    description = "Robot di chuyển dọc các kệ để quét mật độ hàng hoá." },
-            new { value = "restock",  label = "Bổ sung hàng", description = "Lộ trình dẫn đến các kệ cần bổ sung." },
-            new { value = "delivery", label = "Giao hàng",   description = "Vận chuyển hàng từ kho đến vị trí quy định." },
-            new { value = "custom",   label = "Tùy chỉnh",   description = "Lộ trình do admin tự định nghĩa." },
-        };
+        var types = Enum.GetValues<RouteTypeKind>()
+            .OrderBy(k => (int)k)
+            .Select(kind =>
+            {
+                var key = $"RouteType_{kind}";
+                var label = TryLocalize($"{key}_Label") ?? kind.DefaultLabel();
+                var description = TryLocalize($"{key}_Description") ?? kind.DefaultDescription();
+                return new
+                {
+                    value = kind.ToDbString(),
+                    numeric = (int)kind,
+                    label,
+                    description
+                };
+            })
+            .ToList();
         return Ok(types);
+    }
+
+    private string TryLocalize(string key)
+    {
+        var localized = localizer.Get(key);
+        return string.Equals(localized, key, StringComparison.Ordinal) ? string.Empty : localized;
     }
 }

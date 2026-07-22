@@ -11,7 +11,9 @@ namespace SmartMarketBot.Infrastructure.Services;
 public sealed class AdCampaignService(
     AppDbContext db,
     ILocalizationService localizer,
-    ILogger<AdCampaignService> logger) : IAdCampaignService
+    ILogger<AdCampaignService> logger,
+    IRobotRouteService routeService,
+    ISemanticObjectService semanticObjectService) : IAdCampaignService
 {
     private static readonly Lock WalletLock = new();
 
@@ -1337,5 +1339,50 @@ public sealed class AdCampaignService(
         }
 
         return new RobotPlaylistResponseDto(robotId, aisleNode?.Aisle?.ZoneId, playlistItems, DateTime.UtcNow, null);
+    }
+
+    public async Task<TargetingContextResponseDto> GetTargetingContextAsync(
+        int campaignId, int floorId, CancellationToken cancellationToken = default)
+    {
+        var exists = await db.AdCampaigns.AnyAsync(c => c.AdCampaignId == campaignId, cancellationToken);
+        if (!exists)
+            throw new KeyNotFoundException(localizer.Get("CampaignNotFound", campaignId));
+
+        // Resolve latest map for floor. Mirrors MapsController.GetLatestMap logic:
+        // order by CreatedAt desc, take first. floorId > 0 already enforced by controller.
+        var mapId = await db.Maps
+            .Where(m => m.FloorId == floorId)
+            .OrderByDescending(m => m.CreatedAt)
+            .Select(m => (int?)m.MapId)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        if (mapId is null)
+        {
+            // No map for this floor → return empty payload (FE can render the empty state)
+            return new TargetingContextResponseDto(0, floorId, [], [], []);
+        }
+
+        // Fan out the 3 data fetches in parallel. Each is independent.
+        var shelvesTask = semanticObjectService.GetShelvesByMapAsync(mapId.Value, cancellationToken);
+        var routesTask = routeService.GetRoutesByMapAsync(mapId.Value, null, null, cancellationToken);
+        var assignedTask = GetAssignedRoutesInternalAsync(campaignId, cancellationToken);
+
+        await Task.WhenAll(shelvesTask, routesTask, assignedTask);
+
+        var routes = routesTask.Result
+            .Select(r => new RouteSummaryDto(
+                r.RobotRouteId, r.RouteName, r.ZoneId, r.ZoneName, r.WaypointCount))
+            .ToList();
+
+        var assignedIds = assignedTask.Result.Routes
+            .Select(r => r.RobotRouteId)
+            .ToList();
+
+        return new TargetingContextResponseDto(
+            mapId.Value,
+            floorId,
+            shelvesTask.Result,
+            routes,
+            assignedIds);
     }
 }

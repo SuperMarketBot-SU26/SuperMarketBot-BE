@@ -1,6 +1,8 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using SmartMarketBot.Application.Interfaces;
 using SmartMarketBot.Domain.Entities;
+using SmartMarketBot.Domain.Enums;
 
 namespace SmartMarketBot.Infrastructure.Persistence;
 
@@ -837,10 +839,18 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
                 .HasForeignKey(x => x.MapId);
             // === Phase 1: phân loại & liên kết Zone ===
             entity.Property(x => x.ZoneId).HasColumnName("ZoneID");
+            // Enum → lowercase string ("patrol" | "restock" | "delivery" | "custom").
+            // Converter định nghĩa 1 chiều: enum ↔ string. DB column vẫn là NVARCHAR(50),
+            // không đổi schema, không phá data cũ. Nếu DB chứa giá trị lạ (do nhập tay),
+            // converter sẽ ném — đó là fail-fast đúng nghĩa.
             entity.Property(x => x.RouteType)
                   .HasColumnName("RouteType")
+                  .HasConversion(
+                      new ValueConverter<RouteTypeKind, string>(
+                          v => v.ToDbString(),
+                          v => ParseRouteType(v)))
                   .HasMaxLength(50)
-                  .HasDefaultValue("patrol")
+                  .HasDefaultValue(RouteTypeKind.Patrol)
                   .IsRequired();
             entity.Property(x => x.Description)
                   .HasColumnName("Description")
@@ -943,5 +953,20 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
                 .HasForeignKey(x => x.ProductTypeId)
                 .OnDelete(DeleteBehavior.SetNull);
         });
+    }
+
+    /// <summary>
+    /// Parse RouteTypeKind từ DB string. Fail-fast nếu DB dính giá trị lạ —
+    /// tốt hơn silent-coerce về Patrol, vì khi đó admin sẽ phát hiện lỗi mapping
+    /// sớm thay vì mất ad trên route sai.
+    /// </summary>
+    private static RouteTypeKind ParseRouteType(string value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+            return RouteTypeKind.Patrol;
+        if (RouteTypeKindExtensions.TryParseDbString(value, out var kind) && Enum.IsDefined(kind))
+            return kind;
+        throw new InvalidOperationException(
+            $"Unknown RouteTypeKind value in DB: '{value}'. Valid: {string.Join(", ", RouteTypeKindExtensions.AllDbStrings)}");
     }
 }

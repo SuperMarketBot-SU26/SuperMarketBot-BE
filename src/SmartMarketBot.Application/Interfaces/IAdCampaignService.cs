@@ -40,4 +40,12 @@ public interface IAdCampaignService
     /// Lấy danh sách route mà campaign đã mua quyền phát.
     /// </summary>
     Task<CampaignRoutesResponseDto> GetAssignedRoutesAsync(int campaignId, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Single-fetch payload cho TargetingSelector UI: mapId + shelves (filter shelf)
+    /// + all routes of map + campaign's assigned routeIds.
+    /// Thay thế 4 HTTP call ở FE (maps/latest + semantic-objects paged + routes +
+    /// ad-campaigns/{id}/routes).
+    /// </summary>
+    Task<TargetingContextResponseDto> GetTargetingContextAsync(int campaignId, int floorId, CancellationToken cancellationToken = default);
 }

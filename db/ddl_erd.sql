@@ -454,11 +454,12 @@ CREATE TABLE ROBOT_ROUTE (
     RobotID       INT           NOT NULL,
     MapID         INT           NOT NULL,
     RouteName     NVARCHAR(200) NULL,
-    RouteType     NVARCHAR(50)  NOT NULL DEFAULT N'patrol',  -- patrol | restock | delivery | custom
+    RouteType     NVARCHAR(50)  NOT NULL DEFAULT N'patrol',  -- patrol | ad_zone | ad_shelf | ad_autonomous
     IsActive      BIT           NOT NULL DEFAULT 1,
     CreatedAt     DATETIME2     NOT NULL DEFAULT DATEADD(hour, 7, GETUTCDATE()),
     CONSTRAINT FK_RR_ROBOT FOREIGN KEY (RobotID) REFERENCES ROBOT(RobotID) ON DELETE CASCADE,
-    CONSTRAINT FK_RR_MAP   FOREIGN KEY (MapID)   REFERENCES MAP(MapID)
+    CONSTRAINT FK_RR_MAP   FOREIGN KEY (MapID)   REFERENCES MAP(MapID),
+    CONSTRAINT CK_RR_ROUTETYPE CHECK (RouteType IN (N'patrol', N'ad_zone', N'ad_shelf', N'ad_autonomous'))
 );
 CREATE INDEX IX_RR_RobotID ON ROBOT_ROUTE(RobotID);
 
@@ -551,4 +552,3 @@ CREATE TABLE CART_ITEM (
 );
 CREATE INDEX IX_CART_ITEM_CartID ON CART_ITEM(CartID);
 CREATE INDEX IX_CART_ITEM_ProductID ON CART_ITEM(ProductID);
-

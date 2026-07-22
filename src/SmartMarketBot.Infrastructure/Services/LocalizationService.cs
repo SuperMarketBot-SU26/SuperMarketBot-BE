@@ -112,6 +112,17 @@ public sealed class LocalizationService : ILocalizationService
                 ["DestNodeInvalid"] = "DestinationNodeId phải là số nguyên hợp lệ.",
                 ["RobotNotFound"] = "Không tìm thấy robot '{0}'.",
                 ["AllergenRegistered"] = "Sản phẩm chứa thành phần dị ứng đã đăng ký.",
+                ["InvalidRouteType"] = "Loại lộ trình '{0}' không hợp lệ. Hợp lệ: {1}.",
+
+                // RobotRoute types (enum RouteTypeKind)
+                ["RouteType_Patrol_Label"] = "Tuần tra",
+                ["RouteType_Patrol_Description"] = "Robot di chuyển dọc các kệ để quét mật độ hàng hoá.",
+                ["RouteType_AdZone_Label"] = "QC theo khu vực",
+                ["RouteType_AdZone_Description"] = "Robot chạy quanh một khu vực (zone) để phát quảng cáo cho khách.",
+                ["RouteType_AdShelf_Label"] = "QC theo kệ",
+                ["RouteType_AdShelf_Description"] = "Robot dừng tại các kệ quảng cáo và phát nội dung tương ứng.",
+                ["RouteType_AdAutonomous_Label"] = "QC tự động",
+                ["RouteType_AdAutonomous_Description"] = "Robot tự chọn thời điểm & vị trí phát quảng cáo, không gắn với shelf/zone cố định.",
 
                 // Map Management
                 ["MapSyncSuccess"] = "Đã đồng bộ bản đồ thành công.",
@@ -224,6 +235,17 @@ public sealed class LocalizationService : ILocalizationService
                 ["DestNodeInvalid"] = "DestinationNodeId must be a valid integer.",
                 ["RobotNotFound"] = "Robot '{0}' not found.",
                 ["AllergenRegistered"] = "Product contains a registered allergen ingredient.",
+                ["InvalidRouteType"] = "Route type '{0}' is invalid. Allowed: {1}.",
+
+                // RobotRoute types (enum RouteTypeKind)
+                ["RouteType_Patrol_Label"] = "Patrol",
+                ["RouteType_Patrol_Description"] = "Robot moves along shelves to scan product density.",
+                ["RouteType_AdZone_Label"] = "Ads by Zone",
+                ["RouteType_AdZone_Description"] = "Robot runs around a zone to play ads to nearby customers.",
+                ["RouteType_AdShelf_Label"] = "Ads by Shelf",
+                ["RouteType_AdShelf_Description"] = "Robot stops at shelves and plays ads relevant to those shelves.",
+                ["RouteType_AdAutonomous_Label"] = "Autonomous Ads",
+                ["RouteType_AdAutonomous_Description"] = "Robot autonomously picks when and where to play ads; not bound to shelf/zone.",
 
                 // Map Management
                 ["MapSyncSuccess"] = "Map synchronized successfully.",

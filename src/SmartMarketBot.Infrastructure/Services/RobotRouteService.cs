@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using SmartMarketBot.Application.Interfaces;
 using SmartMarketBot.Application.Models.RobotRoutes;
+using SmartMarketBot.Domain.Enums;
 using SmartMarketBot.Infrastructure.Persistence;
 
 namespace SmartMarketBot.Infrastructure.Services;
@@ -28,8 +29,16 @@ public sealed class RobotRouteService(
         if (zoneId.HasValue)
             query = query.Where(r => r.ZoneId == zoneId.Value);
 
+        // Validate routeType query param against enum. Unknown string → empty list
+        // (matches FE's expectation that invalid filter just shows nothing, instead
+        // of throwing 400 on every map-load if FE cached a stale value).
         if (!string.IsNullOrWhiteSpace(routeType))
-            query = query.Where(r => r.RouteType == routeType);
+        {
+            if (RouteTypeKindExtensions.TryParseDbString(routeType, out var kind) && Enum.IsDefined(kind))
+                query = query.Where(r => r.RouteType == kind);
+            else
+                return [];
+        }
 
         var routes = await query
             .Include(r => r.Zone)
@@ -41,7 +50,7 @@ public sealed class RobotRouteService(
             r.RobotRouteId,
             r.MapId,
             r.RouteName,
-            r.RouteType,
+            r.RouteType.ToDbString(),
             r.Description,
             r.ZoneId,
             r.Zone?.ZoneName,
@@ -78,7 +87,7 @@ public sealed class RobotRouteService(
             route.RobotRouteId,
             route.MapId,
             route.RouteName,
-            route.RouteType,
+            route.RouteType.ToDbString(),
             route.Description,
             route.ZoneId,
             route.Zone?.ZoneName,
@@ -115,12 +124,20 @@ public sealed class RobotRouteService(
                 throw new KeyNotFoundException(localizer.Get("ZoneNotFound", dto.ZoneId.Value));
         }
 
+        // Validate: RouteType hợp lệ. DTO là string (FE wire format) — chuyển sang enum.
+        if (string.IsNullOrWhiteSpace(dto.RouteType))
+            throw new InvalidOperationException(localizer.Get("InvalidRouteType",
+                dto.RouteType ?? "(null)", string.Join(", ", RouteTypeKindExtensions.AllDbStrings)));
+        if (!RouteTypeKindExtensions.TryParseDbString(dto.RouteType, out var routeType) || !Enum.IsDefined(routeType))
+            throw new InvalidOperationException(localizer.Get("InvalidRouteType",
+                dto.RouteType, string.Join(", ", RouteTypeKindExtensions.AllDbStrings)));
+
         var route = new Domain.Entities.RobotRoute
         {
             MapId = dto.MapId,
             RobotId = dto.RobotId,
             RouteName = dto.RouteName,
-            RouteType = dto.RouteType,
+            RouteType = routeType,
             Description = dto.Description,
             ZoneId = dto.ZoneId,
             CreatedAt = DateTime.UtcNow
@@ -185,9 +202,17 @@ public sealed class RobotRouteService(
                 throw new KeyNotFoundException(localizer.Get("ZoneNotFound", dto.ZoneId.Value));
         }
 
+        // Validate: RouteType hợp lệ
+        if (string.IsNullOrWhiteSpace(dto.RouteType))
+            throw new InvalidOperationException(localizer.Get("InvalidRouteType",
+                dto.RouteType ?? "(null)", string.Join(", ", RouteTypeKindExtensions.AllDbStrings)));
+        if (!RouteTypeKindExtensions.TryParseDbString(dto.RouteType, out var routeType) || !Enum.IsDefined(routeType))
+            throw new InvalidOperationException(localizer.Get("InvalidRouteType",
+                dto.RouteType, string.Join(", ", RouteTypeKindExtensions.AllDbStrings)));
+
         // Cập nhật thông tin route
         route.RouteName = dto.RouteName;
-        route.RouteType = dto.RouteType;
+        route.RouteType = routeType;
         route.Description = dto.Description;
         route.ZoneId = dto.ZoneId;
 

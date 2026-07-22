@@ -454,11 +454,12 @@ CREATE TABLE ROBOT_ROUTE (
     RobotID       INT           NOT NULL,
     MapID         INT           NOT NULL,
     RouteName     NVARCHAR(200) NULL,
-    RouteType     NVARCHAR(50)  NOT NULL DEFAULT N'patrol',  -- patrol | restock | delivery | custom
+    RouteType     NVARCHAR(50)  NOT NULL DEFAULT N'patrol',  -- patrol | ad_zone | ad_shelf | ad_autonomous
     IsActive      BIT           NOT NULL DEFAULT 1,
     CreatedAt     DATETIME2     NOT NULL DEFAULT DATEADD(hour, 7, GETUTCDATE()),
     CONSTRAINT FK_RR_ROBOT FOREIGN KEY (RobotID) REFERENCES ROBOT(RobotID) ON DELETE CASCADE,
-    CONSTRAINT FK_RR_MAP   FOREIGN KEY (MapID)   REFERENCES MAP(MapID)
+    CONSTRAINT FK_RR_MAP   FOREIGN KEY (MapID)   REFERENCES MAP(MapID),
+    CONSTRAINT CK_RR_ROUTETYPE CHECK (RouteType IN (N'patrol', N'ad_zone', N'ad_shelf', N'ad_autonomous'))
 );
 CREATE INDEX IX_RR_RobotID ON ROBOT_ROUTE(RobotID);
 
@@ -551,4 +552,43 @@ CREATE TABLE CART_ITEM (
 );
 CREATE INDEX IX_CART_ITEM_CartID ON CART_ITEM(CartID);
 CREATE INDEX IX_CART_ITEM_ProductID ON CART_ITEM(ProductID);
+
+-- ============================================================================
+-- ROUTE_TYPE ENUM REFACTOR (Phase: enum enforcement + taxonomy swap)
+-- Adds CHECK constraint + coerces legacy values (restock|delivery|custom → patrol)
+-- to match the new C# enum (RouteTypeKind): patrol | ad_zone | ad_shelf | ad_autonomous.
+-- Idempotent: re-runnable. Safe to apply to envs where the prior migration ran.
+-- ============================================================================
+IF COL_LENGTH('dbo.ROBOT_ROUTE', 'RouteType') IS NOT NULL
+BEGIN
+    -- 1. Normalize existing values: trim + lowercase. Defensive against 'Patrol'/'PATROL'.
+    UPDATE dbo.ROBOT_ROUTE
+       SET RouteType = LOWER(LTRIM(RTRIM(RouteType)))
+     WHERE RouteType <> LOWER(LTRIM(RTRIM(RouteType)));
+
+    -- 2. Coerce legacy taxonomy (restock|delivery|custom) → 'patrol'.
+    --    Pre-ad-taxonomy rows: không có 1:1 mapping sạch vào AdZone/AdShelf/AdAutonomous
+    --    (cần operator review từng route), nên gộp về patrol để không phá schema.
+    --    Sau khi chạy SELECT dưới để review nếu cần.
+    UPDATE dbo.ROBOT_ROUTE
+       SET RouteType = N'patrol'
+     WHERE RouteType IN (N'restock', N'delivery', N'custom', N'', N' ', N'patrols');
+
+    -- 3. Replace the CHECK constraint with the new taxonomy. Drop + recreate in
+    --    one shot so we don't have to handle the "old constraint exists with
+    --    old values" case in two steps.
+    IF EXISTS (
+        SELECT 1
+          FROM sys.check_constraints
+         WHERE name = 'CK_RR_ROUTETYPE'
+    )
+    BEGIN
+        ALTER TABLE dbo.ROBOT_ROUTE DROP CONSTRAINT CK_RR_ROUTETYPE;
+    END
+
+    ALTER TABLE dbo.ROBOT_ROUTE
+        WITH CHECK
+        ADD CONSTRAINT CK_RR_ROUTETYPE
+        CHECK (RouteType IN (N'patrol', N'ad_zone', N'ad_shelf', N'ad_autonomous'));
+END
 

@@ -1,5 +1,7 @@
 namespace SmartMarketBot.Domain.Entities;
 
+using SmartMarketBot.Domain.Enums;
+
 public class RobotRoute
 {
     public int RobotRouteId { get; set; }
@@ -11,8 +13,9 @@ public class RobotRoute
     // === Phase 1: phân loại & liên kết khu vực ===
     /// <summary>Liên kết khu vực (Zone) để lọc / phân loại lộ trình theo khu vực bản đồ. Null = chưa gán.</summary>
     public int? ZoneId { get; set; }
-    /// <summary>Loại lộ trình: patrol | restock | delivery | custom. Mặc định 'patrol' (tuần tra quét kệ).</summary>
-    public string RouteType { get; set; } = "patrol";
+    /// <summary>Loại lộ trình. Lưu DB dưới dạng string lowercase ("patrol" | "restock" | "delivery" | "custom")
+    /// qua <see cref="RouteTypeKindExtensions.ToDbString"/>. Mặc định 'patrol' (tuần tra quét kệ).</summary>
+    public RouteTypeKind RouteType { get; set; } = RouteTypeKind.Patrol;
     /// <summary>Mô tả ngắn cho admin (vd: "Tuần tra khu rau củ, quét kệ 5-12 mỗi sáng").</summary>
     public string? Description { get; set; }
 

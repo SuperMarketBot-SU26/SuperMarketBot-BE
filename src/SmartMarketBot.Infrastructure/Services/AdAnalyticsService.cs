@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using SmartMarketBot.Application.Interfaces;
 using SmartMarketBot.Application.Models.Ads;
 using SmartMarketBot.Domain.Entities;
+using SmartMarketBot.Domain.Enums;
 using SmartMarketBot.Infrastructure.Persistence;
 
 namespace SmartMarketBot.Infrastructure.Services;
@@ -43,7 +44,7 @@ public sealed class AdAnalyticsService(AppDbContext db, ILocalizationService loc
             .AsNoTracking()
             .Include(so => so.ProductType)
             .FirstOrDefaultAsync(so =>
-                so.ObjectType == "shelf" &&
+                so.ObjectType == SemanticObjectType.Shelf &&
                 so.XMin <= request.XCoord && so.XMax >= request.XCoord &&
                 so.YMin <= request.YCoord && so.YMax >= request.YCoord, ct);
 

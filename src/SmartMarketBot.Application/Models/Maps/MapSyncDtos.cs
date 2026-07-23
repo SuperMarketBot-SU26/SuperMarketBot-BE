@@ -1,3 +1,5 @@
+using SmartMarketBot.Domain.Enums;
+
 namespace SmartMarketBot.Application.Models.Maps;
 
 // Input DTOs (properties with defaults) — class syntax for init-only flexibility
@@ -30,7 +32,7 @@ public sealed record MapSyncEdgeDto(
 
 public sealed record MapSyncSemanticObjectDto(
     int? ObjectId,
-    string ObjectType,
+    SemanticObjectType ObjectType,
     double XMin,
     double YMin,
     double XMax,

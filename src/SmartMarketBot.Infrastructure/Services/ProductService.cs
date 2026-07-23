@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using SmartMarketBot.Application.Interfaces;
 using SmartMarketBot.Application.Models.Products;
+using SmartMarketBot.Domain.Enums;
 using SmartMarketBot.Infrastructure.Persistence;
 
 namespace SmartMarketBot.Infrastructure.Services;
@@ -291,7 +292,7 @@ public sealed class ProductService(AppDbContext dbContext) : IProductService
             from pt in ptGroup.DefaultIfEmpty()
             join so in dbContext.SemanticObjects.AsNoTracking()
                 on pt.ProductTypeId equals so.ProductTypeId into soGroup
-            from so in soGroup.Where(x => x.ObjectType == "shelf").DefaultIfEmpty()
+            from so in soGroup.Where(x => x.ObjectType == SemanticObjectType.Shelf).DefaultIfEmpty()
             join m in dbContext.Maps.AsNoTracking() on so.MapId equals m.MapId into mGroup
             from m in mGroup.DefaultIfEmpty()
             where !floorId.HasValue || (m != null && m.FloorId == floorId.Value)

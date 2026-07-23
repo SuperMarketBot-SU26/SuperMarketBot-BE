@@ -1,5 +1,6 @@
 using System.ComponentModel.DataAnnotations;
 using SmartMarketBot.Application.Models.Products;
+using SmartMarketBot.Domain.Enums;
 
 namespace SmartMarketBot.Application.Models.SemanticObjects;
 
@@ -13,7 +14,7 @@ public sealed record AssignProductTypeRequestDto
 public sealed record SemanticObjectDto(
     int ObjectId,
     int MapId,
-    string ObjectType,
+    SemanticObjectType ObjectType,
     double XMin,
     double YMin,
     double XMax,

@@ -275,6 +275,57 @@ public sealed class NavigationService(IAppDbContext dbContext, ILocalizationServ
 
     }
 
+    /// <summary>Phase B Step 2 — Tính route theo NodeCode (line-scan). Algorithm giống PlanRouteAsync, chỉ khác input.</summary>
+    public async Task<RouteLinePlanResultDto> PlanLineRouteAsync(
+        RouteLinePlanRequestDto request, CancellationToken cancellationToken = default)
+    {
+        // 1. Resolve NodeCode → NodeId (DB). Tên node duy nhất trong 1 map.
+        var nodeIds = await dbContext.NavigationNodes
+            .AsNoTracking()
+            .Where(n => n.NodeCode == request.StartNodeCode || n.NodeCode == request.EndNodeCode)
+            .Select(n => new { n.NodeId, n.NodeCode, n.MapId })
+            .ToListAsync(cancellationToken);
+
+        var startEntry = nodeIds.FirstOrDefault(n => n.NodeCode == request.StartNodeCode);
+        var endEntry = nodeIds.FirstOrDefault(n => n.NodeCode == request.EndNodeCode);
+
+        if (startEntry is null)
+            throw new KeyNotFoundException(localizer.Get("StartNodeNotFoundByCode", request.StartNodeCode));
+        if (endEntry is null)
+            throw new KeyNotFoundException(localizer.Get("EndNodeNotFoundByCode", request.EndNodeCode));
+
+        // 2. Reuse Dijkstra pipeline (NodeId-driven). Cross-map route giữa 2 map khác nhau bị từ chối.
+        if (startEntry.MapId != endEntry.MapId)
+            throw new InvalidOperationException(localizer.Get("StartEndNodeMapMismatch"));
+
+        var route = await PlanRouteAsync(
+            new RoutePlanRequestDto(startEntry.NodeId, endEntry.NodeId),
+            cancellationToken);
+
+        if (route.Nodes.Count == 0)
+            return new RouteLinePlanResultDto(0d, [], startEntry.NodeId, endEntry.NodeId);
+
+        var pathIds = route.Nodes.Select(n => n.NodeId).ToHashSet();
+        var codeMap = await dbContext.NavigationNodes
+            .AsNoTracking()
+            .Where(n => pathIds.Contains(n.NodeId))
+            .Select(n => new { n.NodeId, n.NodeCode })
+            .ToDictionaryAsync(n => n.NodeId, n => n.NodeCode, cancellationToken);
+
+        var resultNodes = route.Nodes
+            .Select(n => new RouteLineNodeDto(
+                n.NodeId,
+                codeMap.TryGetValue(n.NodeId, out var code) ? code : string.Empty,
+                n.DistanceFromStart))
+            .ToList();
+
+        return new RouteLinePlanResultDto(
+            route.TotalDistance,
+            resultNodes,
+            startEntry.NodeId,
+            endEntry.NodeId);
+    }
+
     // ── FindMobileRouteAsync ─────────────────────────────────────────────────
 
     private static double DistanceSquared(double x1, double y1, double x2, double y2)

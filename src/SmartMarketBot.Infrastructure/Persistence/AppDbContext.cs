@@ -788,6 +788,9 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
             entity.Property(x => x.HeadingRad).HasColumnName("HeadingRad");
             // [P0-3/4 FIX] Mapping cho CurrentNodeId — dùng cho auto-dock / reroute
             entity.Property(x => x.CurrentNodeId).HasColumnName("CurrentNodeId");
+            // Phase B Step 2 — NodeCode từ line-scan firmware; nullable để log cũ không vỡ
+            entity.Property(x => x.CurrentNodeCode).HasColumnName("CurrentNodeCode").HasMaxLength(50);
+            entity.HasIndex(x => x.CurrentNodeCode).HasDatabaseName("IX_ROBOT_LOG_CurrentNodeCode");
             entity.HasOne(x => x.Robot)
                 .WithMany(r => r.RobotLogs)
                 .HasForeignKey(x => x.RobotId)

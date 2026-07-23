@@ -113,6 +113,10 @@ public sealed class LocalizationService : ILocalizationService
                 ["RobotNotFound"] = "Không tìm thấy robot '{0}'.",
                 ["AllergenRegistered"] = "Sản phẩm chứa thành phần dị ứng đã đăng ký.",
                 ["InvalidRouteType"] = "Loại lộ trình '{0}' không hợp lệ. Hợp lệ: {1}.",
+                // Phase B Step 2 — Line-scan navigation (NodeCode)
+                ["StartNodeNotFoundByCode"] = "Không tìm thấy NodeCode '{0}' trên sơ đồ.",
+                ["EndNodeNotFoundByCode"] = "Không tìm thấy NodeCode '{0}' trên sơ đồ.",
+                ["StartEndNodeMapMismatch"] = "NodeCode bắt đầu và kết thúc phải thuộc cùng một bản đồ.",
 
                 // RobotRoute types (enum RouteTypeKind)
                 ["RouteType_Patrol_Label"] = "Tuần tra",
@@ -236,6 +240,10 @@ public sealed class LocalizationService : ILocalizationService
                 ["RobotNotFound"] = "Robot '{0}' not found.",
                 ["AllergenRegistered"] = "Product contains a registered allergen ingredient.",
                 ["InvalidRouteType"] = "Route type '{0}' is invalid. Allowed: {1}.",
+                // Phase B Step 2 — Line-scan navigation (NodeCode)
+                ["StartNodeNotFoundByCode"] = "NodeCode '{0}' not found on map.",
+                ["EndNodeNotFoundByCode"] = "NodeCode '{0}' not found on map.",
+                ["StartEndNodeMapMismatch"] = "Start and end NodeCodes must belong to the same map.",
 
                 // RobotRoute types (enum RouteTypeKind)
                 ["RouteType_Patrol_Label"] = "Patrol",

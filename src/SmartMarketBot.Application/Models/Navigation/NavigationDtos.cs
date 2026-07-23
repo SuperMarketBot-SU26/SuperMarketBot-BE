@@ -10,6 +10,24 @@ public sealed record RouteNodeDto(int NodeId, double X, double Y, double Distanc
 public sealed record RoutePlanResultDto(double TotalDistance, IReadOnlyList<RouteNodeDto> Nodes);
 
 /// <summary>
+/// Phase B Step 2 — Line-scan plan: truyền NodeCode thay vì NodeId.
+/// Firmware line-scan chỉ đọc được mã vật lý (RFID/QR/tape-line), không có NodeId.
+/// BE resolve NodeCode → NodeId trong DB, sau đó chạy Dijkstra như thường.
+/// </summary>
+public sealed record RouteLinePlanRequestDto(string StartNodeCode, string EndNodeCode);
+
+public sealed record RouteLineNodeDto(int NodeId, string NodeCode, double DistanceFromStart);
+
+public sealed record RouteLinePlanResultDto(
+    double TotalDistance,
+    IReadOnlyList<RouteLineNodeDto> Nodes,
+    int StartNodeId,
+    int EndNodeId);
+
+/// <summary>Phase B Step 2 — HTTP request gửi lệnh line_navigate xuống robot.</summary>
+public sealed record NavigateLineMapRequestDto(string RobotCode, string StartNodeCode, string EndNodeCode);
+
+/// <summary>
 /// Phase 3 — Yêu cầu reroute khi có chướng ngại vật mới trên đường.
 /// </summary>
 public sealed record RerouteRequestDto(

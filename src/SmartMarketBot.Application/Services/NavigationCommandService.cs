@@ -39,6 +39,31 @@ public sealed class NavigationCommandService(
     }
 
     /// <summary>
+    /// Phase B Step 2 — Gửi lệnh line_navigate đến robot với waypoint chỉ chứa NodeCode.
+    /// Firmware line-scan không nhận tọa độ; chỉ dựa vào mã vật lý (RFID/QR/tape-line) để dừng & rẽ.
+    /// Backend vẫn chạy Dijkstra để tính đường ngắn nhất; chỉ khác payload xuống robot.
+    /// </summary>
+    public async Task SendLineNavigationAsync(
+        string robotCode, string startNodeCode, string endNodeCode, CancellationToken ct = default)
+    {
+        var route = await navigationService.PlanLineRouteAsync(
+            new RouteLinePlanRequestDto(startNodeCode, endNodeCode), ct);
+
+        if (route.Nodes.Count == 0)
+        {
+            throw new InvalidOperationException(
+                $"No line route found from NodeCode '{startNodeCode}' to '{endNodeCode}'.");
+        }
+
+        var waypoints = route.Nodes
+            .Select(n => new { nodeCode = n.NodeCode })
+            .ToList();
+
+        var payload = JsonSerializer.Serialize(new { waypoints });
+        await commandPublisher.PublishCommandAsync(robotCode, "line_navigate", payload, ct);
+    }
+
+    /// <summary>
     /// Reroute: đánh dấu node bị chặn tạm thời rồi tính lại đường đi và gửi lệnh mới.
     /// </summary>
     public async Task RerouteAsync(RerouteRequestDto request, CancellationToken ct = default)

@@ -60,6 +60,28 @@ public sealed class NavigationController(
     }
 
     /// <summary>
+    /// Phase B Step 2 — Tính route Dijkstra theo NodeCode và gửi waypoints (NodeCode-only) xuống robot.
+    /// Dùng cho ESP32-S3 line-scan firmware: không cần X/Y, chỉ cần mã vật lý tại waypoint.
+    /// </summary>
+    [HttpPost("line-navigate")]
+    public async Task<IActionResult> LineNavigateRobot(
+        [FromBody] NavigateLineMapRequestDto request,
+        CancellationToken cancellationToken)
+    {
+        await navigationCommandService.SendLineNavigationAsync(
+            request.RobotCode,
+            request.StartNodeCode,
+            request.EndNodeCode,
+            cancellationToken);
+        return Accepted(new
+        {
+            message = $"Line-navigate command sent to {request.RobotCode}.",
+            request.StartNodeCode,
+            request.EndNodeCode
+        });
+    }
+
+    /// <summary>
     /// Phase 3 — Reroute: đánh dấu nodes bị chặn, tính lại đường đi và gửi lệnh navigate xuống robot.
     /// </summary>
     [HttpPost("reroute")]

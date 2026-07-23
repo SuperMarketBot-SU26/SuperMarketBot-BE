@@ -39,7 +39,9 @@ public sealed record RobotTelemetryDto(
     int? UsLF = null,
     int? UsLR = null,
     int? UsRF = null,
-    int? UsRR = null);
+    int? UsRR = null,
+    // Phase B Step 2 — firmware line-scan chỉ gửi NodeCode, BE forward cho FE qua SignalR
+    string? CurrentNodeCode = null);
 
 public sealed record RobotStatusDto(
     string RobotCode,

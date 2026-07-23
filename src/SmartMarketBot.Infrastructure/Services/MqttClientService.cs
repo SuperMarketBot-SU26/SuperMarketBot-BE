@@ -218,7 +218,10 @@ public sealed class MqttClientService(
                     XCoord = payload.XCoord,
                     YCoord = payload.YCoord,
                     HeadingRad = payload.HeadingRad,
-                    CurrentNodeId = payload.CurrentNodeId
+                    CurrentNodeId = payload.CurrentNodeId,
+                    // Phase B Step 2 — firmware line-scan chỉ gửi NodeCode, BE lưu raw vào log.
+                    // Legacy AMR không gửi → trường này NULL cho log từ thiết bị cũ.
+                    CurrentNodeCode = payload.CurrentNodeCode
                 };
 
                 dbContext.RobotLogs.Add(log);
@@ -262,7 +265,8 @@ public sealed class MqttClientService(
                     UsLF: payload.UsLF,
                     UsLR: payload.UsLR,
                     UsRF: payload.UsRF,
-                    UsRR: payload.UsRR);
+                    UsRR: payload.UsRR,
+                    CurrentNodeCode: payload.CurrentNodeCode);
 
                 await notifier.NotifyTelemetryAsync(telemetry);
             }
@@ -423,6 +427,11 @@ public sealed class MqttClientService(
         public double? YCoord { get; set; }
         public DateTime? Timestamp { get; set; }
         public string? Ip { get; set; }
+
+        // Phase B Step 2 — NodeCode từ firmware line-scan (RFID/QR/tape-line).
+        // Legacy AMR gửi CurrentNodeId; thiết bị mới gửi CurrentNodeCode. Cả hai nullable,
+        // BE lưu raw vào RobotLog.CurrentNodeCode (nullable) cho Phase 4 ad engine.
+        public string? CurrentNodeCode { get; set; }
 
         // Phase 1 — sensor telemetry từ ESP32-S3
         public int? LidarFront { get; set; }

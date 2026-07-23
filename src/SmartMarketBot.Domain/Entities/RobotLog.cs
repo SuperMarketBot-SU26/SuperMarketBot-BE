@@ -22,5 +22,13 @@ public class RobotLog
     /// </summary>
     public int? CurrentNodeId { get; set; }
 
+    /// <summary>
+    /// Phase B Step 2 — Mã vật lý tại waypoint (RFID/QR/tape-line) do firmware line-scan đọc.
+    /// Line-scan navigation chỉ gửi NodeCode về BE — BE lưu raw vào log để debug trajectory
+    /// và phục vụ Phase 4 (ad engine: truy node → semantic-object qua NODE_SEMANTIC_OBJECT).
+    /// Legacy AMR vẫn chỉ gửi X/Y/CurrentNodeId; trường này NULL cho log cũ.
+    /// </summary>
+    public string? CurrentNodeCode { get; set; }
+
     public virtual Robot? Robot { get; set; }
 }

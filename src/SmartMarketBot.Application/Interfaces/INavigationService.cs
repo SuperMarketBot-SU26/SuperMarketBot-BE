@@ -20,4 +20,11 @@ public interface INavigationService
     /// Tự động tìm NavigationNode gần nhất với (startX, startY) và gần nhất với đích.
     /// </summary>
     Task<MobileRouteResponseDto> FindMobileRouteAsync(MobileRouteRequestDto request, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Phase B Step 2 — Tính route theo NodeCode (firmware line-scan).
+    /// Resolve NodeCode → NodeId trong DB; algorithm Dijkstra giống PlanRouteAsync
+    /// nhưng input/output dùng NodeCode (firmware không biết NodeId).
+    /// </summary>
+    Task<RouteLinePlanResultDto> PlanLineRouteAsync(RouteLinePlanRequestDto request, CancellationToken cancellationToken = default);
 }

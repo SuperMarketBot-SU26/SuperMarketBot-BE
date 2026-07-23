@@ -130,6 +130,7 @@ public sealed class MapSyncService(
             if (dto.NodeId.HasValue && dto.NodeId.Value > 0 && existingNodes.TryGetValue(dto.NodeId.Value, out var existing))
             {
                 existing.NodeName = dto.NodeName;
+                existing.NodeCode = dto.NodeCode;
                 existing.XCoord = dto.XCoord;
                 existing.YCoord = dto.YCoord;
                 existing.NodeType = dto.NodeType;
@@ -143,6 +144,9 @@ public sealed class MapSyncService(
                 {
                     MapId = mapId,
                     NodeName = dto.NodeName,
+                    NodeCode = string.IsNullOrWhiteSpace(dto.NodeCode)
+                        ? $"AUTO_{Guid.NewGuid():N}".Substring(0, 12)  // backfill nếu client thiếu
+                        : dto.NodeCode,
                     XCoord = dto.XCoord,
                     YCoord = dto.YCoord,
                     NodeType = dto.NodeType,
@@ -384,7 +388,7 @@ public sealed class MapSyncService(
             .AsNoTracking()
             .Where(n => n.MapId == map.MapId)
             .Select(n => new MapSyncNodeDto(
-                n.NodeId, n.NodeName, n.XCoord, n.YCoord, n.NodeType, n.IsBlocked))
+                n.NodeId, n.NodeCode, n.NodeName, n.XCoord, n.YCoord, n.NodeType, n.IsBlocked))
             .ToListAsync(cancellationToken);
 
         var nodeIds = nodes.Select(n => n.NodeId).ToHashSet();

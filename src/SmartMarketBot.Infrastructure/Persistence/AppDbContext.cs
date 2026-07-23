@@ -817,6 +817,7 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
             entity.Property(x => x.NodeId).HasColumnName("NodeID");
             entity.Property(x => x.MapId).HasColumnName("MapID");
             entity.Property(x => x.NodeName).HasColumnName("NodeName").HasMaxLength(100);
+            entity.Property(x => x.NodeCode).HasColumnName("NodeCode").HasMaxLength(50).IsRequired();
             entity.Property(x => x.XCoord).HasColumnName("XCoord").HasDefaultValue(0);
             entity.Property(x => x.YCoord).HasColumnName("YCoord").HasDefaultValue(0);
             entity.Property(x => x.NodeType).HasColumnName("NodeType").HasMaxLength(50);
@@ -825,6 +826,11 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
                 .WithMany(m => m.NavigationNodes)
                 .HasForeignKey(x => x.MapId)
                 .OnDelete(DeleteBehavior.Cascade);
+            // Phase B: NodeCode là identity vật lý trên line — unique per map (cho phép
+            // cùng tên giữa các map khác nhau; firmware so NodeCode trong 1 floor).
+            entity.HasIndex(x => new { x.MapId, x.NodeCode })
+                .IsUnique()
+                .HasDatabaseName("IX_NAVIGATION_NODE_MapID_NodeCode");
         });
 
         modelBuilder.Entity<NavigationEdge>(entity =>

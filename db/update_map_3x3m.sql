@@ -26,16 +26,19 @@ SET IDENTITY_INSERT dbo.MAP OFF;
 GO
 
 -- 3. Thêm NAVIGATION_NODE (8 node tọa độ)
+-- Phase B: thêm cột NodeCode — định danh vật lý trên line-scanning.
+-- Mã code theo pattern L{Map}_{Stop} ví dụ "L1-S1" cho start,
+-- "L1-KV1-1" cho stop trước kệ KV1 row 1, v.v.
 SET IDENTITY_INSERT dbo.NAVIGATION_NODE ON;
-INSERT INTO dbo.NAVIGATION_NODE (NodeID, MapID, NodeName, XCoord, YCoord, NodeType, IsBlocked) VALUES
-(1, 1, N'START_NODE', 0.500, 0.200, N'start', 0),
-(2, 1, N'NODE_KV1_Shelf_1', 0.600, 2.100, N'destination', 0),
-(3, 1, N'NODE_KV1_Shelf_2', 1.000, 2.100, N'destination', 0),
-(4, 1, N'NODE_KV2_Shelf_1', 2.000, 2.100, N'destination', 0),
-(5, 1, N'NODE_KV2_Shelf_2', 2.400, 2.100, N'destination', 0),
-(6, 1, N'NODE_KV3_Shelf_1', 2.200, 1.100, N'destination', 0),
-(7, 1, N'NODE_KV3_Shelf_2', 2.200, 0.600, N'destination', 0),
-(8, 1, N'CHECKOUT_NODE', 2.500, 0.200, N'checkout', 0);
+INSERT INTO dbo.NAVIGATION_NODE (NodeID, MapID, NodeCode, NodeName, XCoord, YCoord, NodeType, IsBlocked) VALUES
+(1, 1, N'L1-S1',  N'START_NODE',     0.500, 0.200, N'start',       0),
+(2, 1, N'L1-K1A', N'NODE_KV1_Shelf_1', 0.600, 2.100, N'destination', 0),
+(3, 1, N'L1-K1B', N'NODE_KV1_Shelf_2', 1.000, 2.100, N'destination', 0),
+(4, 1, N'L1-K2A', N'NODE_KV2_Shelf_1', 2.000, 2.100, N'destination', 0),
+(5, 1, N'L1-K2B', N'NODE_KV2_Shelf_2', 2.400, 2.100, N'destination', 0),
+(6, 1, N'L1-K3A', N'NODE_KV3_Shelf_1', 2.200, 1.100, N'destination', 0),
+(7, 1, N'L1-K3B', N'NODE_KV3_Shelf_2', 2.200, 0.600, N'destination', 0),
+(8, 1, N'L1-CO',  N'CHECKOUT_NODE',  2.500, 0.200, N'checkout',    0);
 SET IDENTITY_INSERT dbo.NAVIGATION_NODE OFF;
 GO
 

@@ -15,6 +15,7 @@ public sealed record MapSyncRequestDto
 
 public sealed record MapSyncNodeDto(
     int? NodeId,
+    string NodeCode,
     string NodeName,
     double XCoord,
     double YCoord,

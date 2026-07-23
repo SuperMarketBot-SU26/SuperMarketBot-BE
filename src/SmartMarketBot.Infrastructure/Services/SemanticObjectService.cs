@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using SmartMarketBot.Application.Interfaces;
 using SmartMarketBot.Application.Models.Ads;
 using SmartMarketBot.Application.Models.SemanticObjects;
+using SmartMarketBot.Domain.Enums;
 using SmartMarketBot.Infrastructure.Persistence;
 
 namespace SmartMarketBot.Infrastructure.Services;
@@ -128,12 +129,12 @@ public sealed class SemanticObjectService(
         return await db.SemanticObjects
             .AsNoTracking()
             .Include(s => s.ProductType)
-            .Where(s => s.MapId == mapId && s.ObjectType == "shelf")
+            .Where(s => s.MapId == mapId && s.ObjectType == SemanticObjectType.Shelf)
             .OrderBy(s => s.ObjectId)
             .Select(s => new ShelfSummaryDto(
                 s.ObjectId,
                 s.Label,
-                s.ObjectType,
+                s.ObjectType.ToString(),
                 s.ProductTypeId,
                 s.ProductType != null ? s.ProductType.TypeName : null))
             .ToListAsync(cancellationToken);

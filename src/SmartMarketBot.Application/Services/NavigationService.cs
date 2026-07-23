@@ -7,52 +7,22 @@ namespace SmartMarketBot.Application.Services;
 
 public sealed class NavigationService(IAppDbContext dbContext, ILocalizationService localizer) : INavigationService
 {
-    private sealed record NodeData(int NodeId, double XCoord, double YCoord, bool IsBlocked);
+    private sealed record NodeData(int NodeId, string? NodeName, double XCoord, double YCoord, string? NodeType, bool IsBlocked);
     private sealed record EdgeData(int FromNodeId, int ToNodeId, double Distance, bool IsBidirectional);
-    private sealed record ObstacleRect(double XMin, double YMin, double XMax, double YMax);
 
     // ── Shared helpers ────────────────────────────────────────────────────────
 
     /// <summary>
-    /// Tải danh sách NavigationNodes và đánh dấu bất kỳ node nào
-    /// có tọa độ nằm trong vùng cấm (SEMANTIC_OBJECT loại 'obstacle') là IsBlocked = true.
-    /// Schema mới (V4.0): thay thế bảng ForbiddenZones bằng SEMANTIC_OBJECT (object_type = 'obstacle').
+    /// Tải danh sách NavigationNodes.
+    /// Schema mới (V4.0): thay thế bảng ForbiddenZones bằng SEMANTIC_OBJECT.
+    /// (Đã loại bỏ logic vùng cấm động obstacle).
     /// </summary>
-    private async Task<Dictionary<int, NodeData>> LoadNodesWithObstaclesAsync(
-        CancellationToken ct)
+    private async Task<Dictionary<int, NodeData>> LoadNodesAsync(CancellationToken ct)
     {
-        var nodes = await dbContext.NavigationNodes
+        return await dbContext.NavigationNodes
             .AsNoTracking()
-            .Select(n => new NodeData(n.NodeId, n.XCoord, n.YCoord, n.IsBlocked))
+            .Select(n => new NodeData(n.NodeId, n.NodeName, n.XCoord, n.YCoord, n.NodeType, n.IsBlocked))
             .ToDictionaryAsync(n => n.NodeId, ct);
-
-        // Vùng cấm động giờ là SEMANTIC_OBJECT loại 'obstacle' (cùng cấu trúc AABB)
-        var obstacles = await dbContext.SemanticObjects
-            .AsNoTracking()
-            .Where(so => so.ObjectType == "obstacle")
-            .Select(so => new ObstacleRect(so.XMin, so.YMin, so.XMax, so.YMax))
-            .ToListAsync(ct);
-
-        if (obstacles.Count == 0)
-            return nodes;
-
-        // Đánh dấu các node nằm trong vùng cấm là blocked (in-memory)
-        foreach (var nodeId in nodes.Keys.ToList())
-        {
-            var n = nodes[nodeId];
-            if (!n.IsBlocked && IsInsideAnyObstacle(n.XCoord, n.YCoord, obstacles))
-                nodes[nodeId] = n with { IsBlocked = true };
-        }
-
-        return nodes;
-    }
-
-    private static bool IsInsideAnyObstacle(double x, double y, IReadOnlyList<ObstacleRect> obstacles)
-    {
-        foreach (var o in obstacles)
-            if (x >= o.XMin && x <= o.XMax && y >= o.YMin && y <= o.YMax)
-                return true;
-        return false;
     }
 
     // ── PlanRouteAsync ───────────────────────────────────────────────────────
@@ -60,8 +30,7 @@ public sealed class NavigationService(IAppDbContext dbContext, ILocalizationServ
     public async Task<RoutePlanResultDto> PlanRouteAsync(
         RoutePlanRequestDto request, CancellationToken cancellationToken = default)
     {
-        // Nodes already include obstacle (ForbiddenZone) coordinate filtering
-        var nodes = await LoadNodesWithObstaclesAsync(cancellationToken);
+        var nodes = await LoadNodesAsync(cancellationToken);
 
         if (!nodes.ContainsKey(request.StartNodeId) || !nodes.ContainsKey(request.EndNodeId))
             throw new InvalidOperationException(localizer.Get("StartEndNodeNotExist"));
@@ -100,8 +69,8 @@ public sealed class NavigationService(IAppDbContext dbContext, ILocalizationServ
         OptimizeShoppingRouteRequestDto request,
         CancellationToken cancellationToken = default)
     {
-        // 1. Load nodes (với obstacle coordinate check) + edges
-        var nodes = await LoadNodesWithObstaclesAsync(cancellationToken);
+        // 1. Load nodes + edges
+        var nodes = await LoadNodesAsync(cancellationToken);
 
         var edges = await dbContext.NavigationEdges
             .AsNoTracking()
@@ -109,13 +78,9 @@ public sealed class NavigationService(IAppDbContext dbContext, ILocalizationServ
             .ToListAsync(cancellationToken);
 
         // Lấy IDs vùng cấm để trả về response (thông tin cho client)
-        var obstacleIds = await dbContext.SemanticObjects
-            .AsNoTracking()
-            .Where(so => so.ObjectType == "obstacle")
-            .Select(so => so.ObjectId)
-            .ToListAsync(cancellationToken);
+        var obstacleIds = new List<int>();
 
-        // Adjacency graph: tự động loại các node bị blocked (kể cả từ obstacle)
+        // Adjacency graph
         var adjacency = BuildAdjacency(edges, nodes);
 
         // 2. Tìm NodeId gần nhất cho từng ProductId
@@ -236,34 +201,69 @@ public sealed class NavigationService(IAppDbContext dbContext, ILocalizationServ
             }
         }
 
+        int waypointOrder = waypoints.Count;
+
         for (int i = 0; i < orderedProductIds.Count; i++)
         {
             var pid = orderedProductIds[i];
             if (!productNodeMap.TryGetValue(pid, out var pn)) continue;
 
-            var (dist, _) = Dijkstra(adjacency, prevNode);
+            var (dist, previous) = Dijkstra(adjacency, prevNode);
             var segDist = dist.TryGetValue(pn.NodeId, out var sd) && !double.IsInfinity(sd) && !double.IsNaN(sd) ? sd : 0;
             totalDistance += segDist;
+
+            var legPath = ReconstructPath(previous, prevNode, pn.NodeId);
+            foreach (var stepNodeId in legPath.Skip(1))
+            {
+                if (!nodes.TryGetValue(stepNodeId, out var stepNode)) continue;
+
+                bool isTargetProduct = (stepNodeId == pn.NodeId);
+                waypoints.Add(new ShoppingWaypointDto(
+                    waypointOrder++,
+                    stepNodeId,
+                    $"{stepNode.XCoord:F1},{stepNode.YCoord:F1}",
+                    stepNode.XCoord,
+                    stepNode.YCoord,
+                    isTargetProduct ? pid : null,
+                    isTargetProduct ? $"Product #{pid}" : (stepNode.NodeName ?? "Lối đi"),
+                    null,
+                    isTargetProduct ? pn.SlotCode : null,
+                    isTargetProduct ? (pn.SlotCode is null ? null : $"Slot {pn.SlotCode}") : "Hành lang"));
+            }
+
             prevNode = pn.NodeId;
+        }
 
-            var coordLabel = nodes.TryGetValue(pn.NodeId, out var nd)
-                ? $"{nd.XCoord:F1},{nd.YCoord:F1}"
-                : $"Node {pn.NodeId}";
+        // 5. Tự động thêm điểm cuối là Quầy Thu Ngân (Checkout) nếu có trên sơ đồ
+        var checkoutNode = nodes.Values.FirstOrDefault(n => "CHECKOUT".Equals(n.NodeType, StringComparison.OrdinalIgnoreCase) || (n.NodeName != null && n.NodeName.Contains("Checkout", StringComparison.OrdinalIgnoreCase)));
+        if (checkoutNode != null && checkoutNode.NodeId != prevNode)
+        {
+            var (dist, previous) = Dijkstra(adjacency, prevNode);
+            var segDist = dist.TryGetValue(checkoutNode.NodeId, out var sd) && !double.IsInfinity(sd) && !double.IsNaN(sd) ? sd : 0;
+            totalDistance += segDist;
 
-            waypoints.Add(new ShoppingWaypointDto(
-                i + 1,
-                pn.NodeId,
-                coordLabel,
-                pn.XCoord,
-                pn.YCoord,
-                pid,
-                $"Product #{pid}",
-                null,
-                pn.SlotCode,
-                pn.SlotCode is null ? null : $"Slot {pn.SlotCode}"));
+            var legPath = ReconstructPath(previous, prevNode, checkoutNode.NodeId);
+            foreach (var stepNodeId in legPath.Skip(1))
+            {
+                if (!nodes.TryGetValue(stepNodeId, out var stepNode)) continue;
+
+                bool isCheckoutFinal = (stepNodeId == checkoutNode.NodeId);
+                waypoints.Add(new ShoppingWaypointDto(
+                    waypointOrder++,
+                    stepNodeId,
+                    $"{stepNode.XCoord:F1},{stepNode.YCoord:F1}",
+                    stepNode.XCoord,
+                    stepNode.YCoord,
+                    null,
+                    isCheckoutFinal ? "Quầy Thu Ngân (Checkout)" : (stepNode.NodeName ?? "Lối đi"),
+                    null,
+                    isCheckoutFinal ? "CHECKOUT" : null,
+                    isCheckoutFinal ? "Điểm kết thúc / Thanh toán" : "Hành lang"));
+            }
         }
 
 
+        waypoints = ExpandPathWithDetourNodes(waypoints);
         var safeTotalDistance = double.IsInfinity(totalDistance) || double.IsNaN(totalDistance) ? 0d : Math.Round(totalDistance, 2);
 
         return new OptimizeShoppingRouteResponseDto(
@@ -271,9 +271,48 @@ public sealed class NavigationService(IAppDbContext dbContext, ILocalizationServ
             waypoints.Count,
             waypoints,
             obstacleIds,
-            $"TSP Nearest-Neighbour + Dijkstra. {obstacleIds.Count} obstacle(s) excluded from graph.");
-
+            $"TSP Nearest-Neighbour + Dijkstra + Dynamic Detour.");
     }
+
+    private static List<ShoppingWaypointDto> ExpandPathWithDetourNodes(
+        List<ShoppingWaypointDto> rawWaypoints)
+    {
+        if (rawWaypoints.Count < 2) return rawWaypoints;
+
+        var expanded = new List<ShoppingWaypointDto> { rawWaypoints[0] with { Order = 0 } };
+        int orderCounter = 1;
+
+        for (int i = 0; i < rawWaypoints.Count - 1; i++)
+        {
+            var curr = rawWaypoints[i];
+            var next = rawWaypoints[i + 1];
+
+            bool isDiagonal = Math.Abs(curr.X - next.X) > 1e-4 && Math.Abs(curr.Y - next.Y) > 1e-4;
+
+            if (isDiagonal)
+            {
+                double cornerX = curr.X;
+                double cornerY = next.Y;
+
+                expanded.Add(new ShoppingWaypointDto(
+                    orderCounter++,
+                    0, // Virtual NodeId = 0
+                    $"{cornerX:F1},{cornerY:F1}",
+                    cornerX,
+                    cornerY,
+                    null,
+                    "Corner Detour Node",
+                    null,
+                    null,
+                    "Bẻ góc 90°"));
+            }
+
+            expanded.Add(next with { Order = orderCounter++ });
+        }
+
+        return expanded;
+    }
+
 
     // ── FindMobileRouteAsync ─────────────────────────────────────────────────
 
@@ -283,7 +322,7 @@ public sealed class NavigationService(IAppDbContext dbContext, ILocalizationServ
     public async Task<MobileRouteResponseDto> FindMobileRouteAsync(
         MobileRouteRequestDto request, CancellationToken cancellationToken = default)
     {
-        var nodes = await LoadNodesWithObstaclesAsync(cancellationToken);
+        var nodes = await LoadNodesAsync(cancellationToken);
 
         if (nodes.Count == 0)
             return new MobileRouteResponseDto(0d, 0, []);
@@ -364,17 +403,31 @@ public sealed class NavigationService(IAppDbContext dbContext, ILocalizationServ
         // Tính khoảng cách từ (startX,startY) đến startNode
         var distToFirstNode = Math.Sqrt(DistanceSquared(request.StartX, request.StartY, startNode.XCoord, startNode.YCoord));
 
-        var path = new List<MobileRoutePointDto>
-        {
-            new(request.StartX, request.StartY, startNode.NodeId, "Điểm xuất phát")
-        };
+        var path = new List<MobileRoutePointDto>();
+        double currentX = request.StartX;
+        double currentY = request.StartY;
 
-        double accumulated = distToFirstNode;
-        foreach (var nodeId in pathIds.Skip(1))
+        path.Add(new MobileRoutePointDto(currentX, currentY, startNode.NodeId, "Điểm xuất phát"));
+
+        foreach (var nodeId in pathIds)
         {
             var nd = nodes[nodeId];
-            accumulated += distances.TryGetValue(nodeId, out var d) ? d : 0;
-            path.Add(new MobileRoutePointDto(nd.XCoord, nd.YCoord, nodeId, null));
+            bool dx = Math.Abs(currentX - nd.XCoord) > 1e-4;
+            bool dy = Math.Abs(currentY - nd.YCoord) > 1e-4;
+
+            if (dx && dy)
+            {
+                // Bẻ góc 90 độ nếu lệch cả X và Y
+                path.Add(new MobileRoutePointDto(currentX, nd.YCoord, 0, "Bẻ góc 90°"));
+                currentY = nd.YCoord;
+            }
+
+            if (dx || dy)
+            {
+                path.Add(new MobileRoutePointDto(nd.XCoord, nd.YCoord, nodeId, null));
+                currentX = nd.XCoord;
+                currentY = nd.YCoord;
+            }
         }
 
         if (request.EndObjectId.HasValue)
@@ -388,6 +441,11 @@ public sealed class NavigationService(IAppDbContext dbContext, ILocalizationServ
             {
                 var centerX = (destObject.XMin + destObject.XMax) / 2;
                 var centerY = (destObject.YMin + destObject.YMax) / 2;
+
+                if (Math.Abs(currentX - centerX) > 1e-4 && Math.Abs(currentY - centerY) > 1e-4)
+                {
+                    path.Add(new MobileRoutePointDto(currentX, centerY, 0, "Bẻ góc điểm đích"));
+                }
                 path.Add(new MobileRoutePointDto(centerX, centerY, null, destLabel ?? "Đích đến"));
             }
         }
@@ -422,10 +480,10 @@ public sealed class NavigationService(IAppDbContext dbContext, ILocalizationServ
 
         foreach (var edge in edges)
         {
-            if (!nodes.ContainsKey(edge.FromNodeId) || !nodes.ContainsKey(edge.ToNodeId))
+            if (!nodes.TryGetValue(edge.FromNodeId, out var from) || !nodes.TryGetValue(edge.ToNodeId, out var to))
                 continue;
 
-            if (nodes[edge.FromNodeId].IsBlocked || nodes[edge.ToNodeId].IsBlocked)
+            if (from.IsBlocked || to.IsBlocked)
                 continue;
 
             graph[edge.FromNodeId].Add((edge.ToNodeId, edge.Distance));

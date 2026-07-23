@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using SmartMarketBot.Application.Interfaces;
 using SmartMarketBot.Domain.Entities;
+using SmartMarketBot.Domain.Enums;
 
 namespace SmartMarketBot.Infrastructure.Persistence;
 
@@ -923,7 +924,7 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
             entity.HasKey(x => x.ObjectId);
             entity.Property(x => x.ObjectId).HasColumnName("ObjectID");
             entity.Property(x => x.MapId).HasColumnName("MapID");
-            entity.Property(x => x.ObjectType).HasColumnName("ObjectType").HasMaxLength(100).IsRequired();
+            entity.Property(x => x.ObjectType).HasConversion<string>().HasColumnName("ObjectType").HasMaxLength(100).IsRequired();
             entity.Property(x => x.XMin).HasColumnName("XMin").HasDefaultValue(0);
             entity.Property(x => x.YMin).HasColumnName("YMin").HasDefaultValue(0);
             entity.Property(x => x.XMax).HasColumnName("XMax").HasDefaultValue(0);

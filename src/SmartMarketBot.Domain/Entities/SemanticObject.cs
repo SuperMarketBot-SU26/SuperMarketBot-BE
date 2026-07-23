@@ -1,10 +1,12 @@
+using SmartMarketBot.Domain.Enums;
+
 namespace SmartMarketBot.Domain.Entities;
 
 public class SemanticObject
 {
     public int ObjectId { get; set; }
     public int MapId { get; set; }
-    public string ObjectType { get; set; } = string.Empty;
+    public SemanticObjectType ObjectType { get; set; }
     public double XMin { get; set; }
     public double YMin { get; set; }
     public double XMax { get; set; }

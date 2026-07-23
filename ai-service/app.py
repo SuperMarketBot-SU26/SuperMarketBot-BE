@@ -7,6 +7,21 @@ from deepface import DeepFace
 
 app = FastAPI(title="SmartMarketBot AI Face Service")
 
+@app.on_event("startup")
+def warmup_models():
+    print("[AI Service] Warming up DeepFace models (Facenet & OpenCV)...")
+    try:
+        dummy_img = np.zeros((100, 100, 3), dtype=np.uint8)
+        DeepFace.represent(
+            img_path=dummy_img,
+            model_name="Facenet",
+            enforce_detection=False,
+            detector_backend="opencv"
+        )
+        print("[AI Service] Warmup completed successfully! Model Facenet is loaded in RAM.")
+    except Exception as e:
+        print(f"[AI Service] Warmup warning: {e}")
+
 class ImageRequest(BaseModel):
     image_base64: str
     detector_backend: str = "opencv"
@@ -44,12 +59,23 @@ def extract_vector(request: ImageRequest):
             detector_backend=request.detector_backend
         )
         if not representations:
-            raise HTTPException(status_code=400, detail="No face detected in the image")
+            return {
+                "status": "failed",
+                "message": "No face detected in the image",
+                "face_vector": []
+            }
         
         vector = representations[0]["embedding"]
         return {
             "status": "success",
             "face_vector": vector
+        }
+    except ValueError as ve:
+        # DeepFace raises ValueError when enforce_detection=True and no face is detected
+        return {
+            "status": "failed",
+            "message": f"No face detected: {str(ve)}",
+            "face_vector": []
         }
     except HTTPException as he:
         raise he

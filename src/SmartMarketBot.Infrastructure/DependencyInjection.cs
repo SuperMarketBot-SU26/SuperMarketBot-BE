@@ -24,7 +24,13 @@ public static class DependencyInjection
 
         // Database
         services.AddDbContext<AppDbContext>(options =>
-            options.UseSqlServer(connectionString));
+            options.UseSqlServer(connectionString, sqlOptions =>
+            {
+                sqlOptions.EnableRetryOnFailure(
+                    maxRetryCount: 5,
+                    maxRetryDelay: TimeSpan.FromSeconds(10),
+                    errorNumbersToAdd: null);
+            }));
         services.AddScoped<IAppDbContext>(sp => sp.GetRequiredService<AppDbContext>());
 
         // Auth / Token / Email
@@ -72,7 +78,10 @@ public static class DependencyInjection
         services.AddScoped<IMemberRealtimeService, MemberRealtimeService>();
 
         services.AddHttpClient<IAiVisionProxy, AiVisionProxy>();
-        services.AddHttpClient<IFaceAiService, FaceAiService>();
+        services.AddHttpClient<IFaceAiService, FaceAiService>(client =>
+        {
+            client.Timeout = TimeSpan.FromSeconds(30);
+        });
         services.AddHttpClient<IGeminiService, GeminiService>();
         services.AddHttpClient<ICloudStorageService, CloudinaryService>();
 

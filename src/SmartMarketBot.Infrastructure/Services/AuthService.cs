@@ -185,84 +185,92 @@ public sealed class AuthService(
 
     public async Task<FaceLoginResponseDto> FaceLoginAsync(FaceLoginRequestDto request, CancellationToken ct = default)
     {
-        // Strategy A: gọi Python AI service (chính xác cao, dùng Cloudinary Face API nếu có)
-        var verifyResult = await faceAiService.VerifyFaceAsync(request.ImageBase64, ct);
-
-        Member? member = null;
-        double confidence = 0;
-        if (verifyResult is { Status: "success" } && verifyResult.MemberId > 0)
+        try
         {
-            member = await db.Members
-                .Include(m => m.Account)
-                .FirstOrDefaultAsync(m => m.MemberId == verifyResult.MemberId, ct);
-            confidence = verifyResult.ConfidenceScore;
-        }
+            // Strategy A: gọi Python AI service (chính xác cao, dùng Cloudinary Face API nếu có)
+            var verifyResult = await faceAiService.VerifyFaceAsync(request.ImageBase64, ct);
 
-        // Strategy B: nếu Python không xác thực được → tự trích vector rồi so khớp với tất cả FaceVector trong DB
-        // (cosine similarity — fallback khi Python AI down)
-        if (member == null)
-        {
-            var probeVector = await faceAiService.ExtractFaceVectorAsync(request.ImageBase64, ct);
-            if (probeVector != null && probeVector.Count > 0)
+            Member? member = null;
+            double confidence = 0;
+            if (verifyResult is { Status: "success" } && verifyResult.MemberId > 0)
             {
-                var best = await FindBestFaceMatchAsync(probeVector, ct);
-                if (best is not null)
+                member = await db.Members
+                    .Include(m => m.Account)
+                    .FirstOrDefaultAsync(m => m.MemberId == verifyResult.MemberId, ct);
+                confidence = verifyResult.ConfidenceScore;
+            }
+
+            // Strategy B: nếu Python không xác thực được → tự trích vector rồi so khớp với tất cả FaceVector trong DB
+            // (cosine similarity — fallback khi Python AI down)
+            if (member == null)
+            {
+                var probeVector = await faceAiService.ExtractFaceVectorAsync(request.ImageBase64, ct);
+                if (probeVector != null && probeVector.Count > 0)
                 {
-                    member = best.Value.Member;
-                    confidence = best.Value.Similarity;
-                    logger.LogInformation(
-                        "[AuthService] Face matched via DB vector scan → MemberId={Id}, sim={Sim:F3}",
-                        member.MemberId, confidence);
+                    var best = await FindBestFaceMatchAsync(probeVector, ct);
+                    if (best is not null)
+                    {
+                        member = best.Value.Member;
+                        confidence = best.Value.Similarity;
+                        logger.LogInformation(
+                            "[AuthService] Face matched via DB vector scan → MemberId={Id}, sim={Sim:F3}",
+                            member.MemberId, confidence);
+                    }
                 }
             }
-        }
 
-        if (member == null)
+            if (member == null)
+            {
+                return new FaceLoginResponseDto(false, "Không nhận diện được khuôn mặt", null, null, null);
+            }
+
+            // 3. Truy vấn các sản phẩm mua nhiều nhất từ lịch sử mua hàng
+            var topProductsList = await db.InvoiceHistoryItems
+                .Where(i => i.InvoiceHistory!.MemberId == member.MemberId)
+                .GroupBy(i => i.Product!.ProductName)
+                .OrderByDescending(g => g.Count())
+                .Select(g => g.Key)
+                .Take(3)
+                .ToListAsync(ct);
+
+            var topProductsStr = topProductsList.Any()
+                ? string.Join(", ", topProductsList)
+                : "chưa có lịch sử mua hàng";
+
+            // 4. Gọi Gemini API để sinh câu chào cá nhân hóa
+            var greeting = await geminiService.GeneratePersonalizedGreetingAsync(member.FullName, topProductsStr, ct);
+
+            // 5. Nếu thành viên có tài khoản liên kết, tự động sinh JWT Token đăng nhập
+            AuthResponseDto? tokenDto = null;
+            if (member.Account != null)
+            {
+                tokenDto = await BuildAuthResponseAsync(member.Account, ct);
+            }
+
+            var memberTier = await db.Memberships
+                .Where(mp => mp.MemberId == member.MemberId)
+                .OrderByDescending(mp => mp.MembershipId)
+                .Select(mp => mp.TierName)
+                .FirstOrDefaultAsync(ct);
+
+            var memberDto = new FaceLoginMemberDto(
+                member.MemberId,
+                member.FullName,
+                member.Account?.Phone ?? "",
+                memberTier ?? "Bronze",
+                member.TotalPoints
+            );
+
+            return new FaceLoginResponseDto(
+                true,
+                $"Đăng nhập bằng khuôn mặt thành công (confidence: {confidence:F2})",
+                greeting, tokenDto, memberDto);
+        }
+        catch (Exception ex)
         {
-            return new FaceLoginResponseDto(false, "Không nhận diện được khuôn mặt", null, null, null);
+            logger.LogError(ex, "[AuthService] Error during FaceLoginAsync execution");
+            return new FaceLoginResponseDto(false, "Lỗi kết nối hoặc xử lý nhận diện khuôn mặt. Vui lòng thử lại.", null, null, null);
         }
-
-        // 3. Truy vấn các sản phẩm mua nhiều nhất từ lịch sử mua hàng
-        var topProductsList = await db.InvoiceHistoryItems
-            .Where(i => i.InvoiceHistory!.MemberId == member.MemberId)
-            .GroupBy(i => i.Product!.ProductName)
-            .OrderByDescending(g => g.Count())
-            .Select(g => g.Key)
-            .Take(3)
-            .ToListAsync(ct);
-
-        var topProductsStr = topProductsList.Any()
-            ? string.Join(", ", topProductsList)
-            : "chưa có lịch sử mua hàng";
-
-        // 4. Gọi Gemini API để sinh câu chào cá nhân hóa
-        var greeting = await geminiService.GeneratePersonalizedGreetingAsync(member.FullName, topProductsStr, ct);
-
-        // 5. Nếu thành viên có tài khoản liên kết, tự động sinh JWT Token đăng nhập
-        AuthResponseDto? tokenDto = null;
-        if (member.Account != null)
-        {
-            tokenDto = await BuildAuthResponseAsync(member.Account, ct);
-        }
-
-        var memberTier = await db.Memberships
-            .Where(mp => mp.MemberId == member.MemberId)
-            .OrderByDescending(mp => mp.MembershipId)
-            .Select(mp => mp.TierName)
-            .FirstOrDefaultAsync(ct);
-
-        var memberDto = new FaceLoginMemberDto(
-            member.MemberId,
-            member.FullName,
-            member.Account?.Phone ?? "",
-            memberTier ?? "Bronze",
-            member.TotalPoints
-        );
-
-        return new FaceLoginResponseDto(
-            true,
-            $"Đăng nhập bằng khuôn mặt thành công (confidence: {confidence:F2})",
-            greeting, tokenDto, memberDto);
     }
 
     /// <summary>

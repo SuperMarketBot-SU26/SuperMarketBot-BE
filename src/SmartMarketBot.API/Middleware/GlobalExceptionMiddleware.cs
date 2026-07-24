@@ -32,6 +32,11 @@ public sealed class GlobalExceptionMiddleware(RequestDelegate next, ILogger<Glob
             logger.LogWarning(ex, "Business validation error.");
             await WriteErrorAsync(context, HttpStatusCode.BadRequest, ex.Message);
         }
+        catch (BadHttpRequestException ex)
+        {
+            logger.LogWarning(ex, "Bad HTTP Request: {Message}", ex.Message);
+            await WriteErrorAsync(context, HttpStatusCode.BadRequest, ex.Message);
+        }
         catch (Exception ex)
         {
             // OpenAPI/Swagger endpoints generate JSON schemas for DTOs using JsonSchemaExporter.

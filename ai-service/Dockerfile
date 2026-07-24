@@ -18,8 +18,8 @@ RUN python -c "import os, urllib.request, cv2; \
     urllib.request.urlretrieve('https://raw.githubusercontent.com/opencv/opencv/master/data/haarcascades/haarcascade_frontalface_default.xml', os.path.join(path, 'haarcascade_frontalface_default.xml')); \
     urllib.request.urlretrieve('https://raw.githubusercontent.com/opencv/opencv/master/data/haarcascades/haarcascade_eye.xml', os.path.join(path, 'haarcascade_eye.xml'))"
 
-# Pre-download Facenet model weights to avoid cold start issues during runtime (using detector_backend='skip' to bypass face detection during build)
-RUN python -c "from deepface import DeepFace; import numpy as np; DeepFace.represent(img_path=np.zeros((100, 100, 3), dtype=np.uint8), model_name='Facenet', enforce_detection=False, detector_backend='skip')"
+# Pre-download Facenet model weights & OpenCV detector to avoid cold start issues during runtime
+RUN python -c "from deepface import DeepFace; import numpy as np; DeepFace.represent(img_path=np.zeros((100, 100, 3), dtype=np.uint8), model_name='Facenet', enforce_detection=False, detector_backend='opencv')"
 
 COPY . .
 

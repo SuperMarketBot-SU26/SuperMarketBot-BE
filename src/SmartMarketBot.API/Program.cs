@@ -17,6 +17,13 @@ using SmartMarketBot.Infrastructure.Options;
 
 var builder = WebApplication.CreateBuilder(args);
 
+builder.Services.Configure<Microsoft.AspNetCore.Server.Kestrel.Core.KestrelServerOptions>(options =>
+{
+    options.Limits.MinRequestBodyDataRate = null;
+    options.Limits.MinResponseDataRate = null;
+    options.Limits.MaxRequestBodySize = 30 * 1024 * 1024;
+});
+
 builder.Services.AddControllers()
     .AddJsonOptions(options =>
     {
@@ -83,6 +90,16 @@ builder.Services
 builder.Services.AddAuthorization();
 
 var app = builder.Build();
+
+app.Use(async (context, next) =>
+{
+    var minRateFeature = context.Features.Get<Microsoft.AspNetCore.Server.Kestrel.Core.Features.IHttpMinRequestBodyDataRateFeature>();
+    if (minRateFeature != null)
+    {
+        minRateFeature.MinDataRate = null;
+    }
+    await next();
+});
 
 // Scalar API docs — luôn bật (kể cả Production/Azure để demo capstone)
 app.MapOpenApi();

@@ -1,131 +1,98 @@
-# SmartMarketBot — Backend (.NET 10)
+# SmartMarketBot — Backend (.NET 10 & Python AI Microservice)
 
-Backend cho hệ thống **siêu thị thông minh** (robot dẫn đường + quảng cáo tài trợ + cá nhân hoá hội viên).
+High-performance Backend system for **Smart Supermarket System** (Autonomous Navigation Robot, Dynamic Ad Campaigns, Personalized Face Recognition & AI Meal Recommendations).
 
-- **Stack:** ASP.NET Core 10, Clean Architecture 4-layer, EF Core 10, SQL Server, SignalR, MQTTnet, JWT
-- **Schema:** 37 bảng SNAKE_CASE — xem [`db/erd_database.sql`](db/erd_database.sql)
-- **Tích hợp:** AI Face Login + Vision (qua repo [`SuperMarketBot-AI`](../SuperMarketBot-AI)), Android, ESP32 IoT
+- **Architecture:** Clean Architecture 4-Layer (.NET 10 + EF Core 10 + Azure SQL)
+- **AI Microservice:** Python FastAPI (`ai-service`) with DeepFace (Facenet + OpenCV) for 128D Face Embedding Extraction & Gemini 2.5 Flash for personalized greetings
+- **Realtime & IoT:** SignalR Hubs (`/hubs/robot`, `/hubs/staff`, `/hubs/member`) + MQTT HiveMQ Broker
 
 ---
 
-## 🚀 Quick Start (Docker)
+## 🚀 Quick Start (Docker Compose)
 
 ```bash
-# Yêu cầu: Docker Desktop, .NET 10 SDK
+# Run full stack (API + Python AI Service + Mosquitto Broker)
 docker compose up -d --build
 
-# Sau ~30s, kiểm tra:
-curl http://localhost:5000/api/health
-# Mở Swagger: http://localhost:5000/swagger
+# Swagger / Scalar Docs: http://localhost:5000/scalar/v1 (or /swagger)
+# OpenAPI JSON:        http://localhost:5000/openapi/v1.json
+# Python AI Service:   http://localhost:8000
 ```
 
-| Service        | Port | URL                                          |
-| -------------- | ---- | -------------------------------------------- |
-| API + Swagger  | 5000 | http://localhost:5000                        |
-| SQL Server     | 1433 | `supermarketbot.database.windows.net,1433` (Azure SQL Database) |
-| MQTT Broker    | 8883 | `60922debd474446a84747b871c4a8182.s1.eu.hivemq.cloud` (HiveMQ Cloud TLS) |
-| SignalR Hub    | 5000 | `ws://localhost:5000/hubs/robot`             |
-
-> AI Face Service (Python) chạy riêng ở repo [`SuperMarketBot-AI`](../SuperMarketBot-AI).
+| Component | Port | Host / URL |
+|---|---|---|
+| ASP.NET Core API | 5000 | `http://localhost:5000` |
+| Python AI Service | 8000 | `http://localhost:8000` (Docker internal: `http://ai-service:8000`) |
+| Azure SQL Database | 1433 | `supermarketbot.database.windows.net,1433` |
+| HiveMQ Broker | 8883 | `60922debd474446a84747b871c4a8182.s1.eu.hivemq.cloud` |
+| SignalR Hubs | 5000 | `/hubs/robot`, `/hubs/staff`, `/hubs/member` |
 
 ---
 
-## 🛠️ Dev (không dùng Docker)
+## 🛠️ Local Development (without Docker)
 
 ```bash
-# Cấu hình kết nối DB và MQTT đã được trỏ sang Azure SQL và HiveMQ Cloud trong appsettings.json.
-# Bạn chỉ cần chạy ứng dụng:
+# Run Python AI Service locally
+cd ai-service
+pip install -r requirements.txt
+python app.py
+
+# Run .NET API locally
+cd ..
 dotnet run --project src/SmartMarketBot.API
 ```
 
 ---
 
-## 📁 Cấu trúc Solution
+## 🏗️ Architecture & Solution Layout
 
 ```
 SuperMarketBot-BE/
+├── ai-service/                Python FastAPI Face Recognition Microservice
+│   ├── app.py                 DeepFace (Facenet) vector extraction + model warmup
+│   ├── requirements.txt       FastAPI, OpenCV, DeepFace, TensorFlow
+│   └── Dockerfile             Pre-downloads model weights during docker build
 ├── src/
-│   ├── SmartMarketBot.Domain/         Entities, enums (no deps)
-│   ├── SmartMarketBot.Application/    Interfaces, DTOs, services, Dijkstra
-│   ├── SmartMarketBot.Infrastructure/ EF Core, MQTT, JWT, AI proxy
-│   └── SmartMarketBot.API/            Controllers, Hubs, Middleware
-├── db/
-│   └── erd_database.sql               Full 37-table schema (one-shot)
-├── scripts/
-│   └── gen-hash/                      PBKDF2 hash generator
-├── docs/                              Tài liệu dự án
-│   ├── architecture/                  Audit, design notes
-│   ├── deployment/                    Deploy guides
-│   ├── development/                   Dev workflow
-│   └── archive/                       Files cũ (lịch sử)
-├── .cursor/rules/                     AI coding rules
-├── docker-compose.yml                 SQL + Mosquitto + API
-├── Dockerfile                         Multi-stage build
-├── mosquitto.conf                     MQTT broker config
-├── SmartMarketBot.sln
-├── README.md
-├── AGENTS.md                          AI assistant guide
-└── LICENSE
+│   ├── SmartMarketBot.Domain/         Entities (SNAKE_CASE mappings), Enums, Value Objects
+│   ├── SmartMarketBot.Application/    Interfaces, DTOs, Business Services, Dijkstra Routing
+│   ├── SmartMarketBot.Infrastructure/ AppDbContext (EF Core Retry), FaceAiService, GeminiService, MQTT
+│   └── SmartMarketBot.API/            Controllers, SignalR Hubs, Kestrel Config, GlobalExceptionMiddleware
+├── docker-compose.yml         Multi-container orchestration
+└── Dockerfile                 Multi-stage build for ASP.NET Core 10
 ```
 
 ---
 
-## 🏗️ Kiến trúc 4 Layer
+## 🔑 Core Features & API Map
 
-```
-[API Controllers, SignalR Hubs, Middleware]
-            │
-            ▼
-[Application: DTOs, Interfaces, Services, Dijkstra]
-            │
-            ▼
-[Infrastructure: AppDbContext, MQTT, JWT, AI proxy]
-            │
-            ▼
-[Domain: Entities, Enums, Exceptions]
-```
+### 1. Authentication & Face Login (`/api/auth`)
+- `POST /api/auth/login` — Standard Email/Password login.
+- `POST /api/auth/face-login` — High-speed face recognition. Calls Python `ai-service` (`/extract-vector`), computes Cosine Similarity (threshold 0.60), fetches top purchases, and generates personalized greetings via Gemini AI.
+- `POST /api/auth/register-face` — Register/extract 128D face vector for active member.
 
-**Nguyên tắc:** Domain chỉ chứa POCO, không phụ thuộc EF Core / HTTP. Mọi quan hệ FK đều khai báo tường minh trong `AppDbContext.OnModelCreating`.
+### 2. Autonomous Navigation & Pathfinding
+- `Dijkstra Algorithm` in Application layer for shortest aisle path calculation.
+- MQTT topics for telemetry & robot position tracking: `smartmarketbot/robot/{robotId}/telemetry`.
+
+### 3. Smart Advertising & Dynamic Playlist
+- Ad Campaign matching based on robot position, aisle semantic targets, and sponsor budgets.
 
 ---
 
-## 🔐 Auth + Phân quyền
+## 💡 AI Developer & Vibe Coding Guidelines
 
-- JWT access token (15 phút) + refresh token (7 ngày, lưu bảng `USER_TOKEN`)
-- OTP email 6 số (bảng `EMAIL_OTP`) cho đăng ký / quên mật khẩu
-- PBKDF2-SHA256 hashing
+When extending or maintaining this repository with AI coding assistants:
 
-Tài khoản demo (sau khi seed `erd_database.sql`):
-
-| Username        | Password              | Role   |
-| --------------- | --------------------- | ------ |
-| `admin_lth`     | `hash_pbkdf2_code_123`| Admin  |
-| `staff_dtnhan`  | `hash_pbkdf2_code_123`| Staff  |
-| `member_qhuy`   | `hash_pbkdf2_code_123`| Member |
-| `member_ahung`  | `hash_pbkdf2_code_123`| Member |
+1. **Clean Layer Dependencies:**
+   `Domain` (No external dependencies) ⬅ `Application` ⬅ `Infrastructure` ⬅ `API`.
+2. **EF Core SQL Transient Faults:**
+   Azure SQL transient retries are enabled via `EnableRetryOnFailure` in `DependencyInjection.cs`. Always use `async/await` and pass `CancellationToken` for DB queries.
+3. **Kestrel Request Body Limits:**
+   Kestrel `MinRequestBodyDataRate` checks are disabled in `Program.cs` and `GlobalExceptionMiddleware.cs` to prevent payload upload timeouts over proxy tunnels (ngrok/LTE).
+4. **Python AI Service Warmup:**
+   `ai-service/app.py` preloads `Facenet` and `OpenCV` models during `@app.on_event("startup")`. Any model additions must be pre-warmed in `warmup_models()` to avoid cold-start delays.
 
 ---
 
-## 🔌 Tích hợp với repo khác
-
-| Repo                          | Giao tiếp                                  |
-| ----------------------------- | ------------------------------------------ |
-| [`SuperMarketBot-AI`](../SuperMarketBot-AI) | HTTP REST (`/verify`, `/extract-vector`) |
-| [`SuperMarketBot-FE`](../SuperMarketBot-FE) | REST + SignalR `/hubs/robot`              |
-| [`SuperMarketBot-Android`](../SuperMarketBot-Android) | REST + SignalR                     |
-| [`SuperMarketBot-Android-Robot`](../SuperMarketBot-Android-Robot) | MQTT pub/sub                    |
-| [`SuperMarketBot-IOT`](../SuperMarketBot-IOT) | MQTT publish telemetry → `smartmarketbot/robot/+/telemetry` |
-
----
-
-## 📚 Tài liệu
-
-- [`docs/architecture/audit_report.md`](docs/architecture/audit_report.md) — Audit code ↔ schema
-- [`db/erd_database.sql`](db/erd_database.sql) — Full schema (37 bảng + seed)
-- [`.cursor/rules/`](.cursor/rules/) — Quy tắc coding cho AI
-
----
-
-## 📜 License
-
-Xem [`LICENSE`](LICENSE).
+## 📜 License & Project Info
+Developed for SmartMarketBot Capstone Project.

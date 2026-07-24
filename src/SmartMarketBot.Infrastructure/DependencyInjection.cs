@@ -85,6 +85,10 @@ public static class DependencyInjection
         services.AddHttpClient<IGeminiService, GeminiService>();
         services.AddHttpClient<ICloudStorageService, CloudinaryService>();
 
+        // Health Checks
+        services.AddHealthChecks()
+            .AddCheck<HealthChecks.DatabaseHealthCheck>("sqlserver_db");
+
         // MQTT (Singleton + HostedService)
         services.AddSingleton<MqttClientService>();
         services.AddSingleton<IRobotCommandPublisher>(sp => sp.GetRequiredService<MqttClientService>());

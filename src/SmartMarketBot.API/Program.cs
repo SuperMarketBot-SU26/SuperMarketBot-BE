@@ -121,6 +121,8 @@ app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapControllers();
+app.MapHealthChecks("/health");
+app.MapHealthChecks("/healthz");
 app.MapHub<RobotHub>("/hubs/robot");
 app.MapHub<StaffHub>("/hubs/staff");
 app.MapHub<MemberHub>("/hubs/member");

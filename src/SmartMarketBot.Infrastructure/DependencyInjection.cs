@@ -48,10 +48,8 @@ public static class DependencyInjection
         services.AddScoped<IAisleScanService, AisleScanService>();
         services.AddScoped<ISearchService, SearchService>();
         services.AddScoped<IMapSyncService, MapSyncService>();
-        services.AddScoped<IFloorService, FloorService>();
         services.AddScoped<IZoneAisleService, ZoneAisleService>();
         services.AddScoped<ISemanticObjectService, SemanticObjectService>();
-        services.AddScoped<IShelfService, ShelfService>();
 
         services.AddScoped<IAdminUserService, AdminUserService>();
 

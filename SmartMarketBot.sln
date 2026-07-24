@@ -1,7 +1,7 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 18
-VisualStudioVersion = 18.8.11912.234 insiders
+VisualStudioVersion = 18.8.11912.234
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "src", "src", "{827E0CD3-B72D-47B6-A68D-7590B98EB39B}"
 EndProject
@@ -12,6 +12,8 @@ EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SmartMarketBot.Infrastructure", "src\SmartMarketBot.Infrastructure\SmartMarketBot.Infrastructure.csproj", "{1A95A7D6-A28C-408D-A09A-5ABB69C6B054}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SmartMarketBot.API", "src\SmartMarketBot.API\SmartMarketBot.API.csproj", "{EC913177-676A-4D56-B424-B4C909F7BE1F}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SmartMarketBot.Tests", "src\SmartMarketBot.Tests\SmartMarketBot.Tests.csproj", "{3D5D63A6-5B31-4D5A-92E6-4D4C562F326F}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -71,6 +73,18 @@ Global
 		{EC913177-676A-4D56-B424-B4C909F7BE1F}.Release|x64.Build.0 = Release|Any CPU
 		{EC913177-676A-4D56-B424-B4C909F7BE1F}.Release|x86.ActiveCfg = Release|Any CPU
 		{EC913177-676A-4D56-B424-B4C909F7BE1F}.Release|x86.Build.0 = Release|Any CPU
+		{3D5D63A6-5B31-4D5A-92E6-4D4C562F326F}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{3D5D63A6-5B31-4D5A-92E6-4D4C562F326F}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{3D5D63A6-5B31-4D5A-92E6-4D4C562F326F}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{3D5D63A6-5B31-4D5A-92E6-4D4C562F326F}.Debug|x64.Build.0 = Debug|Any CPU
+		{3D5D63A6-5B31-4D5A-92E6-4D4C562F326F}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{3D5D63A6-5B31-4D5A-92E6-4D4C562F326F}.Debug|x86.Build.0 = Debug|Any CPU
+		{3D5D63A6-5B31-4D5A-92E6-4D4C562F326F}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{3D5D63A6-5B31-4D5A-92E6-4D4C562F326F}.Release|Any CPU.Build.0 = Release|Any CPU
+		{3D5D63A6-5B31-4D5A-92E6-4D4C562F326F}.Release|x64.ActiveCfg = Release|Any CPU
+		{3D5D63A6-5B31-4D5A-92E6-4D4C562F326F}.Release|x64.Build.0 = Release|Any CPU
+		{3D5D63A6-5B31-4D5A-92E6-4D4C562F326F}.Release|x86.ActiveCfg = Release|Any CPU
+		{3D5D63A6-5B31-4D5A-92E6-4D4C562F326F}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -80,6 +94,7 @@ Global
 		{C3ABE5E8-B4A9-4043-B2FF-ACD847F2FF6C} = {827E0CD3-B72D-47B6-A68D-7590B98EB39B}
 		{1A95A7D6-A28C-408D-A09A-5ABB69C6B054} = {827E0CD3-B72D-47B6-A68D-7590B98EB39B}
 		{EC913177-676A-4D56-B424-B4C909F7BE1F} = {827E0CD3-B72D-47B6-A68D-7590B98EB39B}
+		{3D5D63A6-5B31-4D5A-92E6-4D4C562F326F} = {827E0CD3-B72D-47B6-A68D-7590B98EB39B}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {C0343A79-91A7-48D6-A579-1E86857F2819}
